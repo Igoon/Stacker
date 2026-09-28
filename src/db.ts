@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import path from "node:path";
+import { isoLocal } from "./dates";
 
 const dbPath = path.join(process.cwd(), "data.db");
 export const db = new Database(dbPath);
@@ -28,7 +29,7 @@ export interface Tx {
   rupiah?: string;
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => isoLocal();
 
 export function addTx(input: {
   jumlah: number;
@@ -81,6 +82,20 @@ export function deleteTx(id: number): boolean {
   return db.prepare(`DELETE FROM transactions WHERE id = ?`).run(id).changes > 0;
 }
 
+export function listAll(): Tx[] {
+  return db
+    .prepare(`SELECT * FROM transactions ORDER BY tanggal ASC, id ASC`)
+    .all() as Tx[];
+}
+
+export function listRange(from: string, to: string): Tx[] {
+  return db
+    .prepare(
+      `SELECT * FROM transactions WHERE tanggal >= ? AND tanggal <= ? ORDER BY tanggal ASC, id ASC`
+    )
+    .all(from, to) as Tx[];
+}
+
 export function saldo(): number {
   const row = db
     .prepare(
@@ -91,17 +106,16 @@ export function saldo(): number {
   return row.s;
 }
 
-export function ringkasBulanIni() {
-  const bulan = new Date().toISOString().slice(0, 7);
+export function ringkasRange(from: string, to: string) {
   return db
     .prepare(
       `SELECT tipe, kategori, SUM(jumlah) AS total
          FROM transactions
-        WHERE substr(tanggal, 1, 7) = ?
+        WHERE tanggal >= ? AND tanggal <= ?
         GROUP BY tipe, kategori
         ORDER BY total DESC`
     )
-    .all(bulan) as { tipe: string; kategori: string; total: number }[];
+    .all(from, to) as { tipe: string; kategori: string; total: number }[];
 }
 
 export const rupiah = (n: number) =>

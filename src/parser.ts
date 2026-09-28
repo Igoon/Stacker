@@ -1,8 +1,11 @@
+import { extractDate } from "./dates";
+
 export interface ParseResult {
   jumlah: number;
   tipe: "masuk" | "keluar";
   kategori: string;
   catatan: string;
+  tanggal?: string;
 }
 
 export interface LocalParse {
@@ -43,8 +46,9 @@ function parseNumber(raw: string, suffix: string): number {
 }
 
 export function parseLocal(text: string): LocalParse | null {
+  const { tanggal, cleaned } = extractDate(text);
   const numRe = /(\d[\d.,]*)\s*(jt|juta|rb|ribu|k)?/gi;
-  const found = [...text.matchAll(numRe)]
+  const found = [...cleaned.matchAll(numRe)]
     .map((m) => ({ raw: m[1], suffix: m[2] ?? "", value: parseNumber(m[1], m[2] ?? "") }))
     .filter((x) => Number.isFinite(x.value) && x.value > 0);
 
@@ -53,7 +57,7 @@ export function parseLocal(text: string): LocalParse | null {
   const suffixed = found.filter((x) => MULT[x.suffix.toLowerCase()]);
   const chosen = suffixed.length > 0 ? suffixed[0] : found.reduce((a, b) => (b.value > a.value ? b : a));
 
-  const low = text.toLowerCase();
+  const low = cleaned.toLowerCase();
   const tipe: "masuk" | "keluar" = MASUK.some((k) => low.includes(k)) ? "masuk" : "keluar";
 
   let kategori = "Lainnya";
@@ -67,6 +71,7 @@ export function parseLocal(text: string): LocalParse | null {
   }
 
   const result: ParseResult = { jumlah: chosen.value, tipe, kategori, catatan: text.trim() };
+  if (tanggal) result.tanggal = tanggal;
 
   let reason: string | undefined;
   if (found.length > 1) reason = "beberapa angka";

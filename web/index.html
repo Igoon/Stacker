@@ -17,7 +17,17 @@
   }
   header .name { font-weight: 600; }
   header .sub { font-size: 12px; color: #8696a0; }
+  header .right { display: flex; align-items: center; gap: 8px; }
   header .saldo { font-size: 13px; background: #005c4b; color: #d1f4cc; padding: 4px 10px; border-radius: 12px; }
+  header .csv {
+    font-size: 12px; text-decoration: none; color: #d1f4cc; background: #2a3942;
+    padding: 5px 10px; border-radius: 12px;
+  }
+  header .csv:hover { background: #3b4a54; }
+  .dl {
+    display: inline-block; margin-top: 6px; font-size: 13px; color: #53bdeb;
+    text-decoration: none; word-break: break-all;
+  }
   #chat {
     flex: 1; overflow-y: auto; padding: 16px;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect width='40' height='40' fill='%230b141a'/%3E%3C/svg%3E");
@@ -56,7 +66,10 @@
       <div class="name">Duit Bot</div>
       <div class="sub">catat keuangan lewat chat</div>
     </div>
-    <div class="saldo" id="saldo">Saldo: -</div>
+    <div class="right">
+      <div class="saldo" id="saldo">Saldo: -</div>
+      <a class="csv" href="/api/csv" title="Unduh semua transaksi (CSV)">CSV</a>
+    </div>
   </header>
   <div id="chat"></div>
   <footer>
@@ -69,7 +82,7 @@
   const input = document.getElementById("input");
   const saldoEl = document.getElementById("saldo");
 
-  function addBubble(text, side, txs) {
+  function addBubble(text, side, txs, file) {
     const row = document.createElement("div");
     row.className = "row " + side;
     const b = document.createElement("div");
@@ -91,6 +104,16 @@
       d.appendChild(btn);
       b.appendChild(d);
     }
+    if (file) {
+      const url = URL.createObjectURL(new Blob(["\ufeff" + file.content], { type: "text/csv" }));
+      const a = document.createElement("a");
+      a.className = "dl";
+      a.href = url;
+      a.download = file.name;
+      a.textContent = "⬇ " + file.name;
+      b.appendChild(document.createElement("br"));
+      b.appendChild(a);
+    }
     row.appendChild(b);
     chat.appendChild(row);
     chat.scrollTop = chat.scrollHeight;
@@ -111,7 +134,7 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: text }),
     }).then((x) => x.json());
-    addBubble(r.text, "bot", r.txs);
+    addBubble(r.text, "bot", r.txs, r.file);
     refresh();
   }
 

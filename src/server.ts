@@ -3,7 +3,9 @@ import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { aiEnabled, handleMessage } from "./bot";
-import { deleteTx, listTx, rupiah, saldo } from "./db";
+import { deleteTx, listAll, listRange, listTx, rupiah, saldo } from "./db";
+import { parsePeriod } from "./dates";
+import { toCSV } from "./csv";
 import { startTelegram, telegramEnabled } from "./telegram";
 import { startBackups } from "./backup";
 
@@ -35,6 +37,20 @@ app.get("/api/state", (_req, res) => {
 app.delete("/api/transactions/:id", (req, res) => {
   const ok = deleteTx(Number(req.params.id));
   res.json({ ok });
+});
+
+app.get("/api/csv", (req, res) => {
+  const arg = String(req.query.period ?? "").trim();
+  const per = arg ? parsePeriod(arg) : null;
+  if (arg && !per) {
+    res.status(400).json({ error: "Periode tidak dikenali" });
+    return;
+  }
+  const rows = per ? listRange(per.from, per.to) : listAll();
+  const name = `transaksi-${per ? `${per.from}_${per.to}` : "semua"}.csv`;
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${name}"`);
+  res.send(toCSV(rows));
 });
 
 const PORT = Number(process.env.PORT ?? 3000);

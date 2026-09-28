@@ -60,6 +60,19 @@ async function send(chatId: number, text: string, txs?: Tx[]): Promise<void> {
   await call("sendMessage", body);
 }
 
+async function sendDocument(chatId: number, name: string, content: string): Promise<void> {
+  try {
+    const fd = new FormData();
+    fd.set("chat_id", String(chatId));
+    fd.set("document", new Blob([content], { type: "text/csv" }), name);
+    const res = await fetch(`${API}/sendDocument`, { method: "POST", body: fd });
+    const j = (await res.json()) as { ok: boolean };
+    if (!j.ok) console.error("[telegram] sendDocument:", JSON.stringify(j));
+  } catch (e) {
+    console.error("[telegram] sendDocument gagal:", (e as Error).message);
+  }
+}
+
 function allowed(chatId: number): boolean {
   return !ALLOWED_CHAT || String(chatId) === ALLOWED_CHAT;
 }
@@ -107,6 +120,7 @@ async function handleUpdate(u: TgUpdate): Promise<void> {
   try {
     const r = await handleMessage(normalize(msg.text));
     await send(chatId, r.text + txLines(r.txs ?? []), r.txs);
+    if (r.file) await sendDocument(chatId, r.file.name, r.file.content);
   } catch (e) {
     await send(chatId, "Error: " + (e as Error).message);
   }

@@ -1,27 +1,34 @@
 import {
   addTx,
   deleteTx,
+  listAll,
+  listRange,
   listTx,
-  ringkasBulanIni,
+  ringkasRange,
   rupiah,
   saldo,
   updateTx,
   type Tx,
 } from "./db";
 import { parseLocal, type ParseResult } from "./parser";
+import { parsePeriod } from "./dates";
+import { toCSV } from "./csv";
 import { aiEnabled, parseGemini } from "./ai";
 
 export interface Reply {
   text: string;
   txs?: Tx[];
+  file?: { name: string; content: string };
 }
 
 const HELP =
   "Cara pakai:\n" +
   "• Catat: `makan siang 50rb` atau `gaji 5jt`\n" +
   "• Beberapa sekaligus: `parkir 5rb sama kopi 18rb`\n" +
+  "• Tanggal: `kemarin makan 50rb`, `tgl 3 bayar kos 1jt`, `3 september jajan 20rb`\n" +
   "• Cek saldo: `saldo`\n" +
-  "• Ringkasan bulan ini: `laporan`\n" +
+  "• Ringkasan: `laporan`, `laporan september`, `laporan minggu lalu`, `laporan 2026-08`\n" +
+  "• Export CSV: `csv`, `csv september`, `csv 2026`\n" +
   "• Hapus: `hapus 3` (angka = id)\n" +
   "• Ubah: `ubah 3 jadi 60rb`";
 
@@ -33,9 +40,16 @@ export async function handleMessage(input: string): Promise<Reply> {
   if (["help", "bantuan", "?"].includes(low)) return { text: HELP };
   if (low === "saldo") return { text: `Saldo: ${rupiah(saldo())}` };
 
-  if (["laporan", "ringkasan", "report"].includes(low)) {
-    const rows = ringkasBulanIni();
-    if (rows.length === 0) return { text: "Belum ada transaksi bulan ini." };
+  if (/^(laporan|ringkasan|report)\b/.test(low)) {
+    const arg = text.replace(/^\s*(laporan|ringkasan|report)\s*/i, "").trim();
+    const per = parsePeriod(arg);
+    if (!per) {
+      return {
+        text: "Periode tidak dikenali. Contoh: `laporan september`, `laporan minggu lalu`, `laporan 2026-08`.",
+      };
+    }
+    const rows = ringkasRange(per.from, per.to);
+    if (rows.length === 0) return { text: `Belum ada transaksi ${per.label}.` };
     const masuk = rows.filter((r) => r.tipe === "masuk");
     const keluar = rows.filter((r) => r.tipe === "keluar");
     const fmt = (rs: typeof rows) => rs.map((r) => `  ${r.kategori}: ${rupiah(r.total)}`).join("\n");
@@ -43,7 +57,7 @@ export async function handleMessage(input: string): Promise<Reply> {
     const tKeluar = keluar.reduce((a, b) => a + b.total, 0);
     return {
       text:
-        `Ringkasan bulan ini\n\nMasuk (${rupiah(tMasuk)})\n${fmt(masuk) || "  -"}\n\n` +
+        `Ringkasan ${per.label}\n\nMasuk (${rupiah(tMasuk)})\n${fmt(masuk) || "  -"}\n\n` +
         `Keluar (${rupiah(tKeluar)})\n${fmt(keluar) || "  -"}\n\nSelisih: ${rupiah(tMasuk - tKeluar)}`,
     };
   }
@@ -72,6 +86,19 @@ export async function handleMessage(input: string): Promise<Reply> {
         rows
           .map((r) => `#${r.id} ${r.tipe === "masuk" ? "+" : "-"}${rupiah(r.jumlah)} ${r.kategori}`)
           .join("\n"),
+    };
+  }
+
+  if (/^(csv|export)\b/.test(low)) {
+    const arg = text.replace(/^\s*(csv|export)\s*/i, "").trim();
+    const per = arg ? parsePeriod(arg) : null;
+    if (arg && !per) return { text: "Periode tidak dikenali. Contoh: `csv september`, `csv 2026`." };
+    const rows = per ? listRange(per.from, per.to) : listAll();
+    if (rows.length === 0) return { text: `Tidak ada transaksi${per ? ` ${per.label}` : ""}.` };
+    const name = `transaksi-${per ? `${per.from}_${per.to}` : "semua"}.csv`;
+    return {
+      text: `CSV ${rows.length} transaksi (${per ? per.label : "semua"}).`,
+      file: { name, content: toCSV(rows) },
     };
   }
 

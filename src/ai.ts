@@ -58,7 +58,10 @@ function validate(raw: unknown): ParseResult[] {
     const tipe = t.tipe === "masuk" ? "masuk" : "keluar";
     const kategori = KATEGORI_NAMES.includes(String(t.kategori)) ? String(t.kategori) : "Lainnya";
     const catatan = String(t.catatan ?? "").trim() || "transaksi";
-    out.push({ jumlah, tipe, kategori, catatan });
+    const hasil: ParseResult = { jumlah, tipe, kategori, catatan };
+    const tgl = String(t.tanggal ?? "").trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(tgl)) hasil.tanggal = tgl;
+    out.push(hasil);
   }
   return out;
 }
