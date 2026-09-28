@@ -46,7 +46,7 @@ function txLines(txs: Tx[]): string {
   if (txs.length === 0) return "";
   return (
     "\n\n" +
-    txs.map((t) => `${t.tipe === "masuk" ? "+" : "-"}${t.rupiah} · ${t.kategori} · #${t.id}`).join("\n")
+    txs.map((t) => `${t.tipe === "masuk" ? "+" : "-"}${t.rupiah} · ${t.kategori}${t.akun ? ` · ${t.akun}` : ""} · #${t.id}`).join("\n")
   );
 }
 

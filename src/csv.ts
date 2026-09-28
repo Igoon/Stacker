@@ -6,11 +6,11 @@ function cell(v: string | number | null): string {
 }
 
 export function toCSV(rows: Tx[]): string {
-  const head = ["id", "tanggal", "tipe", "kategori", "jumlah", "catatan"];
+  const head = ["id", "tanggal", "tipe", "akun", "kategori", "jumlah", "catatan"];
   const lines = rows.map((t) =>
-    [t.id, t.tanggal, t.tipe, t.kategori, t.jumlah, t.catatan ?? ""].map(cell).join(",")
+    [t.id, t.tanggal, t.tipe, t.akun ?? "", t.kategori, t.jumlah, t.catatan ?? ""].map(cell).join(",")
   );
   const total = rows.reduce((a, t) => a + (t.tipe === "masuk" ? t.jumlah : -t.jumlah), 0);
-  lines.push(["", "", "", "selisih", total, rupiah(total)].map(cell).join(","));
+  lines.push(["", "", "", "", "selisih", total, rupiah(total)].map(cell).join(","));
   return [head.join(","), ...lines].join("\r\n");
 }

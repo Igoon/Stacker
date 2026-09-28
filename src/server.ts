@@ -3,7 +3,7 @@ import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { aiEnabled, handleMessage } from "./bot";
-import { deleteTx, listAll, listRange, listTx, rupiah, saldo } from "./db";
+import { accountBalances, deleteTx, listAll, listRange, listTx, rupiah, saldo } from "./db";
 import { parsePeriod } from "./dates";
 import { toCSV } from "./csv";
 import { startTelegram, telegramEnabled } from "./telegram";
@@ -30,6 +30,13 @@ app.get("/api/state", (_req, res) => {
     saldoRupiah: rupiah(saldo()),
     aiEnabled,
     telegramEnabled,
+    accounts: accountBalances().map((a) => ({
+      id: a.id,
+      nama: a.nama,
+      tipe: a.tipe,
+      saldo: a.saldo ?? 0,
+      rupiah: a.rupiah,
+    })),
     transactions: rows,
   });
 });
