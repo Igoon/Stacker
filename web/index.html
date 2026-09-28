@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Duit Bot</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #111b21; height: 100vh; display: flex; justify-content: center;
+  }
+  .app { width: 100%; max-width: 480px; height: 100vh; display: flex; flex-direction: column; background: #0b141a; }
+  header {
+    background: #1f2c33; color: #e9edef; padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  header .name { font-weight: 600; }
+  header .sub { font-size: 12px; color: #8696a0; }
+  header .saldo { font-size: 13px; background: #005c4b; color: #d1f4cc; padding: 4px 10px; border-radius: 12px; }
+  #chat {
+    flex: 1; overflow-y: auto; padding: 16px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect width='40' height='40' fill='%230b141a'/%3E%3C/svg%3E");
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .row { display: flex; }
+  .row.me { justify-content: flex-end; }
+  .bubble {
+    max-width: 78%; padding: 8px 12px; border-radius: 10px;
+    font-size: 14.5px; line-height: 1.35; white-space: pre-wrap; word-wrap: break-word;
+  }
+  .me .bubble { background: #005c4b; color: #e9edef; border-top-right-radius: 2px; }
+  .bot .bubble { background: #1f2c33; color: #e9edef; border-top-left-radius: 2px; }
+  .tx { margin-top: 6px; border-top: 1px solid #2a3942; padding-top: 6px; font-size: 13px; color: #8696a0; }
+  .tx b { color: #e9edef; }
+  .tx button {
+    margin-top: 6px; background: #2a3942; color: #e9edef; border: 0;
+    border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer;
+  }
+  .tx button:hover { background: #3b4a54; }
+  footer { display: flex; gap: 8px; padding: 10px; background: #1f2c33; }
+  footer input {
+    flex: 1; border: 0; border-radius: 20px; padding: 10px 16px;
+    background: #2a3942; color: #e9edef; font-size: 14.5px; outline: none;
+  }
+  footer button {
+    background: #00a884; border: 0; width: 44px; height: 44px; border-radius: 50%;
+    color: #111b21; font-size: 18px; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <div class="name">Duit Bot</div>
+      <div class="sub">catat keuangan lewat chat</div>
+    </div>
+    <div class="saldo" id="saldo">Saldo: -</div>
+  </header>
+  <div id="chat"></div>
+  <footer>
+    <input id="input" placeholder="makan siang 50rb..." autocomplete="off" />
+    <button id="send">&#10148;</button>
+  </footer>
+</div>
+<script>
+  const chat = document.getElementById("chat");
+  const input = document.getElementById("input");
+  const saldoEl = document.getElementById("saldo");
+
+  function addBubble(text, side, txs) {
+    const row = document.createElement("div");
+    row.className = "row " + side;
+    const b = document.createElement("div");
+    b.className = "bubble";
+    b.textContent = text;
+    for (const tx of txs || []) {
+      const d = document.createElement("div");
+      d.className = "tx";
+      const sign = tx.tipe === "masuk" ? "+" : "-";
+      d.innerHTML = "<b>" + sign + tx.rupiah + "</b> · " + tx.kategori + " · #" + tx.id;
+      const btn = document.createElement("button");
+      btn.textContent = "Hapus";
+      btn.onclick = async () => {
+        await fetch("/api/transactions/" + tx.id, { method: "DELETE" });
+        d.remove();
+        refresh();
+      };
+      d.appendChild(document.createElement("br"));
+      d.appendChild(btn);
+      b.appendChild(d);
+    }
+    row.appendChild(b);
+    chat.appendChild(row);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  async function refresh() {
+    const r = await fetch("/api/state").then((x) => x.json());
+    saldoEl.textContent = "Saldo: " + r.saldoRupiah;
+  }
+
+  async function send() {
+    const text = input.value.trim();
+    if (!text) return;
+    addBubble(text, "me");
+    input.value = "";
+    const r = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text }),
+    }).then((x) => x.json());
+    addBubble(r.text, "bot", r.txs);
+    refresh();
+  }
+
+  document.getElementById("send").onclick = send;
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
+
+  addBubble("Halo! Catat transaksi tinggal ketik.\nContoh: `makan siang 50rb` / `gaji 5jt`\nKetik `help` buat perintah.", "bot");
+  refresh();
+</script>
+</body>
+</html>

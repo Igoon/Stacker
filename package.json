@@ -1,0 +1,25 @@
+{
+  "name": "finance-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --ignore \"./data.db*\" --ignore \"./backups/**\" --ignore \"./*.log\" src/server.ts",
+    "start": "tsx src/server.ts",
+    "backup": "tsx src/backup-cli.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google/genai": "^2.24.0",
+    "better-sqlite3": "^11.8.1",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
