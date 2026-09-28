@@ -1,10 +1,17 @@
+import fs from "node:fs";
+import path from "node:path";
 import { GoogleGenAI, Type } from "@google/genai";
+import { isoLocal } from "./dates";
 import { KATEGORI_NAMES, type ParseResult } from "./parser";
 
 const KEY = process.env.GEMINI_API_KEY ?? "";
 const MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 const TIMEOUT_MS = 6000;
 const CACHE_TTL = 1000 * 60 * 60 * 6;
+const DAILY_LIMIT = Math.max(0, Number(process.env.GEMINI_DAILY_LIMIT ?? 100));
+
+const CACHE_FILE = path.join(process.cwd(), "ai-cache.json");
+const USAGE_FILE = path.join(process.cwd(), "ai-usage.json");
 
 export const aiEnabled = KEY.trim().length > 0;
 
@@ -44,7 +51,75 @@ const SCHEMA = {
   required: ["transactions"],
 };
 
+function loadJson<T>(file: string): T | null {
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8")) as T;
+  } catch {
+    return null;
+  }
+}
+
+function saveJson(file: string, data: unknown): void {
+  try {
+    fs.writeFileSync(file, JSON.stringify(data));
+  } catch (e) {
+    console.error("[ai] gagal simpan", path.basename(file), (e as Error).message);
+  }
+}
+
 const cache = new Map<string, { at: number; value: ParseResult[] }>();
+{
+  const saved = loadJson<Record<string, { at: number; value: ParseResult[] }>>(CACHE_FILE);
+  if (saved) {
+    const now = Date.now();
+    for (const [k, v] of Object.entries(saved)) {
+      if (v && now - v.at < CACHE_TTL) cache.set(k, v);
+    }
+  }
+}
+
+let usage: { tanggal: string; count: number } =
+  loadJson<{ tanggal: string; count: number }>(USAGE_FILE) ?? { tanggal: isoLocal(), count: 0 };
+if (usage.tanggal !== isoLocal()) usage = { tanggal: isoLocal(), count: 0 };
+
+function callsToday(): number {
+  if (usage.tanggal !== isoLocal()) {
+    usage = { tanggal: isoLocal(), count: 0 };
+    saveJson(USAGE_FILE, usage);
+  }
+  return usage.count;
+}
+
+function bumpUsage(): void {
+  usage = { tanggal: isoLocal(), count: callsToday() + 1 };
+  saveJson(USAGE_FILE, usage);
+}
+
+export interface AiStats {
+  enabled: boolean;
+  model: string;
+  callsToday: number;
+  dailyLimit: number;
+  cacheSize: number;
+  remaining: number;
+}
+
+export function aiStats(): AiStats {
+  const calls = callsToday();
+  return {
+    enabled: aiEnabled,
+    model: MODEL,
+    callsToday: calls,
+    dailyLimit: DAILY_LIMIT,
+    cacheSize: cache.size,
+    remaining: Math.max(0, DAILY_LIMIT - calls),
+  };
+}
+
+export function aiResetUsage(): void {
+  usage = { tanggal: isoLocal(), count: 0 };
+  saveJson(USAGE_FILE, usage);
+}
 
 function validate(raw: unknown): ParseResult[] {
   if (!raw || typeof raw !== "object") return [];
@@ -72,6 +147,13 @@ export async function parseGemini(text: string): Promise<ParseResult[] | null> {
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_TTL) return hit.value;
 
+  if (callsToday() >= DAILY_LIMIT) {
+    console.warn(`[ai] batas harian ${DAILY_LIMIT} tercapai, lewati AI.`);
+    return null;
+  }
+
+  bumpUsage();
+
   try {
     const res = await getClient().models.generateContent({
       model: MODEL,
@@ -85,7 +167,10 @@ export async function parseGemini(text: string): Promise<ParseResult[] | null> {
     });
     const parsed = JSON.parse(res.text ?? "{}");
     const list = validate(parsed);
-    if (list.length) cache.set(key, { at: Date.now(), value: list });
+    if (list.length) {
+      cache.set(key, { at: Date.now(), value: list });
+      saveJson(CACHE_FILE, Object.fromEntries(cache));
+    }
     return list.length ? list : null;
   } catch (e) {
     console.error("[ai] gagal:", (e as Error).message);

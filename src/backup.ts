@@ -31,6 +31,14 @@ export async function runBackup(): Promise<string | null> {
   return dest;
 }
 
+export async function backupTagged(tag: string): Promise<string> {
+  if (!fs.existsSync(DIR)) fs.mkdirSync(DIR, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const dest = path.join(DIR, `${tag}-${stamp}.db`);
+  await db.backup(dest);
+  return dest;
+}
+
 let timer: NodeJS.Timeout | null = null;
 
 export function startBackups(): void {

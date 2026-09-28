@@ -1,17 +1,89 @@
 import "dotenv/config";
 import express from "express";
 import path from "node:path";
+import { timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { aiEnabled, handleMessage } from "./bot";
+import { aiStats } from "./ai";
 import { accountBalances, deleteTx, listAll, listRange, listTx, rupiah, saldo } from "./db";
 import { parsePeriod } from "./dates";
 import { toCSV } from "./csv";
 import { startTelegram, telegramEnabled } from "./telegram";
 import { startBackups } from "./backup";
 
+const HOST = (process.env.HOST ?? "127.0.0.1").trim();
+const PORT = Number(process.env.PORT ?? 3000);
+const WEB_USER = (process.env.WEB_USER ?? "admin").trim();
+const WEB_PASSWORD = (process.env.WEB_PASSWORD ?? "").trim();
+const WEB_MAX_FAIL = Math.max(1, Number(process.env.WEB_MAX_FAIL ?? 5));
+const WEB_LOCK_MS = Math.max(1, Number(process.env.WEB_LOCK_MINUTES ?? 15)) * 60_000;
+
+function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return timingSafeEqual(ab, bb);
+}
+
+const webFails = new Map<string, { count: number; lockUntil: number }>();
+
+function lockRemainMs(ip: string): number {
+  const a = webFails.get(ip);
+  if (!a) return 0;
+  return Math.max(0, a.lockUntil - Date.now());
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-app.use(express.json());
+app.disable("x-powered-by");
+app.use(express.json({ limit: "256kb" }));
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  next();
+});
+
+if (WEB_PASSWORD) {
+  app.use((req, res, next) => {
+    const ip = req.ip ?? req.socket.remoteAddress ?? "?";
+
+    const remain = lockRemainMs(ip);
+    if (remain > 0) {
+      res.setHeader("Retry-After", String(Math.ceil(remain / 1000)));
+      res.status(429).send(`Terlalu banyak percobaan. Coba lagi ${Math.ceil(remain / 60000)} menit.`);
+      return;
+    }
+
+    const [scheme, encoded] = (req.headers.authorization ?? "").split(" ");
+    if (scheme === "Basic" && encoded) {
+      const decoded = Buffer.from(encoded, "base64").toString("utf8");
+      const i = decoded.indexOf(":");
+      const u = decoded.slice(0, i);
+      const p = decoded.slice(i + 1);
+      if (safeEqual(u, WEB_USER) && safeEqual(p, WEB_PASSWORD)) {
+        webFails.delete(ip);
+        next();
+        return;
+      }
+    }
+
+    const a = webFails.get(ip) ?? { count: 0, lockUntil: 0 };
+    a.count += 1;
+    if (a.count >= WEB_MAX_FAIL) {
+      a.lockUntil = Date.now() + WEB_LOCK_MS;
+      a.count = 0;
+      console.warn(`[web] IP ${ip} terkunci ${Math.round(WEB_LOCK_MS / 60000)} menit setelah ${WEB_MAX_FAIL} gagal.`);
+    } else {
+      console.warn(`[web] login gagal dari ${ip} (${a.count}/${WEB_MAX_FAIL}).`);
+    }
+    webFails.set(ip, a);
+
+    res.setHeader("WWW-Authenticate", 'Basic realm="Finance Bot"');
+    res.status(401).send("Unauthorized");
+  });
+}
+
 app.use(express.static(path.join(__dirname, "..", "web")));
 
 app.post("/api/chat", async (req, res) => {
@@ -29,6 +101,7 @@ app.get("/api/state", (_req, res) => {
     saldo: saldo(),
     saldoRupiah: rupiah(saldo()),
     aiEnabled,
+    ai: aiStats(),
     telegramEnabled,
     accounts: accountBalances().map((a) => ({
       id: a.id,
@@ -60,9 +133,13 @@ app.get("/api/csv", (req, res) => {
   res.send(toCSV(rows));
 });
 
-const PORT = Number(process.env.PORT ?? 3000);
-const server = app.listen(PORT, () => {
-  console.log(`Finance bot jalan di http://localhost:${PORT}`);
+const server = app.listen(PORT, HOST, () => {
+  console.log(`Finance bot jalan di http://${HOST}:${PORT}`);
+  console.log(
+    WEB_PASSWORD
+      ? `Web auth: aktif (user: ${WEB_USER}; lockout ${WEB_MAX_FAIL}x → ${Math.round(WEB_LOCK_MS / 60000)} menit)`
+      : "Web auth: NONAKTIF (set WEB_PASSWORD)"
+  );
   console.log(aiEnabled ? "AI fallback: aktif" : "AI fallback: nonaktif (set GEMINI_API_KEY)");
   console.log(telegramEnabled ? "Telegram: aktif" : "Telegram: nonaktif (set TELEGRAM_BOT_TOKEN)");
   startTelegram();

@@ -5,3 +5,5 @@ data.db-shm
 backups/
 .env
 *.log
+ai-cache.json
+ai-usage.json

@@ -26,6 +26,11 @@ CREATE TABLE IF NOT EXISTS transactions (
   transfer_id TEXT,
   created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS settings (
+  key   TEXT PRIMARY KEY,
+  value TEXT
+);
 `);
 
 function hasColumn(table: string, col: string): boolean {
@@ -162,6 +167,10 @@ export function deleteTx(id: number): boolean {
   return db.prepare(`DELETE FROM transactions WHERE id = ?`).run(id).changes > 0;
 }
 
+export function deleteAllTx(): number {
+  return db.prepare(`DELETE FROM transactions`).run().changes;
+}
+
 export function listAccounts(): Account[] {
   return db.prepare(`SELECT * FROM accounts ORDER BY id ASC`).all() as Account[];
 }
@@ -187,18 +196,28 @@ export function setAccountSaldoAwal(id: number, value: number): void {
   db.prepare(`UPDATE accounts SET saldo_awal = ? WHERE id = ?`).run(value, id);
 }
 
-export function accountBalance(id: number): number {
-  const acc = db.prepare(`SELECT saldo_awal FROM accounts WHERE id = ?`).get(id) as
-    | { saldo_awal: number }
-    | undefined;
-  if (!acc) return 0;
+export function accountFlow(id: number): number {
   const row = db
     .prepare(
       `SELECT COALESCE(SUM(CASE WHEN tipe='masuk' THEN jumlah ELSE -jumlah END), 0) AS s
          FROM transactions WHERE account_id = ?`
     )
     .get(id) as { s: number };
-  return acc.saldo_awal + row.s;
+  return row.s;
+}
+
+export function accountBalance(id: number): number {
+  const acc = db.prepare(`SELECT saldo_awal FROM accounts WHERE id = ?`).get(id) as
+    | { saldo_awal: number }
+    | undefined;
+  if (!acc) return 0;
+  return acc.saldo_awal + accountFlow(id);
+}
+
+export function reconcileAccount(id: number, target: number): number {
+  const awal = target - accountFlow(id);
+  db.prepare(`UPDATE accounts SET saldo_awal = ? WHERE id = ?`).run(awal, id);
+  return awal;
 }
 
 export function accountBalances(): Account[] {
@@ -238,3 +257,21 @@ export function ringkasRange(from: string, to: string, accountId?: number) {
 
 export const rupiah = (n: number) => "Rp" + Math.abs(n).toLocaleString("id-ID");
 export const rupiahSigned = (n: number) => (n < 0 ? "-" : "") + rupiah(n);
+
+export function getSetting(key: string): string | null {
+  const row = db.prepare(`SELECT value FROM settings WHERE key = ?`).get(key) as
+    | { value: string }
+    | undefined;
+  return row ? row.value : null;
+}
+
+export function setSetting(key: string, value: string | null): void {
+  if (value === null) {
+    db.prepare(`DELETE FROM settings WHERE key = ?`).run(key);
+    return;
+  }
+  db.prepare(
+    `INSERT INTO settings (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+  ).run(key, value);
+}

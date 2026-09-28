@@ -4,6 +4,7 @@ import {
   addAccount,
   addTx,
   deleteAccount,
+  deleteAllTx,
   deleteTx,
   getAccountByName,
   listAccounts,
@@ -11,6 +12,7 @@ import {
   listRange,
   listTx,
   ringkasRange,
+  reconcileAccount,
   rupiah,
   rupiahSigned,
   saldo,
@@ -22,7 +24,8 @@ import {
 import { parseLocal, type ParseResult } from "./parser";
 import { parsePeriod } from "./dates";
 import { toCSV } from "./csv";
-import { aiEnabled, parseGemini } from "./ai";
+import { backupTagged } from "./backup";
+import { aiEnabled, aiResetUsage, aiStats, parseGemini } from "./ai";
 
 export interface Reply {
   text: string;
@@ -53,6 +56,7 @@ const HELP =
   "  akun tambah seabank bank saldo 1jt\n" +
   "  akun hapus seabank\n" +
   "  saldo awal bsi 45.001.889\n" +
+  "  sesuaikan bsi 100jt         (paksa saldo ke nilai nyata)\n" +
   "  ubah 1 akun bsi             (pindah tx ke akun)\n\n" +
   "Laporan & export:\n" +
   "  laporan | laporan september | laporan minggu lalu\n" +
@@ -61,7 +65,15 @@ const HELP =
   "  riwayat\n" +
   "  ubah 3 jadi 60rb\n" +
   "  hapus 3\n" +
+  "  ai | ai reset               (pemakaian AI)\n" +
+  "  reset transaksi            (hapus semua, ada backup)\n" +
   "  help\n\n" +
+  "Keamanan (Telegram):\n" +
+  "  /login                     (keypad angka, PIN tak tampil di chat)\n" +
+  "  /logout                    (bersihkan balasan bot + keluar)\n" +
+  "  /setpin                    (keypad buat PIN)\n" +
+  "  /changepin                 (keypad ganti PIN)\n" +
+  "  /resetpin                  (keypad hapus PIN)\n\n" +
   "Nominal: 50rb, 1,5jt, 50000, 45.001.889\n" +
   "Periode: september, 2026-08, minggu ini, minggu lalu, bulan lalu, tahun ini, hari ini, kemarin";
 
@@ -86,12 +98,45 @@ function resolveAccount(text: string): Account | undefined {
 
 const withRupiah = (t: Tx): Tx => ({ ...t, rupiah: rupiah(t.jumlah) });
 
+function parseAmount(raw: string): number | undefined {
+  const p = parseLocal(raw);
+  if (p) return p.result.jumlah;
+  const m = raw.match(/\d[\d.,]*/);
+  if (!m) return undefined;
+  const n = Number(m[0].replace(/[.,]/g, ""));
+  return Number.isFinite(n) ? n : undefined;
+}
+
 export async function handleMessage(input: string): Promise<Reply> {
   const text = input.trim();
   const low = text.toLowerCase();
 
   if (!text) return { text: "Tulis sesuatu, contoh: makan siang 50rb" };
   if (["help", "bantuan", "?"].includes(low)) return { text: HELP };
+
+  if (low === "ai reset") {
+    aiResetUsage();
+    return { text: "Counter AI direset." };
+  }
+
+  if (low === "ai" || low === "ai info") {
+    const s = aiStats();
+    return {
+      text:
+        `AI: ${s.enabled ? "aktif" : "nonaktif"}\n` +
+        `Model: ${s.model}\n` +
+        `Panggilan hari ini: ${s.callsToday} / ${s.dailyLimit} (sisa ${s.remaining})\n` +
+        `Cache: ${s.cacheSize} entri\n\n` +
+        "Catatan: pesan yang diproses lokal tidak memakai AI.",
+    };
+  }
+
+  if (/^reset\s+(transaksi|laporan|semua)$/i.test(text)) {
+    const bkp = await backupTagged("pre-reset").catch(() => null);
+    const n = deleteAllTx();
+    const tail = bkp ? `\nBackup: ${bkp.split(/[\\/]/).pop()}` : "";
+    return { text: `Semua transaksi dihapus (${n}). Saldo kini = saldo awal tiap akun.${tail}` };
+  }
 
   if ((low === "saldo" || low.startsWith("saldo ")) && !/^saldo\s+awal\b/.test(low)) {
     const arg = text.replace(/^saldo\s*/i, "").trim();
@@ -145,10 +190,27 @@ export async function handleMessage(input: string): Promise<Reply> {
     const nama = parts[0];
     const acc = getAccountByName(nama);
     if (!acc) return { text: `Akun "${nama}" tidak ada.` };
-    const nominal = parseLocal(nominalRaw)?.result.jumlah;
-    if (!nominal) return { text: "Contoh: `saldo awal bca 5jt`" };
+    const nominal = parseAmount(nominalRaw);
+    if (nominal == null) return { text: "Contoh: `saldo awal bca 5jt`" };
     setAccountSaldoAwal(acc.id, nominal);
-    return { text: `Saldo awal ${acc.nama} = ${rupiah(nominal)}.` };
+    return { text: `Saldo awal ${acc.nama} = ${rupiahSigned(nominal)}.` };
+  }
+
+  if ((m = text.match(/^(?:sesuaikan|betulkan)\s+(?:saldo\s+)?(\S+?)(?:\s+ke)?\s+([\d][\d.,]*(?:\s*(?:jt|juta|rb|ribu|k))?)$/i))) {
+    const acc = getAccountByName(m[1]);
+    if (!acc) return { text: `Akun "${m[1]}" tidak ada. Lihat: \`akun\`` };
+    const target = parseAmount(m[2]);
+    if (target == null) return { text: "Nominal tidak kebaca. Contoh: `sesuaikan bsi 100jt`" };
+    const awal = reconcileAccount(acc.id, target);
+    return {
+      text:
+        `Saldo ${acc.nama} kini ${rupiahSigned(target)}\n` +
+        `(saldo awal diset ${rupiahSigned(awal)}, total transaksi ${rupiahSigned(target - awal)})`,
+    };
+  }
+
+  if (/^(?:sesuaikan|betulkan)\b/.test(low)) {
+    return { text: "Format: `sesuaikan <akun> <nominal>`. Contoh: `sesuaikan bsi 100jt`" };
   }
 
   if (/^transfer\b/.test(low)) {
