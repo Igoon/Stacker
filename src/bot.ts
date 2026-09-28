@@ -33,18 +33,37 @@ export interface Reply {
 const TIPE_AKUN = ["bank", "ewallet", "cash"];
 
 const HELP =
-  "Cara pakai:\n" +
-  "• Catat: `makan siang 50rb`, `gaji 5jt`\n" +
-  "• Beberapa sekaligus: `parkir 5rb sama kopi 18rb`\n" +
-  "• Tanggal: `kemarin makan 50rb`, `tgl 3 bayar kos 1jt`, `3 september jajan 20rb`\n" +
-  "• Akun: `gopay makan 50rb` atau `makan 50rb @bca`\n" +
-  "• Pindah dana: `transfer 100rb bca ke gopay`\n" +
-  "• Saldo: `saldo`, `saldo bca`\n" +
-  "• Akun: `akun`, `akun tambah seabank bank saldo 1jt`, `akun hapus bca`\n" +
-  "• Saldo awal: `saldo awal bca 5jt`\n" +
-  "• Ringkasan: `laporan`, `laporan september`, `laporan minggu lalu`\n" +
-  "• Export CSV: `csv`, `csv september`\n" +
-  "• Hapus: `hapus 3`  • Ubah: `ubah 3 jadi 60rb`";
+  "Catat transaksi:\n" +
+  "  makan siang 50rb\n" +
+  "  gaji 5jt\n" +
+  "  parkir 5rb sama kopi 18rb   (banyak sekaligus)\n" +
+  "  gopay makan 50rb            (akun di depan)\n" +
+  "  makan 50rb @bca             (akun pakai @)\n" +
+  "  kemarin makan 50rb          (tanggal relatif)\n" +
+  "  tgl 3 bayar kos 1jt\n" +
+  "  3 september jajan 20rb\n" +
+  "  2026-09-03 jajan 20rb       (tanggal ISO)\n\n" +
+  "Transfer:\n" +
+  "  transfer 100rb bsi ke gopay\n\n" +
+  "Saldo:\n" +
+  "  saldo                       (total + semua akun)\n" +
+  "  saldo bsi                   (satu akun)\n\n" +
+  "Akun:\n" +
+  "  akun\n" +
+  "  akun tambah seabank bank saldo 1jt\n" +
+  "  akun hapus seabank\n" +
+  "  saldo awal bsi 45.001.889\n" +
+  "  ubah 1 akun bsi             (pindah tx ke akun)\n\n" +
+  "Laporan & export:\n" +
+  "  laporan | laporan september | laporan minggu lalu\n" +
+  "  csv | csv september\n\n" +
+  "Kelola:\n" +
+  "  riwayat\n" +
+  "  ubah 3 jadi 60rb\n" +
+  "  hapus 3\n" +
+  "  help\n\n" +
+  "Nominal: 50rb, 1,5jt, 50000, 45.001.889\n" +
+  "Periode: september, 2026-08, minggu ini, minggu lalu, bulan lalu, tahun ini, hari ini, kemarin";
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -190,6 +209,16 @@ export async function handleMessage(input: string): Promise<Reply> {
   if ((m = low.match(/^hapus\s+(\d+)$/))) {
     const id = Number(m[1]);
     return { text: deleteTx(id) ? `Terhapus #${id}.` : `Id ${id} tidak ada.` };
+  }
+
+  if ((m = low.match(/^ubah\s+(\d+)\s+akun\s+(.+)$/))) {
+    const id = Number(m[1]);
+    const acc = getAccountByName(m[2]);
+    if (!acc) return { text: `Akun "${m[2]}" tidak ada. Lihat: \`akun\`` };
+    const tx = updateTx(id, { account_id: acc.id });
+    return tx
+      ? { text: `#${id} dipindah ke ${acc.nama}.`, txs: [withRupiah(tx)] }
+      : { text: `Id ${id} tidak ada.` };
   }
 
   if ((m = low.match(/^ubah\s+(\d+)\s+jadi\s+(.+)$/))) {
