@@ -117,8 +117,8 @@ app.get("/api/state", (_req, res) => {
 });
 
 app.delete("/api/transactions/:id", (req, res) => {
-  const ok = deleteTx(Number(req.params.id));
-  res.json({ ok });
+  const removed = deleteTx(Number(req.params.id));
+  res.json({ ok: removed > 0, removed });
 });
 
 app.get("/api/csv", (req, res) => {

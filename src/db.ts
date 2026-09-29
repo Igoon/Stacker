@@ -198,8 +198,13 @@ export function updateTx(
   return getTx(id);
 }
 
-export function deleteTx(id: number): boolean {
-  return db.prepare(`DELETE FROM transactions WHERE id = ?`).run(id).changes > 0;
+export function deleteTx(id: number): number {
+  const tx = getTx(id);
+  if (!tx) return 0;
+  if (tx.transfer_id) {
+    return db.prepare(`DELETE FROM transactions WHERE transfer_id = ?`).run(tx.transfer_id).changes;
+  }
+  return db.prepare(`DELETE FROM transactions WHERE id = ?`).run(id).changes;
 }
 
 export function deleteAllTx(): number {

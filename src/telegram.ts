@@ -468,12 +468,12 @@ async function handleUpdate(u: TgUpdate): Promise<void> {
       return;
     }
     const id = Number(m[1]);
-    const ok = deleteTx(id);
+    const n = deleteTx(id);
     await call("answerCallbackQuery", {
       callback_query_id: q.id,
-      text: ok ? `#${id} terhapus` : `#${id} tidak ada`,
+      text: n === 0 ? `#${id} tidak ada` : n > 1 ? `#${id} + pasangan transfer terhapus` : `#${id} terhapus`,
     });
-    if (ok) {
+    if (n > 0) {
       await call("editMessageReplyMarkup", {
         chat_id: chatId,
         message_id: q.message!.message_id,

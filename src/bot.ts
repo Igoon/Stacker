@@ -337,7 +337,9 @@ export async function handleMessage(input: string): Promise<Reply> {
 
   if ((m = low.match(/^hapus\s+(\d+)$/))) {
     const id = Number(m[1]);
-    return { text: deleteTx(id) ? `Terhapus #${id}.` : `Id ${id} tidak ada.` };
+    const n = deleteTx(id);
+    if (!n) return { text: `Id ${id} tidak ada.` };
+    return { text: n > 1 ? `Terhapus #${id} + pasangan transfer (${n} entri).` : `Terhapus #${id}.` };
   }
 
   if ((m = low.match(/^ubah\s+(\d+)\s+akun\s+(.+)$/))) {
