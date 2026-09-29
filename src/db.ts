@@ -31,6 +31,13 @@ CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
   value TEXT
 );
+
+CREATE TABLE IF NOT EXISTS categories (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  nama       TEXT NOT NULL UNIQUE,
+  keywords   TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `);
 
 function hasColumn(table: string, col: string): boolean {
@@ -72,6 +79,27 @@ if (cash) {
   db.prepare(`UPDATE transactions SET account_id = ? WHERE account_id IS NULL`).run(cash.id);
 }
 
+const DEFAULT_CATEGORIES: { nama: string; keywords: string[] }[] = [
+  { nama: "Makanan", keywords: ["makan", "minum", "sarapan", "kopi", "jajan", "camilan", "resto", "warteg", "nasi", "ayam", "bakso", "indomaret", "alfamart"] },
+  { nama: "Transportasi", keywords: ["transport", "ojek", "bensin", "gojek", "grab", "taksi", "parkir", "tol", "kereta", "bus", "angkot", "tiket"] },
+  { nama: "Belanja", keywords: ["belanja", "beli", "shopping", "baju", "sepatu", "tokopedia", "shopee"] },
+  { nama: "Tagihan", keywords: ["listrik", "air", "internet", "pulsa", "kuota", "tagihan", "token", "wifi", "bpjs", "cicilan", "sewa", "kos"] },
+  { nama: "Kesehatan", keywords: ["obat", "dokter", "klinik", "rumah sakit", "vitamin", "apotek"] },
+  { nama: "Hiburan", keywords: ["nonton", "bioskop", "game", "topup", "spotify", "netflix", "liburan", "jalan"] },
+  { nama: "Gaji", keywords: ["gaji", "upah", "honor", "thr", "bonus"] },
+];
+
+{
+  const count = (db.prepare(`SELECT COUNT(*) AS n FROM categories`).get() as { n: number }).n;
+  if (count === 0) {
+    const ins = db.prepare(`INSERT INTO categories (nama, keywords) VALUES (?, ?)`);
+    const tx = db.transaction(() =>
+      DEFAULT_CATEGORIES.forEach((c) => ins.run(c.nama, JSON.stringify(c.keywords)))
+    );
+    tx();
+  }
+}
+
 export interface Account {
   id: number;
   nama: string;
@@ -80,6 +108,13 @@ export interface Account {
   created_at: string;
   saldo?: number;
   rupiah?: string;
+}
+
+export interface Category {
+  id: number;
+  nama: string;
+  keywords: string[];
+  created_at: string;
 }
 
 export interface Tx {
@@ -173,6 +208,49 @@ export function deleteAllTx(): number {
 
 export function listAccounts(): Account[] {
   return db.prepare(`SELECT * FROM accounts ORDER BY id ASC`).all() as Account[];
+}
+
+export function listCategories(): Category[] {
+  const rows = db
+    .prepare(`SELECT id, nama, keywords, created_at FROM categories ORDER BY id ASC`)
+    .all() as { id: number; nama: string; keywords: string; created_at: string }[];
+  return rows.map((r) => {
+    let keywords: string[] = [];
+    try {
+      keywords = JSON.parse(r.keywords) as string[];
+    } catch {
+      keywords = [];
+    }
+    return { ...r, keywords };
+  });
+}
+
+export function categoryNames(): string[] {
+  return [...listCategories().map((c) => c.nama), "Lainnya"];
+}
+
+export function getCategoryByName(nama: string): Category | undefined {
+  return listCategories().find((c) => c.nama.toLowerCase() === nama.trim().toLowerCase());
+}
+
+export function addCategory(nama: string, keywords: string[]): Category {
+  const info = db
+    .prepare(`INSERT INTO categories (nama, keywords) VALUES (?, ?)`)
+    .run(nama.trim(), JSON.stringify(keywords));
+  return {
+    id: Number(info.lastInsertRowid),
+    nama: nama.trim(),
+    keywords,
+    created_at: new Date().toISOString(),
+  };
+}
+
+export function deleteCategory(id: number): boolean {
+  return db.prepare(`DELETE FROM categories WHERE id = ?`).run(id).changes > 0;
+}
+
+export function updateCategoryKeywords(id: number, keywords: string[]): void {
+  db.prepare(`UPDATE categories SET keywords = ? WHERE id = ?`).run(JSON.stringify(keywords), id);
 }
 
 export function getAccountByName(nama: string): Account | undefined {

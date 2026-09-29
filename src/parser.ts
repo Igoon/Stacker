@@ -1,4 +1,5 @@
 import { extractDate } from "./dates";
+import { listCategories } from "./db";
 
 export interface ParseResult {
   jumlah: number;
@@ -15,18 +16,6 @@ export interface LocalParse {
 }
 
 const MASUK = ["gaji", "bonus", "thr", "terima", "dapat", "masuk", "income", "penghasilan", "jual", "profit"];
-
-const KATEGORI: [string, string[]][] = [
-  ["Makanan", ["makan", "minum", "sarapan", "kopi", "jajan", "camilan", "resto", "warteg", "nasi", "ayam", "bakso", "indomaret", "alfamart"]],
-  ["Transportasi", ["transport", "ojek", "bensin", "gojek", "grab", "taksi", "parkir", "tol", "kereta", "bus", "angkot", "tiket"]],
-  ["Belanja", ["belanja", "beli", "shopping", "baju", "sepatu", "tokopedia", "shopee"]],
-  ["Tagihan", ["listrik", "air", "internet", "pulsa", "kuota", "tagihan", "token", "wifi", "bpjs", "cicilan", "sewa", "kos"]],
-  ["Kesehatan", ["obat", "dokter", "klinik", "rumah sakit", "vitamin", "apotek"]],
-  ["Hiburan", ["nonton", "bioskop", "game", "topup", "spotify", "netflix", "liburan", "jalan"]],
-  ["Gaji", ["gaji", "upah", "honor", "thr", "bonus"]],
-];
-
-export const KATEGORI_NAMES = ["Makanan", "Transportasi", "Belanja", "Tagihan", "Kesehatan", "Hiburan", "Gaji", "Lainnya"];
 
 const MULT: Record<string, number> = {
   rb: 1e3, ribu: 1e3, k: 1e3,
@@ -62,11 +51,16 @@ export function parseLocal(text: string): LocalParse | null {
 
   let kategori = "Lainnya";
   let kategoriKetemu = false;
-  for (const [nama, kws] of KATEGORI) {
-    if (kws.some((k) => low.includes(k))) {
-      kategori = nama;
-      kategoriKetemu = true;
-      break;
+  let bestLen = 0;
+  for (const cat of listCategories()) {
+    for (const k of cat.keywords) {
+      const kk = k.toLowerCase().trim();
+      if (!kk) continue;
+      if (low.includes(kk) && kk.length > bestLen) {
+        bestLen = kk.length;
+        kategori = cat.nama;
+        kategoriKetemu = true;
+      }
     }
   }
 

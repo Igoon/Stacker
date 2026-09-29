@@ -64,7 +64,7 @@
   <header>
     <div>
       <div class="name">Duit Bot</div>
-      <div class="sub">catat keuangan lewat chat</div>
+      <div class="sub" id="sub">catat keuangan lewat chat</div>
     </div>
     <div class="right">
       <div class="saldo" id="saldo">Saldo: -</div>
@@ -124,6 +124,7 @@
   async function refresh() {
     const r = await fetch("/api/state").then((x) => x.json());
     saldoEl.textContent = "Saldo: " + r.saldoRupiah;
+    if (r.version) document.getElementById("sub").textContent = "v" + r.version + " · catat keuangan lewat chat";
   }
 
   async function send() {

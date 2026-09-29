@@ -2,7 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { GoogleGenAI, Type } from "@google/genai";
 import { isoLocal } from "./dates";
-import { KATEGORI_NAMES, type ParseResult } from "./parser";
+import { categoryNames } from "./db";
+import type { ParseResult } from "./parser";
 
 const KEY = process.env.GEMINI_API_KEY ?? "";
 const MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
@@ -26,30 +27,39 @@ const SYSTEM_PROMPT =
   "Ubah pesan user jadi daftar transaksi. Pisahkan bila ada beberapa transaksi. " +
   "Nominal dalam Rupiah, integer, tanpa titik. Contoh: '50rb'=50000, '1,5jt'=1500000. " +
   "tipe 'masuk' untuk pemasukan (gaji, bonus, terima uang), selain itu 'keluar'. " +
-  `kategori WAJIB salah satu dari: ${KATEGORI_NAMES.join(", ")}. ` +
   "catatan = teks singkat transaksi. tanggal format YYYY-MM-DD bila disebut, jika tidak kosongkan.\n\n" +
   "Pesan user: ";
 
-const SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
-    transactions: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          jumlah: { type: Type.INTEGER },
-          tipe: { type: Type.STRING, enum: ["masuk", "keluar"] },
-          kategori: { type: Type.STRING, enum: KATEGORI_NAMES },
-          catatan: { type: Type.STRING },
-          tanggal: { type: Type.STRING },
+function buildPrompt(names: string[]): string {
+  return SYSTEM_PROMPT.replace(
+    "tanggal format YYYY-MM-DD bila disebut, jika tidak kosongkan.",
+    `kategori WAJIB salah satu dari: ${names.join(", ")}. ` +
+      "tanggal format YYYY-MM-DD bila disebut, jika tidak kosongkan."
+  );
+}
+
+function buildSchema(names: string[]) {
+  return {
+    type: Type.OBJECT,
+    properties: {
+      transactions: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            jumlah: { type: Type.INTEGER },
+            tipe: { type: Type.STRING, enum: ["masuk", "keluar"] },
+            kategori: { type: Type.STRING, enum: names },
+            catatan: { type: Type.STRING },
+            tanggal: { type: Type.STRING },
+          },
+          required: ["jumlah", "tipe", "kategori"],
         },
-        required: ["jumlah", "tipe", "kategori"],
       },
     },
-  },
-  required: ["transactions"],
-};
+    required: ["transactions"],
+  };
+}
 
 function loadJson<T>(file: string): T | null {
   try {
@@ -121,7 +131,7 @@ export function aiResetUsage(): void {
   saveJson(USAGE_FILE, usage);
 }
 
-function validate(raw: unknown): ParseResult[] {
+function validate(raw: unknown, names: string[]): ParseResult[] {
   if (!raw || typeof raw !== "object") return [];
   const arr = (raw as { transactions?: unknown }).transactions;
   if (!Array.isArray(arr)) return [];
@@ -131,7 +141,7 @@ function validate(raw: unknown): ParseResult[] {
     const jumlah = Math.round(Number(t.jumlah));
     if (!Number.isFinite(jumlah) || jumlah <= 0) continue;
     const tipe = t.tipe === "masuk" ? "masuk" : "keluar";
-    const kategori = KATEGORI_NAMES.includes(String(t.kategori)) ? String(t.kategori) : "Lainnya";
+    const kategori = names.includes(String(t.kategori)) ? String(t.kategori) : "Lainnya";
     const catatan = String(t.catatan ?? "").trim() || "transaksi";
     const hasil: ParseResult = { jumlah, tipe, kategori, catatan };
     const tgl = String(t.tanggal ?? "").trim();
@@ -155,18 +165,19 @@ export async function parseGemini(text: string): Promise<ParseResult[] | null> {
   bumpUsage();
 
   try {
+    const names = categoryNames();
     const res = await getClient().models.generateContent({
       model: MODEL,
-      contents: SYSTEM_PROMPT + text,
+      contents: buildPrompt(names) + text,
       config: {
         responseMimeType: "application/json",
-        responseSchema: SCHEMA as never,
+        responseSchema: buildSchema(names) as never,
         temperature: 0,
         abortSignal: AbortSignal.timeout(TIMEOUT_MS),
       },
     });
     const parsed = JSON.parse(res.text ?? "{}");
-    const list = validate(parsed);
+    const list = validate(parsed, names);
     if (list.length) {
       cache.set(key, { at: Date.now(), value: list });
       saveJson(CACHE_FILE, Object.fromEntries(cache));

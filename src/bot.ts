@@ -2,13 +2,17 @@ import { randomUUID } from "node:crypto";
 import {
   accountBalances,
   addAccount,
+  addCategory,
   addTx,
   deleteAccount,
   deleteAllTx,
+  deleteCategory,
   deleteTx,
   getAccountByName,
+  getCategoryByName,
   listAccounts,
   listAll,
+  listCategories,
   listRange,
   listTx,
   ringkasRange,
@@ -17,6 +21,7 @@ import {
   rupiahSigned,
   saldo,
   setAccountSaldoAwal,
+  updateCategoryKeywords,
   updateTx,
   type Account,
   type Tx,
@@ -26,6 +31,7 @@ import { parsePeriod } from "./dates";
 import { toCSV } from "./csv";
 import { backupTagged } from "./backup";
 import { aiEnabled, aiResetUsage, aiStats, parseGemini } from "./ai";
+import { APP_VERSION } from "./version";
 
 export interface Reply {
   text: string;
@@ -36,6 +42,7 @@ export interface Reply {
 const TIPE_AKUN = ["bank", "ewallet", "cash"];
 
 const HELP =
+  `Duit Bot v${APP_VERSION}\n\n` +
   "Catat transaksi:\n" +
   "  makan siang 50rb\n" +
   "  gaji 5jt\n" +
@@ -58,6 +65,11 @@ const HELP =
   "  saldo awal bsi 45.001.889\n" +
   "  sesuaikan bsi 100jt         (paksa saldo ke nilai nyata)\n" +
   "  ubah 1 akun bsi             (pindah tx ke akun)\n\n" +
+  "Kategori:\n" +
+  "  kategori\n" +
+  "  kategori tambah Sedekah | sedekah, donasi, zakat\n" +
+  "  kategori ubah Sedekah | sedekah, donasi, zakat\n" +
+  "  kategori hapus Sedekah\n\n" +
   "Laporan & export:\n" +
   "  laporan | laporan september | laporan minggu lalu\n" +
   "  csv | csv september\n\n" +
@@ -66,6 +78,7 @@ const HELP =
   "  ubah 3 jadi 60rb\n" +
   "  hapus 3\n" +
   "  ai | ai reset               (pemakaian AI)\n" +
+  "  versi                       (versi aplikasi)\n" +
   "  reset transaksi            (hapus semua, ada backup)\n" +
   "  help\n\n" +
   "Keamanan (Telegram):\n" +
@@ -113,6 +126,8 @@ export async function handleMessage(input: string): Promise<Reply> {
 
   if (!text) return { text: "Tulis sesuatu, contoh: makan siang 50rb" };
   if (["help", "bantuan", "?"].includes(low)) return { text: HELP };
+
+  if (["versi", "version", "v"].includes(low)) return { text: `Duit Bot v${APP_VERSION}` };
 
   if (low === "ai reset") {
     aiResetUsage();
@@ -182,6 +197,58 @@ export async function handleMessage(input: string): Promise<Reply> {
     if (!acc) return { text: `Akun "${m[1]}" tidak ada.` };
     deleteAccount(acc.id);
     return { text: `Akun ${acc.nama} dihapus. Transaksinya tetap ada tanpa akun.` };
+  }
+
+  if (low === "kategori" || low === "kategori list" || low === "kategori daftar") {
+    const cats = listCategories();
+    return {
+      text:
+        "Kategori:\n" +
+        cats
+          .map((c) => `  #${c.id} ${c.nama}${c.keywords.length ? ` (${c.keywords.join(", ")})` : ""}`)
+          .join("\n") +
+        "\n\nTambah: `kategori tambah Sedekah | sedekah, donasi, zakat, infak`",
+    };
+  }
+
+  if ((m = text.match(/^kategori tambah\s+(.+)$/i))) {
+    const rest = m[1].trim();
+    const pipe = rest.indexOf("|");
+    const nama = (pipe === -1 ? rest : rest.slice(0, pipe)).trim();
+    const kwRaw = pipe === -1 ? "" : rest.slice(pipe + 1).trim();
+    if (!nama) return { text: "Format: `kategori tambah <nama> | kata kunci, dipisah, koma`" };
+    const keywords = kwRaw
+      ? kwRaw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
+      : [nama.toLowerCase()];
+    const existing = getCategoryByName(nama);
+    if (existing) {
+      const merged = [...new Set([...existing.keywords, ...keywords])];
+      updateCategoryKeywords(existing.id, merged);
+      return { text: `Kategori ${existing.nama} diperbarui. Kata kunci: ${merged.join(", ")}` };
+    }
+    addCategory(nama, keywords);
+    return { text: `Kategori ${nama} ditambah. Kata kunci: ${keywords.join(", ")}` };
+  }
+
+  if ((m = text.match(/^kategori ubah\s+(.+)$/i))) {
+    const rest = m[1].trim();
+    const pipe = rest.indexOf("|");
+    const nama = (pipe === -1 ? rest : rest.slice(0, pipe)).trim();
+    const kwRaw = pipe === -1 ? "" : rest.slice(pipe + 1).trim();
+    const cat = getCategoryByName(nama);
+    if (!cat) return { text: `Kategori "${nama}" tidak ada. Buat: \`kategori tambah ${nama} | kws\`` };
+    const keywords = kwRaw
+      ? kwRaw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
+      : [nama.toLowerCase()];
+    updateCategoryKeywords(cat.id, keywords);
+    return { text: `Kata kunci ${cat.nama} diganti: ${keywords.join(", ")}` };
+  }
+
+  if ((m = text.match(/^kategori hapus\s+(.+)$/i))) {
+    const cat = getCategoryByName(m[1]);
+    if (!cat) return { text: `Kategori "${m[1]}" tidak ada.` };
+    deleteCategory(cat.id);
+    return { text: `Kategori ${cat.nama} dihapus. Transaksi lama tetap ada.` };
   }
 
   if ((m = text.match(/^saldo awal\s+(.+)$/i))) {

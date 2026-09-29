@@ -10,6 +10,7 @@ import { parsePeriod } from "./dates";
 import { toCSV } from "./csv";
 import { startTelegram, telegramEnabled } from "./telegram";
 import { startBackups } from "./backup";
+import { APP_VERSION } from "./version";
 
 const HOST = (process.env.HOST ?? "127.0.0.1").trim();
 const PORT = Number(process.env.PORT ?? 3000);
@@ -98,6 +99,7 @@ app.post("/api/chat", async (req, res) => {
 app.get("/api/state", (_req, res) => {
   const rows = listTx(50).map((t) => ({ ...t, rupiah: rupiah(t.jumlah) }));
   res.json({
+    version: APP_VERSION,
     saldo: saldo(),
     saldoRupiah: rupiah(saldo()),
     aiEnabled,
@@ -134,7 +136,7 @@ app.get("/api/csv", (req, res) => {
 });
 
 const server = app.listen(PORT, HOST, () => {
-  console.log(`Finance bot jalan di http://${HOST}:${PORT}`);
+  console.log(`Finance bot v${APP_VERSION} jalan di http://${HOST}:${PORT}`);
   console.log(
     WEB_PASSWORD
       ? `Web auth: aktif (user: ${WEB_USER}; lockout ${WEB_MAX_FAIL}x → ${Math.round(WEB_LOCK_MS / 60000)} menit)`
