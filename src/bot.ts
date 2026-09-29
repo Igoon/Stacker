@@ -70,6 +70,8 @@ const HELP =
   "Kategori:\n" +
   "  kategori\n" +
   "  kategori tambah Sedekah | sedekah, donasi, zakat\n" +
+  "  kategori tambahkata Sedekah | infak\n" +
+  "  kategori hapuskata Sedekah | zakat\n" +
   "  kategori ubah Sedekah | sedekah, donasi, zakat\n" +
   "  kategori hapus Sedekah\n\n" +
   "Laporan & export:\n" +
@@ -255,7 +257,46 @@ export async function handleMessage(input: string): Promise<Reply> {
         cats
           .map((c) => `  #${c.id} ${c.nama}${c.keywords.length ? ` (${c.keywords.join(", ")})` : ""}`)
           .join("\n") +
-        "\n\nTambah: `kategori tambah Sedekah | sedekah, donasi, zakat, infak`",
+        "\n\nTambah kategori: `kategori tambah Sedekah | sedekah, donasi, zakat`\n" +
+        "Kata kunci: `kategori tambahkata Sedekah | infak` · `kategori hapuskata Sedekah | zakat`",
+    };
+  }
+
+  if ((m = text.match(/^kategori tambahkata\s+(.+)$/i))) {
+    const rest = m[1].trim();
+    const pipe = rest.indexOf("|");
+    const nama = (pipe === -1 ? rest : rest.slice(0, pipe)).trim();
+    const kwRaw = pipe === -1 ? "" : rest.slice(pipe + 1).trim();
+    const cat = getCategoryByName(nama);
+    if (!cat) return { text: `Kategori "${nama}" tidak ada. Buat: \`kategori tambah ${nama}\`` };
+    const add = kwRaw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+    if (!add.length) return { text: "Format: `kategori tambahkata Sedekah | zakat, infak`" };
+    const merged = [...new Set([...cat.keywords, ...add])];
+    updateCategoryKeywords(cat.id, merged);
+    const added = add.filter((k) => !cat.keywords.includes(k));
+    return {
+      text:
+        `${cat.nama}: +${added.length} kata kunci${added.length ? ` (${added.join(", ")})` : " (tidak ada baru)"}\n` +
+        `Kata kunci: ${merged.join(", ")}`,
+    };
+  }
+
+  if ((m = text.match(/^kategori hapuskata\s+(.+)$/i))) {
+    const rest = m[1].trim();
+    const pipe = rest.indexOf("|");
+    const nama = (pipe === -1 ? rest : rest.slice(0, pipe)).trim();
+    const kwRaw = pipe === -1 ? "" : rest.slice(pipe + 1).trim();
+    const cat = getCategoryByName(nama);
+    if (!cat) return { text: `Kategori "${nama}" tidak ada.` };
+    const del = kwRaw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+    if (!del.length) return { text: "Format: `kategori hapuskata Sedekah | zakat`" };
+    const remaining = cat.keywords.filter((k) => !del.includes(k));
+    updateCategoryKeywords(cat.id, remaining);
+    const removed = del.filter((k) => cat.keywords.includes(k));
+    return {
+      text:
+        `${cat.nama}: -${removed.length} kata kunci${removed.length ? ` (${removed.join(", ")})` : " (tidak ada yang cocok)"}\n` +
+        `Kata kunci: ${remaining.join(", ") || "-"}`,
     };
   }
 
