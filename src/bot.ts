@@ -10,6 +10,7 @@ import {
   deleteTx,
   getAccountByName,
   getCategoryByName,
+  getTx,
   listAccounts,
   listAll,
   listCategories,
@@ -20,6 +21,7 @@ import {
   rupiah,
   rupiahSigned,
   saldo,
+  searchTx,
   setAccountSaldoAwal,
   updateCategoryKeywords,
   updateTx,
@@ -27,7 +29,7 @@ import {
   type Tx,
 } from "./db";
 import { parseLocal, type ParseResult } from "./parser";
-import { parsePeriod } from "./dates";
+import { parsePeriod, type Period } from "./dates";
 import { toCSV } from "./csv";
 import { backupTagged } from "./backup";
 import { aiEnabled, aiResetUsage, aiStats, parseGemini } from "./ai";
@@ -71,10 +73,15 @@ const HELP =
   "  kategori ubah Sedekah | sedekah, donasi, zakat\n" +
   "  kategori hapus Sedekah\n\n" +
   "Laporan & export:\n" +
-  "  laporan | laporan september | laporan minggu lalu\n" +
-  "  csv | csv september\n\n" +
+  "  laporan | laporan september | laporan gopay september\n" +
+  "  csv | csv september | csv gopay\n\n" +
+  "Cari:\n" +
+  "  cari kopi\n" +
+  "  cari jimpitan bsi\n" +
+  "  cari kopi september 50          (50 = jumlah hasil)\n" +
+  "  lihat 12\n\n" +
   "Kelola:\n" +
-  "  riwayat\n" +
+  "  riwayat | riwayat 30\n" +
   "  ubah 3 jadi 60rb\n" +
   "  hapus 3\n" +
   "  ai | ai reset               (pemakaian AI)\n" +
@@ -119,6 +126,47 @@ function parseAmount(raw: string): number | undefined {
   const n = Number(m[0].replace(/[.,]/g, ""));
   return Number.isFinite(n) ? n : undefined;
 }
+
+interface Filter {
+  account?: Account;
+  per?: Period;
+  query: string;
+}
+
+function parseFilter(arg: string): Filter {
+  let rest = ` ${arg} `.replace(/\s+/g, " ");
+  const account = mentionedAccounts(rest)[0]?.acc;
+  if (account) {
+    rest = rest.replace(new RegExp(`(^|\\s)@?${escapeRe(account.nama)}(?=\\s|$)`, "i"), " ");
+  }
+  rest = rest.trim();
+
+  let per: Period | undefined;
+  let query = rest;
+  if (rest) {
+    const whole = parsePeriod(rest);
+    if (whole) {
+      per = whole;
+      query = "";
+    } else {
+      const toks = rest.split(/\s+/);
+      for (let n = Math.min(2, toks.length); n >= 1; n--) {
+        const cand = toks.slice(toks.length - n).join(" ");
+        const pp = parsePeriod(cand);
+        if (pp) {
+          per = pp;
+          query = toks.slice(0, toks.length - n).join(" ");
+          break;
+        }
+      }
+    }
+  }
+  return { account, per, query };
+}
+
+const txLine = (r: Tx) =>
+  `#${r.id} ${r.tanggal} ${r.tipe === "masuk" ? "+" : "-"}${rupiah(r.jumlah)} ${r.kategori}` +
+  (r.akun ? ` · ${r.akun}` : "");
 
 export async function handleMessage(input: string): Promise<Reply> {
   const text = input.trim();
@@ -315,14 +363,17 @@ export async function handleMessage(input: string): Promise<Reply> {
 
   if (/^(laporan|ringkasan|report)\b/.test(low)) {
     const arg = text.replace(/^\s*(laporan|ringkasan|report)\s*/i, "").trim();
-    const per = parsePeriod(arg);
-    if (!per) {
+    const { account, per: perParsed, query } = parseFilter(arg);
+    if (arg && !perParsed && query) {
       return {
-        text: "Periode tidak dikenali. Contoh: `laporan september`, `laporan minggu lalu`, `laporan 2026-08`.",
+        text: "Periode tidak dikenali. Contoh: `laporan september`, `laporan gopay september`, `laporan minggu lalu`.",
       };
     }
-    const rows = ringkasRange(per.from, per.to);
-    if (rows.length === 0) return { text: `Belum ada transaksi ${per.label}.` };
+    const per = perParsed ?? parsePeriod("");
+    if (!per) return { text: "Periode tidak dikenali." };
+    const rows = ringkasRange(per.from, per.to, account?.id);
+    const label = per.label + (account ? ` · ${account.nama}` : "");
+    if (rows.length === 0) return { text: `Belum ada transaksi ${label}.` };
     const masuk = rows.filter((r) => r.tipe === "masuk");
     const keluar = rows.filter((r) => r.tipe === "keluar");
     const fmt = (rs: typeof rows) => rs.map((r) => `  ${r.kategori}: ${rupiah(r.total)}`).join("\n");
@@ -330,8 +381,39 @@ export async function handleMessage(input: string): Promise<Reply> {
     const tKeluar = keluar.reduce((a, b) => a + b.total, 0);
     return {
       text:
-        `Ringkasan ${per.label}\n\nMasuk (${rupiah(tMasuk)})\n${fmt(masuk) || "  -"}\n\n` +
+        `Ringkasan ${label}\n\nMasuk (${rupiah(tMasuk)})\n${fmt(masuk) || "  -"}\n\n` +
         `Keluar (${rupiah(tKeluar)})\n${fmt(keluar) || "  -"}\n\nSelisih: ${rupiahSigned(tMasuk - tKeluar)}`,
+    };
+  }
+
+  if (/^cari\b/.test(low)) {
+    const arg = text.replace(/^\s*cari\s*/i, "").trim();
+    const { account, per, query } = parseFilter(arg);
+    let q = query;
+    let limit = 20;
+    const numMatch = q.match(/\s+(\d{1,4})$/);
+    if (numMatch) {
+      limit = Math.min(10000, Number(numMatch[1]));
+      q = q.slice(0, numMatch.index).trim();
+    }
+    const rows = searchTx(q, { accountId: account?.id, from: per?.from, to: per?.to, limit });
+    if (rows.length === 0) return { text: "Tidak ada hasil." };
+    const label = [q && `"${q}"`, account?.nama, per?.label].filter(Boolean).join(" · ");
+    return {
+      text:
+        `Hasil ${rows.length}${label ? ` — ${label}` : ""}:\n` + rows.map(txLine).join("\n"),
+    };
+  }
+
+  if ((m = low.match(/^lihat\s+(\d+)$/))) {
+    const tx = getTx(Number(m[1]));
+    if (!tx) return { text: `Id ${m[1]} tidak ada.` };
+    return {
+      text:
+        `#${tx.id}\nTanggal: ${tx.tanggal}\nTipe: ${tx.tipe}\n` +
+        `Jumlah: ${rupiahSigned(tx.jumlah)}\nKategori: ${tx.kategori}\nAkun: ${tx.akun ?? "-"}\n` +
+        `Catatan: ${tx.catatan ?? "-"}` +
+        (tx.transfer_id ? `\nTransfer pasangan: ya` : ""),
     };
   }
 
@@ -364,12 +446,13 @@ export async function handleMessage(input: string): Promise<Reply> {
     return tx ? { text: "Diperbarui.", txs: [withRupiah(tx)] } : { text: `Id ${id} tidak ada.` };
   }
 
-  if (["riwayat", "history", "list"].includes(low)) {
-    const rows = listTx(10);
+  if ((m = low.match(/^(riwayat|history|list)(?:\s+(\d{1,3}))?$/))) {
+    const n = Math.min(100, m[2] ? Number(m[2]) : 10);
+    const rows = listTx(n);
     if (rows.length === 0) return { text: "Belum ada transaksi." };
     return {
       text:
-        "10 transaksi terakhir:\n" +
+        `${n} transaksi terakhir:\n` +
         rows
           .map(
             (r) =>
@@ -382,13 +465,24 @@ export async function handleMessage(input: string): Promise<Reply> {
 
   if (/^(csv|export)\b/.test(low)) {
     const arg = text.replace(/^\s*(csv|export)\s*/i, "").trim();
-    const per = arg ? parsePeriod(arg) : null;
-    if (arg && !per) return { text: "Periode tidak dikenali. Contoh: `csv september`, `csv 2026`." };
-    const rows = per ? listRange(per.from, per.to) : listAll();
-    if (rows.length === 0) return { text: `Tidak ada transaksi${per ? ` ${per.label}` : ""}.` };
-    const name = `transaksi-${per ? `${per.from}_${per.to}` : "semua"}.csv`;
+    const { account, per, query } = parseFilter(arg);
+    if (query || (arg && !per && !account)) {
+      return {
+        text: "Filter tidak dikenali. Contoh: `csv september`, `csv gopay`, `csv gopay september`.",
+      };
+    }
+    const rows =
+      per || account
+        ? searchTx("", { accountId: account?.id, from: per?.from, to: per?.to, limit: 10000 }).reverse()
+        : listAll();
+    if (rows.length === 0) {
+      const label = [per?.label, account?.nama].filter(Boolean).join(" · ");
+      return { text: `Tidak ada transaksi${label ? ` ${label}` : ""}.` };
+    }
+    const label = [per?.label ?? "semua", account?.nama].filter(Boolean).join(" · ");
+    const name = `transaksi-${per ? `${per.from}_${per.to}` : "semua"}${account ? `-${account.nama}` : ""}.csv`;
     return {
-      text: `CSV ${rows.length} transaksi (${per ? per.label : "semua"}).`,
+      text: `CSV ${rows.length} transaksi (${label}).`,
       file: { name, content: toCSV(rows) },
     };
   }
@@ -428,7 +522,12 @@ async function resolveTransactions(
   }
 
   const ai = await parseGemini(text);
-  if (ai && ai.length > 0) return { results: ai, usedAI: true };
+  if (ai && ai.length > 0) {
+    if (local?.result.tanggal) {
+      for (const a of ai) if (!a.tanggal) a.tanggal = local.result.tanggal;
+    }
+    return { results: ai, usedAI: true };
+  }
 
   if (local) return { results: [local.result], usedAI: false };
   return { results: [], usedAI: false };

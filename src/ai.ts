@@ -34,6 +34,9 @@ function buildPrompt(names: string[]): string {
   return SYSTEM_PROMPT.replace(
     "tanggal format YYYY-MM-DD bila disebut, jika tidak kosongkan.",
     `kategori WAJIB salah satu dari: ${names.join(", ")}. ` +
+      `Hari ini ${isoLocal()}. ` +
+      "Hitung tanggal relatif ('kemarin','2 hari lalu','3 september') dari hari ini; " +
+      "tahun memakai tahun hari ini bila tidak disebut. " +
       "tanggal format YYYY-MM-DD bila disebut, jika tidak kosongkan."
   );
 }

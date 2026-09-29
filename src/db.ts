@@ -182,6 +182,44 @@ export function listRange(from: string, to: string): Tx[] {
     .all(from, to) as Tx[];
 }
 
+const MAX_SEARCH = 10000;
+
+export function searchTx(
+  query: string,
+  opts: { accountId?: number; from?: string; to?: string; limit?: number } = {}
+): Tx[] {
+  const limit = Math.min(Math.max(1, opts.limit ?? 20), MAX_SEARCH);
+  const where: string[] = [];
+  const args: (string | number)[] = [];
+
+  const q = query.trim();
+  if (q) {
+    const like = `%${q.replace(/[\\%_]/g, (c) => "\\" + c)}%`;
+    where.push(
+      `(t.catatan LIKE ? ESCAPE '\\' OR t.kategori LIKE ? ESCAPE '\\' OR a.nama LIKE ? ESCAPE '\\')`
+    );
+    args.push(like, like, like);
+  }
+  if (opts.from) {
+    where.push(`t.tanggal >= ?`);
+    args.push(opts.from);
+  }
+  if (opts.to) {
+    where.push(`t.tanggal <= ?`);
+    args.push(opts.to);
+  }
+  if (opts.accountId != null) {
+    where.push(`t.account_id = ?`);
+    args.push(opts.accountId);
+  }
+
+  const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  args.push(limit);
+  return db
+    .prepare(`${TX_SELECT} ${clause} ORDER BY t.tanggal DESC, t.id DESC LIMIT ?`)
+    .all(...args) as Tx[];
+}
+
 export function updateTx(
   id: number,
   fields: Partial<Pick<Tx, "jumlah" | "tipe" | "kategori" | "catatan" | "tanggal" | "account_id">>
