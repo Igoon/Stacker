@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { GoogleGenAI, Type } from "@google/genai";
 import { isoLocal } from "./dates";
-import { categoryNames } from "./db";
+import { categoryNames, DATA_DIR } from "./db";
 import type { ParseResult } from "./parser";
 
 const KEY = process.env.GEMINI_API_KEY ?? "";
@@ -11,8 +11,8 @@ const TIMEOUT_MS = 6000;
 const CACHE_TTL = 1000 * 60 * 60 * 6;
 const DAILY_LIMIT = Math.max(0, Number(process.env.GEMINI_DAILY_LIMIT ?? 100));
 
-const CACHE_FILE = path.join(process.cwd(), "ai-cache.json");
-const USAGE_FILE = path.join(process.cwd(), "ai-usage.json");
+const CACHE_FILE = path.join(DATA_DIR, "ai-cache.json");
+const USAGE_FILE = path.join(DATA_DIR, "ai-usage.json");
 
 export const aiEnabled = KEY.trim().length > 0;
 

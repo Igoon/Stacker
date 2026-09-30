@@ -2,7 +2,8 @@ import Database from "better-sqlite3";
 import path from "node:path";
 import { isoLocal } from "./dates";
 
-const dbPath = path.join(process.cwd(), "data.db");
+const dbPath = path.join(process.env.DUIT_DB_DIR || process.cwd(), "data.db");
+export const DATA_DIR = process.env.DUIT_DB_DIR || process.cwd();
 export const db = new Database(dbPath);
 db.pragma("journal_mode = WAL");
 

@@ -6,6 +6,8 @@
     "bash": {
       "*": "ask",
       "npm run typecheck*": "allow",
+      "npm run verify*": "allow",
+      "npm run smoke*": "allow",
       "npm run dev*": "allow",
       "npm run backup*": "allow",
       "npm start*": "allow",

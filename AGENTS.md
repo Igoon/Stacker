@@ -6,13 +6,15 @@ Bot pencatatan keuangan via chat (web + Telegram). TypeScript ESM, Express, SQLi
 
 - `npm run dev` — jalankan server (tsx watch, port 3000). Proses ini memang jalan terus; jangan ditutup kalau mau app hidup.
 - `npm start` — jalan tanpa watch.
-- `npm run typecheck` — **wajib** sebelum commit. Harus lolos tanpa error.
+- `npm run typecheck` — cek tipe. **Wajib** lolos sebelum commit.
+- `npm run smoke` — smoke test di db temp (tak menyentuh `data.db` asli).
+- `npm run verify` — `typecheck` + `smoke` sekaligus. **Jalankan ini sebelum commit.**
 - `npm run backup` — backup `data.db` manual.
 
 ## Verifikasi (urutan wajib tiap perubahan)
 
-1. `npm run typecheck`.
-2. Tes fungsi dengan **db temp**: jalankan skrip `tsx` dengan workdir di `C:\Users\GONJOV~1\AppData\Local\Temp\opencode` agar `data.db` dan `ai-*.json` asli tidak kotor.
+1. `npm run verify` (typecheck + smoke, otomatis pakai db temp).
+2. Untuk fitur baru, tambah/ubah skenario di `src/smoke.ts`.
 3. Restart `npm run dev`, cek log tidak error.
 4. Baru commit.
 
@@ -42,6 +44,7 @@ Bot pencatatan keuangan via chat (web + Telegram). TypeScript ESM, Express, SQLi
 - `src/dates.ts` — tanggal relatif & periode.
 - `src/chart.ts` — chart teks (bar kategori, tren harian).
 - `src/csv.ts` — export CSV.
+- `src/smoke.ts` — smoke test (db temp via `DUIT_DB_DIR`).
 - `src/backup.ts` — backup harian + `backupTagged`.
 - `web/index.html` — UI chat web.
 
