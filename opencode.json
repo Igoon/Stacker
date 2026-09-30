@@ -1,0 +1,28 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "permission": {
+    "edit": "allow",
+    "bash": {
+      "*": "ask",
+      "npm run typecheck*": "allow",
+      "npm run dev*": "allow",
+      "npm run backup*": "allow",
+      "npm start*": "allow",
+      "npm install*": "allow",
+      "npm i *": "allow",
+      "npx tsx*": "allow",
+      "node *": "allow",
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git log*": "allow",
+      "git show*": "allow",
+      "git add*": "allow",
+      "git commit*": "allow",
+      "Get-*": "allow",
+      "Test-Path *": "allow",
+      "Select-String *": "allow",
+      "Remove-Item *Temp*": "allow"
+    }
+  }
+}
