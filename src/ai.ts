@@ -30,10 +30,12 @@ const SYSTEM_PROMPT =
   "catatan = teks singkat transaksi. tanggal format YYYY-MM-DD bila disebut, jika tidak kosongkan.\n\n" +
   "Pesan user: ";
 
-function buildPrompt(names: string[]): string {
+function buildPrompt(masuk: string[], keluar: string[]): string {
   return SYSTEM_PROMPT.replace(
     "tanggal format YYYY-MM-DD bila disebut, jika tidak kosongkan.",
-    `kategori WAJIB salah satu dari: ${names.join(", ")}. ` +
+    `Kategori MASUK wajib salah satu dari: ${masuk.join(", ")}. ` +
+      `Kategori KELUAR wajib salah satu dari: ${keluar.join(", ")}. ` +
+      "Pastikan kategori cocok dengan tipe: pemasukan pakai daftar masuk, pengeluaran pakai daftar keluar. " +
       `Hari ini ${isoLocal()}. ` +
       "Hitung tanggal relatif ('kemarin','2 hari lalu','3 september') dari hari ini; " +
       "tahun memakai tahun hari ini bila tidak disebut. " +
@@ -134,7 +136,7 @@ export function aiResetUsage(): void {
   saveJson(USAGE_FILE, usage);
 }
 
-function validate(raw: unknown, names: string[]): ParseResult[] {
+function validate(raw: unknown, allowed: Record<"masuk" | "keluar", Set<string>>): ParseResult[] {
   if (!raw || typeof raw !== "object") return [];
   const arr = (raw as { transactions?: unknown }).transactions;
   if (!Array.isArray(arr)) return [];
@@ -143,8 +145,8 @@ function validate(raw: unknown, names: string[]): ParseResult[] {
     const t = item as Record<string, unknown>;
     const jumlah = Math.round(Number(t.jumlah));
     if (!Number.isFinite(jumlah) || jumlah <= 0) continue;
-    const tipe = t.tipe === "masuk" ? "masuk" : "keluar";
-    const kategori = names.includes(String(t.kategori)) ? String(t.kategori) : "Lainnya";
+    const tipe: "masuk" | "keluar" = t.tipe === "masuk" ? "masuk" : "keluar";
+    const kategori = allowed[tipe].has(String(t.kategori)) ? String(t.kategori) : "Lainnya";
     const catatan = String(t.catatan ?? "").trim() || "transaksi";
     const hasil: ParseResult = { jumlah, tipe, kategori, catatan };
     const tgl = String(t.tanggal ?? "").trim();
@@ -168,19 +170,21 @@ export async function parseGemini(text: string): Promise<ParseResult[] | null> {
   bumpUsage();
 
   try {
-    const names = categoryNames();
+    const masukNames = categoryNames("masuk");
+    const keluarNames = categoryNames("keluar");
+    const union = [...new Set([...masukNames, ...keluarNames])];
     const res = await getClient().models.generateContent({
       model: MODEL,
-      contents: buildPrompt(names) + text,
+      contents: buildPrompt(masukNames, keluarNames) + text,
       config: {
         responseMimeType: "application/json",
-        responseSchema: buildSchema(names) as never,
+        responseSchema: buildSchema(union) as never,
         temperature: 0,
         abortSignal: AbortSignal.timeout(TIMEOUT_MS),
       },
     });
     const parsed = JSON.parse(res.text ?? "{}");
-    const list = validate(parsed, names);
+    const list = validate(parsed, { masuk: new Set(masukNames), keluar: new Set(keluarNames) });
     if (list.length) {
       cache.set(key, { at: Date.now(), value: list });
       saveJson(CACHE_FILE, Object.fromEntries(cache));

@@ -23,12 +23,13 @@ import {
   saldo,
   searchTx,
   setAccountSaldoAwal,
+  setCategoryTipe,
   updateCategoryKeywords,
   updateTx,
   type Account,
   type Tx,
 } from "./db";
-import { parseLocal, type ParseResult } from "./parser";
+import { parseLocal, MASUK, type ParseResult } from "./parser";
 import { parsePeriod, type Period } from "./dates";
 import { toCSV } from "./csv";
 import { backupTagged } from "./backup";
@@ -54,7 +55,9 @@ const HELP =
   "  kemarin makan 50rb          (tanggal relatif)\n" +
   "  tgl 3 bayar kos 1jt\n" +
   "  3 september jajan 20rb\n" +
-  "  2026-09-03 jajan 20rb       (tanggal ISO)\n\n" +
+  "  2026-09-03 jajan 20rb       (tanggal ISO)\n" +
+  "  terima sedekah 1jt bsi      (arah masuk)\n" +
+  "  bsi sedekah 1jt             (arah keluar)\n\n" +
   "Transfer:\n" +
   "  transfer 100rb bsi ke gopay\n\n" +
   "Saldo:\n" +
@@ -68,8 +71,12 @@ const HELP =
   "  sesuaikan bsi 100jt         (paksa saldo ke nilai nyata)\n" +
   "  ubah 1 akun bsi             (pindah tx ke akun)\n\n" +
   "Kategori:\n" +
+  "  (arah: terima/masuk/dapat/gaji/bunga = masuk; lain = keluar)\n" +
   "  kategori\n" +
-  "  kategori tambah Sedekah | sedekah, donasi, zakat\n" +
+  "  kategori tambah masuk Bunga | bunga, dividen\n" +
+  "  kategori tambah keluar Sedekah | sedekah, donasi\n" +
+  "  kategori tambah keduanya Sedekah | sedekah\n" +
+  "  kategori sisi Sedekah keduanya\n" +
   "  kategori tambahkata Sedekah | infak\n" +
   "  kategori hapuskata Sedekah | zakat\n" +
   "  kategori ubah Sedekah | sedekah, donasi, zakat\n" +
@@ -86,6 +93,7 @@ const HELP =
   "  riwayat | riwayat 30\n" +
   "  ubah 3 jadi 60rb\n" +
   "  hapus 3\n" +
+  "  hapus 24 25                 (beberapa sekaligus, boleh #24)\n" +
   "  ai | ai reset               (pemakaian AI)\n" +
   "  versi                       (versi aplikasi)\n" +
   "  reset transaksi            (hapus semua, ada backup)\n" +
@@ -251,13 +259,18 @@ export async function handleMessage(input: string): Promise<Reply> {
 
   if (low === "kategori" || low === "kategori list" || low === "kategori daftar") {
     const cats = listCategories();
+    const grp = (tipe: string) => cats.filter((c) => c.tipe === tipe || c.tipe === "keduanya");
+    const fmt = (rs: typeof cats) =>
+      rs.map((c) => `  #${c.id} ${c.nama}${c.keywords.length ? ` (${c.keywords.join(", ")})` : ""}`).join("\n") || "  -";
     return {
       text:
-        "Kategori:\n" +
-        cats
-          .map((c) => `  #${c.id} ${c.nama}${c.keywords.length ? ` (${c.keywords.join(", ")})` : ""}`)
-          .join("\n") +
-        "\n\nTambah kategori: `kategori tambah Sedekah | sedekah, donasi, zakat`\n" +
+        "Kategori:\n\nMasuk:\n" +
+        fmt(grp("masuk")) +
+        "\n\nKeluar:\n" +
+        fmt(grp("keluar")) +
+        "\n\nTambah: `kategori tambah masuk Bunga | bunga, dividen` · `kategori tambah keluar Sedekah | sedekah`\n" +
+        "Dua arah: `kategori tambah keduanya Sedekah | sedekah`\n" +
+        "Pindah sisi: `kategori sisi Sedekah keduanya`\n" +
         "Kata kunci: `kategori tambahkata Sedekah | infak` · `kategori hapuskata Sedekah | zakat`",
     };
   }
@@ -303,20 +316,47 @@ export async function handleMessage(input: string): Promise<Reply> {
   if ((m = text.match(/^kategori tambah\s+(.+)$/i))) {
     const rest = m[1].trim();
     const pipe = rest.indexOf("|");
-    const nama = (pipe === -1 ? rest : rest.slice(0, pipe)).trim();
+    let head = (pipe === -1 ? rest : rest.slice(0, pipe)).trim();
     const kwRaw = pipe === -1 ? "" : rest.slice(pipe + 1).trim();
-    if (!nama) return { text: "Format: `kategori tambah <nama> | kata kunci, dipisah, koma`" };
+    let tipe: string | undefined;
+    const words = head.split(/\s+/).filter(Boolean);
+    for (const t of ["masuk", "keluar", "keduanya"]) {
+      if (words.includes(t)) {
+        tipe = t;
+        head = words.filter((w) => w !== t).join(" ").trim();
+        break;
+      }
+    }
+    const nama = head;
+    if (!nama) return { text: "Format: `kategori tambah [masuk|keluar|keduanya] <nama> | kata kunci`" };
     const keywords = kwRaw
       ? kwRaw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
       : [nama.toLowerCase()];
+    if (!tipe) tipe = keywords.some((k) => MASUK.includes(k)) ? "masuk" : "keluar";
     const existing = getCategoryByName(nama);
     if (existing) {
       const merged = [...new Set([...existing.keywords, ...keywords])];
       updateCategoryKeywords(existing.id, merged);
-      return { text: `Kategori ${existing.nama} diperbarui. Kata kunci: ${merged.join(", ")}` };
+      if (tipe) setCategoryTipe(existing.id, tipe);
+      return {
+        text: `Kategori ${existing.nama} (${tipe}) diperbarui. Kata kunci: ${merged.join(", ")}`,
+      };
     }
-    addCategory(nama, keywords);
-    return { text: `Kategori ${nama} ditambah. Kata kunci: ${keywords.join(", ")}` };
+    addCategory(nama, keywords, tipe);
+    return { text: `Kategori ${nama} [${tipe}] ditambah. Kata kunci: ${keywords.join(", ")}` };
+  }
+
+  if ((m = text.match(/^kategori sisi\s+(.+)$/i))) {
+    const parts = m[1].trim().split(/\s+/);
+    const tipe = parts[parts.length - 1].toLowerCase();
+    const nama = parts.slice(0, -1).join(" ").trim();
+    if (!["masuk", "keluar", "keduanya"].includes(tipe) || !nama) {
+      return { text: "Format: `kategori sisi Sedekah keduanya` (masuk|keluar|keduanya)" };
+    }
+    const cat = getCategoryByName(nama);
+    if (!cat) return { text: `Kategori "${nama}" tidak ada.` };
+    setCategoryTipe(cat.id, tipe);
+    return { text: `Kategori ${cat.nama} → ${tipe}.` };
   }
 
   if ((m = text.match(/^kategori ubah\s+(.+)$/i))) {
@@ -446,7 +486,7 @@ export async function handleMessage(input: string): Promise<Reply> {
     };
   }
 
-  if ((m = low.match(/^lihat\s+(\d+)$/))) {
+  if ((m = low.match(/^lihat\s+#?(\d+)$/))) {
     const tx = getTx(Number(m[1]));
     if (!tx) return { text: `Id ${m[1]} tidak ada.` };
     return {
@@ -458,14 +498,34 @@ export async function handleMessage(input: string): Promise<Reply> {
     };
   }
 
-  if ((m = low.match(/^hapus\s+(\d+)$/))) {
-    const id = Number(m[1]);
-    const n = deleteTx(id);
-    if (!n) return { text: `Id ${id} tidak ada.` };
-    return { text: n > 1 ? `Terhapus #${id} + pasangan transfer (${n} entri).` : `Terhapus #${id}.` };
+  if (/^hapus\b/.test(low)) {
+    const arg = text.replace(/^\s*hapus\s*/i, "").trim();
+    const ids = arg
+      .split(/[\s,]+/)
+      .map((s) => s.replace(/^#/, ""))
+      .filter((s) => /^\d+$/.test(s))
+      .map(Number);
+    if (ids.length === 0) return { text: "Format: `hapus 25` atau `hapus 24 25`." };
+    const okIds: number[] = [];
+    const failIds: number[] = [];
+    let pairs = 0;
+    for (const id of ids) {
+      const n = deleteTx(id);
+      if (n > 0) {
+        okIds.push(id);
+        if (n > 1) pairs += 1;
+      } else {
+        failIds.push(id);
+      }
+    }
+    const parts: string[] = [];
+    if (okIds.length) parts.push(`Terhapus: ${okIds.map((i) => `#${i}`).join(", ")}`);
+    if (failIds.length) parts.push(`Tidak ada: ${failIds.map((i) => `#${i}`).join(", ")}`);
+    if (pairs) parts.push(`(${pairs} transfer ikut terhapus pasangannya)`);
+    return { text: parts.join("\n") };
   }
 
-  if ((m = low.match(/^ubah\s+(\d+)\s+akun\s+(.+)$/))) {
+  if ((m = low.match(/^ubah\s+#?(\d+)\s+akun\s+(.+)$/))) {
     const id = Number(m[1]);
     const acc = getAccountByName(m[2]);
     if (!acc) return { text: `Akun "${m[2]}" tidak ada. Lihat: \`akun\`` };
@@ -475,7 +535,7 @@ export async function handleMessage(input: string): Promise<Reply> {
       : { text: `Id ${id} tidak ada.` };
   }
 
-  if ((m = low.match(/^ubah\s+(\d+)\s+jadi\s+(.+)$/))) {
+  if ((m = low.match(/^ubah\s+#?(\d+)\s+jadi\s+(.+)$/))) {
     const id = Number(m[1]);
     const p = parseLocal(m[2]);
     if (!p) return { text: "Nominal baru tidak kebaca. Contoh: `ubah 3 jadi 60rb`" };
@@ -526,6 +586,16 @@ export async function handleMessage(input: string): Promise<Reply> {
       text: `CSV ${rows.length} transaksi (${label}).`,
       file: { name, content: toCSV(rows) },
     };
+  }
+
+  const CMD_WORDS = [
+    "hapus", "ubah", "lihat", "cari", "laporan", "ringkasan", "report", "csv", "export",
+    "riwayat", "history", "list", "akun", "kategori", "saldo", "transfer", "reset", "ai",
+    "versi", "version", "help", "bantuan",
+  ];
+  const word = low.split(/\s+/)[0];
+  if (CMD_WORDS.includes(word)) {
+    return { text: `Perintah "${word}" tidak dikenali. Ketik \`help\` untuk daftar perintah.` };
   }
 
   const account = resolveAccount(text);

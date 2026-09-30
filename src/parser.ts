@@ -15,7 +15,10 @@ export interface LocalParse {
   reason?: string;
 }
 
-const MASUK = ["gaji", "bonus", "thr", "terima", "dapat", "masuk", "income", "penghasilan", "jual", "profit"];
+export const MASUK = [
+  "gaji", "bonus", "thr", "terima", "dapat", "masuk", "income", "penghasilan", "jual", "profit",
+  "bunga", "dividen", "deviden", "kupon", "cashback", "refund", "pengembalian", "menang", "komisi",
+];
 
 const MULT: Record<string, number> = {
   rb: 1e3, ribu: 1e3, k: 1e3,
@@ -52,7 +55,7 @@ export function parseLocal(text: string): LocalParse | null {
   let kategori = "Lainnya";
   let kategoriKetemu = false;
   let bestLen = 0;
-  for (const cat of listCategories()) {
+  for (const cat of listCategories(tipe)) {
     for (const k of cat.keywords) {
       const kk = k.toLowerCase().trim();
       if (!kk) continue;
