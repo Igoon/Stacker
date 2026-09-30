@@ -390,6 +390,26 @@ export function ringkasRange(from: string, to: string, accountId?: number) {
     .all(...args) as { tipe: string; kategori: string; total: number }[];
 }
 
+export function dailySeries(
+  from: string,
+  to: string,
+  accountId?: number
+): { tanggal: string; masuk: number; keluar: number }[] {
+  const where = accountId != null ? `AND account_id = ?` : "";
+  const args = accountId != null ? [from, to, accountId] : [from, to];
+  return db
+    .prepare(
+      `SELECT tanggal,
+              COALESCE(SUM(CASE WHEN tipe='masuk'  THEN jumlah ELSE 0 END), 0) AS masuk,
+              COALESCE(SUM(CASE WHEN tipe='keluar' THEN jumlah ELSE 0 END), 0) AS keluar
+         FROM transactions
+        WHERE tanggal >= ? AND tanggal <= ? ${where}
+        GROUP BY tanggal
+        ORDER BY tanggal ASC`
+    )
+    .all(...args) as { tanggal: string; masuk: number; keluar: number }[];
+}
+
 export const rupiah = (n: number) => "Rp" + Math.abs(n).toLocaleString("id-ID");
 export const rupiahSigned = (n: number) => (n < 0 ? "-" : "") + rupiah(n);
 

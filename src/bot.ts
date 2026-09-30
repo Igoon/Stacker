@@ -8,6 +8,7 @@ import {
   deleteAllTx,
   deleteCategory,
   deleteTx,
+  dailySeries,
   getAccountByName,
   getCategoryByName,
   getTx,
@@ -32,6 +33,7 @@ import {
 import { parseLocal, MASUK, type ParseResult } from "./parser";
 import { parsePeriod, type Period } from "./dates";
 import { toCSV } from "./csv";
+import { buildDailyRange, buildGrafik, shortRp } from "./chart";
 import { backupTagged } from "./backup";
 import { aiEnabled, aiResetUsage, aiStats, parseGemini } from "./ai";
 import { APP_VERSION } from "./version";
@@ -40,6 +42,7 @@ export interface Reply {
   text: string;
   txs?: Tx[];
   file?: { name: string; content: string };
+  pre?: boolean;
 }
 
 const TIPE_AKUN = ["bank", "ewallet", "cash"];
@@ -83,6 +86,7 @@ const HELP =
   "  kategori hapus Sedekah\n\n" +
   "Laporan & export:\n" +
   "  laporan | laporan september | laporan gopay september\n" +
+  "  grafik | grafik september | grafik gopay\n" +
   "  csv | csv september | csv gopay\n\n" +
   "Cari:\n" +
   "  cari kopi\n" +
@@ -588,8 +592,42 @@ export async function handleMessage(input: string): Promise<Reply> {
     };
   }
 
+  if (/^(grafik|chart|dashboard)\b/.test(low)) {
+    const arg = text.replace(/^\s*(grafik|chart|dashboard)\s*/i, "").trim();
+    const { account, per: perParsed, query } = parseFilter(arg);
+    if (query) {
+      return { text: "Periode/akun tidak dikenali. Contoh: `grafik`, `grafik september`, `grafik gopay september`." };
+    }
+    const per = perParsed ?? parsePeriod("");
+    if (!per) return { text: "Periode tidak dikenali." };
+    const rows = ringkasRange(per.from, per.to, account?.id);
+    const label = per.label + (account ? ` · ${account.nama}` : " · semua akun");
+    if (rows.length === 0) return { text: `Belum ada transaksi ${label}.` };
+
+    const keluarCats = rows.filter((r) => r.tipe === "keluar").map((r) => ({ kategori: r.kategori, total: r.total }));
+    const masukCats = rows.filter((r) => r.tipe === "masuk").map((r) => ({ kategori: r.kategori, total: r.total }));
+    const masuk = masukCats.reduce((a, c) => a + c.total, 0);
+    const keluar = keluarCats.reduce((a, c) => a + c.total, 0);
+
+    const series = dailySeries(per.from, per.to, account?.id);
+    const map = new Map(series.map((s) => [s.tanggal, s.keluar]));
+    const daily = buildDailyRange(per.from, per.to).map((t) => ({ tanggal: t, keluar: map.get(t) ?? 0 }));
+
+    const saldoLines = account
+      ? undefined
+      : accountBalances()
+          .filter((a) => (a.saldo ?? 0) !== 0)
+          .map((a) => `${a.nama} ${shortRp(a.saldo ?? 0)}`);
+
+    return {
+      text: buildGrafik({ label, masuk, keluar, keluarCats, masukCats, daily, saldoLines }),
+      pre: true,
+    };
+  }
+
   const CMD_WORDS = [
     "hapus", "ubah", "lihat", "cari", "laporan", "ringkasan", "report", "csv", "export",
+    "grafik", "chart", "dashboard",
     "riwayat", "history", "list", "akun", "kategori", "saldo", "transfer", "reset", "ai",
     "versi", "version", "help", "bantuan",
   ];

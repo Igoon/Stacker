@@ -105,8 +105,14 @@ async function clearChat(chatId: number): Promise<void> {
   }
 }
 
-async function send(chatId: number, text: string, txs?: Tx[]): Promise<void> {
+const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+async function send(chatId: number, text: string, txs?: Tx[], pre?: boolean): Promise<void> {
   const body: Record<string, unknown> = { chat_id: chatId, text };
+  if (pre) {
+    body.text = `<pre>${escHtml(text)}</pre>`;
+    body.parse_mode = "HTML";
+  }
   if (txs && txs.length > 0) {
     body.reply_markup = {
       inline_keyboard: txs.map((t) => [{ text: `Hapus #${t.id}`, callback_data: `del:${t.id}` }]),
@@ -529,7 +535,7 @@ async function handleUpdate(u: TgUpdate): Promise<void> {
   try {
     const r = await handleMessage(normalize(text));
     const tail = r.txs?.length ? `\n\nSesi sisa ~${minutesLeft(userId)} menit.` : "";
-    await send(chatId, r.text + txLines(r.txs ?? []) + tail, r.txs);
+    await send(chatId, r.text + txLines(r.txs ?? []) + tail, r.txs, r.pre);
     if (r.file) await sendDocument(chatId, r.file.name, r.file.content);
   } catch (e) {
     await send(chatId, "Error: " + (e as Error).message);
