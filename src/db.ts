@@ -377,34 +377,73 @@ export function saldo(accountId?: number): number {
   return row.s + flow.s;
 }
 
-export function ringkasRange(from: string, to: string, accountId?: number) {
-  const where = accountId != null ? `AND account_id = ?` : "";
-  const args = accountId != null ? [from, to, accountId] : [from, to];
+export function ringkasRange(
+  from: string,
+  to: string,
+  accountId?: number,
+  includeTransfer = false
+) {
+  const where = [`tanggal >= ?`, `tanggal <= ?`];
+  const args: (string | number)[] = [from, to];
+  if (!includeTransfer) where.push(`transfer_id IS NULL`);
+  if (accountId != null) {
+    where.push(`account_id = ?`);
+    args.push(accountId);
+  }
   return db
     .prepare(
       `SELECT tipe, kategori, SUM(jumlah) AS total
          FROM transactions
-        WHERE tanggal >= ? AND tanggal <= ? ${where}
+        WHERE ${where.join(" AND ")}
         GROUP BY tipe, kategori
         ORDER BY total DESC`
     )
     .all(...args) as { tipe: string; kategori: string; total: number }[];
 }
 
-export function dailySeries(
+export function transferRange(
   from: string,
   to: string,
   accountId?: number
+): { masuk: number; keluar: number } {
+  const where = [`tanggal >= ?`, `tanggal <= ?`, `transfer_id IS NOT NULL`];
+  const args: (string | number)[] = [from, to];
+  if (accountId != null) {
+    where.push(`account_id = ?`);
+    args.push(accountId);
+  }
+  const row = db
+    .prepare(
+      `SELECT
+         COALESCE(SUM(CASE WHEN tipe='masuk'  THEN jumlah ELSE 0 END), 0) AS masuk,
+         COALESCE(SUM(CASE WHEN tipe='keluar' THEN jumlah ELSE 0 END), 0) AS keluar
+       FROM transactions
+      WHERE ${where.join(" AND ")}`
+    )
+    .get(...args) as { masuk: number; keluar: number };
+  return row;
+}
+
+export function dailySeries(
+  from: string,
+  to: string,
+  accountId?: number,
+  includeTransfer = false
 ): { tanggal: string; masuk: number; keluar: number }[] {
-  const where = accountId != null ? `AND account_id = ?` : "";
-  const args = accountId != null ? [from, to, accountId] : [from, to];
+  const where = [`tanggal >= ?`, `tanggal <= ?`];
+  const args: (string | number)[] = [from, to];
+  if (!includeTransfer) where.push(`transfer_id IS NULL`);
+  if (accountId != null) {
+    where.push(`account_id = ?`);
+    args.push(accountId);
+  }
   return db
     .prepare(
       `SELECT tanggal,
               COALESCE(SUM(CASE WHEN tipe='masuk'  THEN jumlah ELSE 0 END), 0) AS masuk,
               COALESCE(SUM(CASE WHEN tipe='keluar' THEN jumlah ELSE 0 END), 0) AS keluar
          FROM transactions
-        WHERE tanggal >= ? AND tanggal <= ? ${where}
+        WHERE ${where.join(" AND ")}
         GROUP BY tanggal
         ORDER BY tanggal ASC`
     )

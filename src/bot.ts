@@ -25,6 +25,7 @@ import {
   searchTx,
   setAccountSaldoAwal,
   setCategoryTipe,
+  transferRange,
   updateCategoryKeywords,
   updateTx,
   type Account,
@@ -464,10 +465,16 @@ export async function handleMessage(input: string): Promise<Reply> {
     const fmt = (rs: typeof rows) => rs.map((r) => `  ${r.kategori}: ${rupiah(r.total)}`).join("\n");
     const tMasuk = masuk.reduce((a, b) => a + b.total, 0);
     const tKeluar = keluar.reduce((a, b) => a + b.total, 0);
+    const tr = transferRange(per.from, per.to, account?.id);
+    const trLine =
+      tr.masuk > 0 || tr.keluar > 0
+        ? `\n\nTransfer: keluar ${rupiah(tr.keluar)} · masuk ${rupiah(tr.masuk)}`
+        : "";
     return {
       text:
         `Ringkasan ${label}\n\nMasuk (${rupiah(tMasuk)})\n${fmt(masuk) || "  -"}\n\n` +
-        `Keluar (${rupiah(tKeluar)})\n${fmt(keluar) || "  -"}\n\nSelisih: ${rupiahSigned(tMasuk - tKeluar)}`,
+        `Keluar (${rupiah(tKeluar)})\n${fmt(keluar) || "  -"}\n\nSelisih: ${rupiahSigned(tMasuk - tKeluar)}` +
+        trLine,
     };
   }
 
@@ -619,8 +626,10 @@ export async function handleMessage(input: string): Promise<Reply> {
           .filter((a) => (a.saldo ?? 0) !== 0)
           .map((a) => `${a.nama} ${shortRp(a.saldo ?? 0)}`);
 
+    const transfer = transferRange(per.from, per.to, account?.id);
+
     return {
-      text: buildGrafik({ label, masuk, keluar, keluarCats, masukCats, daily, saldoLines }),
+      text: buildGrafik({ label, masuk, keluar, keluarCats, masukCats, daily, transfer, saldoLines }),
       pre: true,
     };
   }

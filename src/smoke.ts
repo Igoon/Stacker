@@ -75,6 +75,21 @@ await check("kata perintah tak jadi transaksi", async () => {
   assert.equal(count(), before);
 });
 
+await check("transfer dikecualikan dari total laporan, saldo akun tetap berubah", async () => {
+  const gopay = dbmod.getAccountByName("GoPay")!;
+  const sumKeluar = () =>
+    dbmod
+      .ringkasRange("2000-01-01", "2099-12-31")
+      .filter((r) => r.tipe === "keluar")
+      .reduce((a, b) => a + b.total, 0);
+  const before = sumKeluar();
+  const saldoBefore = dbmod.accountBalance(gopay.id);
+  await handleMessage("transfer 7rb bsi ke gopay");
+  assert.equal(sumKeluar(), before, "transfer tidak boleh menambah total keluar");
+  assert(dbmod.transferRange("2000-01-01", "2099-12-31").keluar >= 7000, "transferRange harus mencatat transfer");
+  assert.equal(dbmod.accountBalance(gopay.id) - saldoBefore, 7000, "saldo GoPay harus naik 7000");
+});
+
 await check("laporan / grafik / cari tidak kosong", async () => {
   assert((await handleMessage("laporan")).text.length > 0);
   assert((await handleMessage("grafik")).text.length > 0);

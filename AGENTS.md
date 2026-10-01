@@ -32,6 +32,7 @@ Bot pencatatan keuangan via chat (web + Telegram). TypeScript ESM, Express, SQLi
 - Perubahan skema DB: pakai `hasColumn` + `ALTER TABLE` non-destruktif (lihat `src/db.ts`). Jangan drop table.
 - Kategori punya sisi `masuk | keluar | keduanya`; arah transaksi ditebak dari kata kunci (`terima/masuk/dapat/gaji/bunga/...` = masuk).
 - Parsing lokal dulu; AI (`parseGemini`) hanya fallback saat confidence `low`. Jaga biaya AI: jangan tambah panggilan AI bila bisa diselesaikan lokal.
+- Transfer antar akun ditandai `transfer_id` (dua baris). **Dikecualikan** dari total analisa (`ringkasRange`/`dailySeries` default `includeTransfer=false`) dan ditampilkan terpisah; tetap dihitung di saldo akun, CSV, dan riwayat.
 
 ## Peta file
 

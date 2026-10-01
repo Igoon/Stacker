@@ -10,6 +10,7 @@ export interface GrafikInput {
   keluarCats: CatAgg[];
   masukCats: CatAgg[];
   daily: { tanggal: string; keluar: number }[];
+  transfer?: { masuk: number; keluar: number };
   saldoLines?: string[];
   barWidth?: number;
   maxCats?: number;
@@ -105,6 +106,11 @@ export function buildGrafik(g: GrafikInput): string {
   const sisa = g.masuk - g.keluar;
   out.push(`Sisa   ${sisa < 0 ? "-" : "+"}${shortRp(sisa)}`);
   out.push("");
+
+  if (g.transfer && (g.transfer.masuk > 0 || g.transfer.keluar > 0)) {
+    out.push(`Transfer  keluar ${shortRp(g.transfer.keluar)} · masuk ${shortRp(g.transfer.masuk)}`);
+    out.push("");
+  }
 
   const kel = catSection("Keluar per kategori", g.keluarCats, barWidth, maxCats);
   if (kel.length) {
