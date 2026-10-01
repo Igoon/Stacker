@@ -49,6 +49,13 @@ Bot pencatatan keuangan via chat (web + Telegram). TypeScript ESM, Express, SQLi
 - `src/backup.ts` — backup harian + `backupTagged`.
 - `web/index.html` — UI chat web.
 
+## Kebijakan versi (SemVer)
+
+- **MAJOR** — perubahan tak kompatibel: skema destruktif, hapus/ubah perintah, atau ubah arti saldo yang memaksa migrasi.
+- **MINOR** — fitur baru yang kompatibel: perintah, kategori, keamanan, chart.
+- **PATCH** — bugfix.
+- Aturan: tiap rilis fitur → bump versi di `package.json` + `git tag` (mis. `v1.5.0`). Versi ditampilkan lewat perintah `versi`.
+
 ## Workflow
 
 Plan dulu untuk desain; Build untuk eksekusi. Ubah kecil, verifikasi, commit. Jangan ganti stack tengah jalan.
