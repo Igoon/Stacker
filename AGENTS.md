@@ -56,6 +56,14 @@ Bot pencatatan keuangan via chat (web + Telegram). TypeScript ESM, Express, SQLi
 - **PATCH** — bugfix.
 - Aturan: tiap rilis fitur → bump versi di `package.json` + `git tag` (mis. `v1.5.0`). Versi ditampilkan lewat perintah `versi`.
 
+## Auto-start Windows (saat login, tanpa admin)
+
+- Pasang: `powershell -ExecutionPolicy Bypass -File scripts\install-startup.ps1`
+- Lepas: `powershell -ExecutionPolicy Bypass -File scripts\uninstall-startup.ps1`
+- Cara kerja: VBS di folder Startup → `cmd` tersembunyi, tunggu ~15 detik, lalu `node <tsx> src\server.ts`. Log: `finance-bot.log` di root proyek.
+- Jalan **saat login**, bukan sebelum login. Butuh internet untuk Telegram.
+- Jangan jalankan `npm run dev` bersamaan di port 3000 (server auto-exit saat `EADDRINUSE`).
+
 ## Workflow
 
 Plan dulu untuk desain; Build untuk eksekusi. Ubah kecil, verifikasi, commit. Jangan ganti stack tengah jalan.
