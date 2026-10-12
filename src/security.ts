@@ -74,16 +74,21 @@ export function resetFail(): void {
   setSetting(K_LOCK, null);
 }
 
-const sessions = new Map<string, number>();
+interface Sess {
+  exp: number;
+  chatId: number;
+}
 
-export function startSession(userId: string): void {
-  sessions.set(userId, Date.now() + SESSION_MS);
+const sessions = new Map<string, Sess>();
+
+export function startSession(userId: string, chatId: number): void {
+  sessions.set(userId, { exp: Date.now() + SESSION_MS, chatId });
 }
 
 export function isAuthed(userId: string): boolean {
-  const exp = sessions.get(userId);
-  if (!exp) return false;
-  if (Date.now() > exp) {
+  const s = sessions.get(userId);
+  if (!s) return false;
+  if (Date.now() > s.exp) {
     sessions.delete(userId);
     return false;
   }
@@ -91,11 +96,26 @@ export function isAuthed(userId: string): boolean {
 }
 
 export function touchSession(userId: string): void {
-  if (sessions.has(userId)) sessions.set(userId, Date.now() + SESSION_MS);
+  const s = sessions.get(userId);
+  if (s) s.exp = Date.now() + SESSION_MS;
 }
 
-export function endSession(userId: string): void {
+export function endSession(userId: string): Sess | undefined {
+  const s = sessions.get(userId);
   sessions.delete(userId);
+  return s;
+}
+
+export function popExpiredSessions(): { userId: string; chatId: number }[] {
+  const now = Date.now();
+  const out: { userId: string; chatId: number }[] = [];
+  for (const [userId, s] of sessions) {
+    if (now > s.exp) {
+      out.push({ userId, chatId: s.chatId });
+      sessions.delete(userId);
+    }
+  }
+  return out;
 }
 
 export function sessionMinutes(): number {
@@ -103,9 +123,9 @@ export function sessionMinutes(): number {
 }
 
 export function minutesLeft(userId: string): number {
-  const exp = sessions.get(userId);
-  if (!exp) return 0;
-  return Math.max(0, Math.ceil((exp - Date.now()) / 60000));
+  const s = sessions.get(userId);
+  if (!s) return 0;
+  return Math.max(0, Math.ceil((s.exp - Date.now()) / 60000));
 }
 
 export function lockInfoText(): string {

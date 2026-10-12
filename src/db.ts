@@ -40,6 +40,13 @@ CREATE TABLE IF NOT EXISTS categories (
   tipe       TEXT NOT NULL DEFAULT 'keluar',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS bot_messages (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  chat_id    INTEGER NOT NULL,
+  message_id INTEGER NOT NULL,
+  created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
 `);
 
 function hasColumn(table: string, col: string): boolean {
@@ -469,4 +476,29 @@ export function setSetting(key: string, value: string | null): void {
     `INSERT INTO settings (key, value) VALUES (?, ?)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value`
   ).run(key, value);
+}
+
+export function addBotMessage(chatId: number, messageId: number): void {
+  db.prepare(`INSERT INTO bot_messages (chat_id, message_id) VALUES (?, ?)`).run(chatId, messageId);
+  db.prepare(
+    `DELETE FROM bot_messages
+      WHERE chat_id = ?
+        AND id NOT IN (SELECT id FROM bot_messages WHERE chat_id = ? ORDER BY id DESC LIMIT 300)`
+  ).run(chatId, chatId);
+}
+
+export function deleteBotMessage(chatId: number, messageId: number): void {
+  db.prepare(`DELETE FROM bot_messages WHERE chat_id = ? AND message_id = ?`).run(chatId, messageId);
+}
+
+export function takeBotMessages(chatId: number): number[] {
+  const rows = db
+    .prepare(`SELECT message_id FROM bot_messages WHERE chat_id = ? ORDER BY id ASC`)
+    .all(chatId) as { message_id: number }[];
+  db.prepare(`DELETE FROM bot_messages WHERE chat_id = ?`).run(chatId);
+  return rows.map((r) => r.message_id);
+}
+
+export function pruneBotMessages(days = 2): void {
+  db.prepare(`DELETE FROM bot_messages WHERE created_at < datetime('now', ?)`).run(`-${days} days`);
 }

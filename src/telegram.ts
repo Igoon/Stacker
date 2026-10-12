@@ -1,5 +1,12 @@
 import { handleMessage } from "./bot";
-import { deleteTx, type Tx } from "./db";
+import {
+  addBotMessage,
+  deleteBotMessage,
+  deleteTx,
+  pruneBotMessages,
+  takeBotMessages,
+  type Tx,
+} from "./db";
 import {
   MAX_FAIL,
   PIN_RE,
@@ -10,6 +17,7 @@ import {
   isLocked,
   lockInfoText,
   minutesLeft,
+  popExpiredSessions,
   registerFail,
   resetFail,
   sessionMinutes,
@@ -88,21 +96,20 @@ function txLines(txs: Tx[]): string {
   );
 }
 
-const sentIds = new Map<number, number[]>();
-
 function rememberSent(chatId: number, id: number): void {
-  const a = sentIds.get(chatId) ?? [];
-  a.push(id);
-  if (a.length > 300) a.splice(0, a.length - 300);
-  sentIds.set(chatId, a);
+  addBotMessage(chatId, id);
 }
 
 async function clearChat(chatId: number): Promise<void> {
-  const ids = sentIds.get(chatId) ?? [];
-  sentIds.set(chatId, []);
+  const ids = takeBotMessages(chatId);
   for (const id of ids) {
     await call("deleteMessage", { chat_id: chatId, message_id: id });
   }
+}
+
+async function deleteSent(chatId: number, id: number): Promise<void> {
+  await call("deleteMessage", { chat_id: chatId, message_id: id });
+  deleteBotMessage(chatId, id);
 }
 
 const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -200,7 +207,7 @@ async function closeKeypad(chatId: number, userId: string, keepText?: string): P
       reply_markup: { inline_keyboard: [] },
     });
   } else {
-    await call("deleteMessage", { chat_id: chatId, message_id: s.msgId });
+    await deleteSent(chatId, s.msgId);
   }
 }
 
@@ -237,13 +244,13 @@ async function submitPin(chatId: number, userId: string, s: PinState): Promise<v
   }
 
   if (s.mode === "login") {
-    startSession(userId);
+    startSession(userId, chatId);
     await closeKeypad(chatId, userId, `Login OK. Sesi ${sessionMinutes()} menit idle.`);
     return;
   }
   if (s.mode === "set") {
     setPin(pin);
-    startSession(userId);
+    startSession(userId, chatId);
     await closeKeypad(chatId, userId, "PIN dibuat. Kamu login sekarang.");
     return;
   }
@@ -343,7 +350,7 @@ async function handleAuthCommand(
         return true;
       }
       setPin(args);
-      startSession(userId);
+      startSession(userId, chatId);
       await send(chatId, `PIN dibuat. Kamu login sekarang. Sesi ${sessionMinutes()} menit idle.`);
       return true;
     }
@@ -416,7 +423,7 @@ async function handleAuthCommand(
       }
       if (verifyPin(args)) {
         resetFail();
-        startSession(userId);
+        startSession(userId, chatId);
         await send(chatId, `Login OK. Sesi ${sessionMinutes()} menit idle.`);
       } else {
         await send(chatId, failText(userId, registerFail()));
@@ -578,6 +585,15 @@ export function startTelegram(): void {
   }
 
   running = true;
+
+  pruneBotMessages();
+  setInterval(() => {
+    for (const s of popExpiredSessions()) {
+      clearChat(s.chatId).catch((e) =>
+        console.error("[telegram] clear timeout gagal:", (e as Error).message)
+      );
+    }
+  }, 30_000).unref();
 
   (async () => {
     console.log(
