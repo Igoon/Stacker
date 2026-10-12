@@ -8,6 +8,7 @@ process.env.DUIT_DB_DIR = dir;
 
 const { handleMessage } = await import("./bot");
 const dbmod = await import("./db");
+const { parseLocal } = await import("./parser");
 
 let pass = 0;
 let fail = 0;
@@ -88,6 +89,54 @@ await check("transfer dikecualikan dari total laporan, saldo akun tetap berubah"
   assert.equal(sumKeluar(), before, "transfer tidak boleh menambah total keluar");
   assert(dbmod.transferRange("2000-01-01", "2099-12-31").keluar >= 7000, "transferRange harus mencatat transfer");
   assert.equal(dbmod.accountBalance(gopay.id) - saldoBefore, 7000, "saldo GoPay harus naik 7000");
+});
+
+await check("parser: angka dalam kata", async () => {
+  const p = parseLocal("makan lima ribu");
+  assert(p, "harus terparse");
+  assert.equal(p!.result.jumlah, 5000);
+  assert.equal(p!.result.tipe, "keluar");
+  assert.equal(p!.result.kategori, "Makanan");
+  assert.equal(p!.confidence, "high");
+
+  const q = parseLocal("gaji dua juta bsi");
+  assert.equal(q!.result.jumlah, 2000000);
+  assert.equal(q!.result.tipe, "masuk");
+  assert.equal(q!.result.kategori, "Gaji");
+});
+
+await check("parser: word-boundary (kosong bukan Tagihan)", async () => {
+  const p = parseLocal("tabungan kosong 10rb");
+  assert(p);
+  assert.equal(p!.result.jumlah, 10000);
+  assert.notEqual(p!.result.kategori, "Tagihan");
+});
+
+await check("parser: imbuhan tetap cocok (makanan -> Makanan)", async () => {
+  const p = parseLocal("makanan 50rb");
+  assert.equal(p!.result.kategori, "Makanan");
+});
+
+await check("parser: override arah eksplisit", async () => {
+  assert.equal(parseLocal("keluar 50rb")!.result.tipe, "keluar");
+  assert.equal(parseLocal("masuk 50rb")!.result.tipe, "masuk");
+});
+
+await check("parser: arah eksplisit tanpa kategori -> high (hemat AI)", async () => {
+  const kel = parseLocal("keluar 50rb");
+  assert.equal(kel!.confidence, "high");
+  assert.equal(kel!.result.tipe, "keluar");
+  assert.equal(kel!.result.kategori, "Lainnya");
+  assert.equal(kel!.explicitTipe, true);
+
+  const mas = parseLocal("masuk 50rb");
+  assert.equal(mas!.confidence, "high");
+  assert.equal(mas!.result.tipe, "masuk");
+});
+
+await check("parser: tetap low saat perlu AI", async () => {
+  assert.equal(parseLocal("keluar 50")!.confidence, "low");
+  assert.equal(parseLocal("servis motor 150rb")!.confidence, "low");
 });
 
 await check("laporan / grafik / cari tidak kosong", async () => {

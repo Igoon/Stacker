@@ -32,7 +32,9 @@ Bot pencatatan keuangan via chat (web + Telegram). TypeScript ESM, Express, SQLi
 - Perubahan skema DB: pakai `hasColumn` + `ALTER TABLE` non-destruktif (lihat `src/db.ts`). Jangan drop table.
 - Kategori punya sisi `masuk | keluar | keduanya`; arah transaksi ditebak dari kata kunci (`terima/masuk/dapat/gaji/bunga/...` = masuk).
 - Parsing lokal dulu; AI (`parseGemini`) hanya fallback saat confidence `low`. Jaga biaya AI: jangan tambah panggilan AI bila bisa diselesaikan lokal.
+- Parser lokal mendukung: digit (`50rb`), **angka dalam kata** (`lima ribu`, `dua juta`), kata kunci kategori dengan aturan imbuhan (kata ≥4 huruf boleh bersuffix; ≤3 huruf wajib utuh), dan **arah eksplisit** (`masuk`/`keluar`/`pengeluaran`/`pendapatan`). Arah eksplisit tanpa kategori → `Lainnya` **tanpa** memanggil AI (hemat kredit); pesan ambigu (multi-angka, nominal <1000, kategori tak dikenal tanpa kata arah) tetap ke AI.
 - Transfer antar akun ditandai `transfer_id` (dua baris). **Dikecualikan** dari total analisa (`ringkasRange`/`dailySeries` default `includeTransfer=false`) dan ditampilkan terpisah; tetap dihitung di saldo akun, CSV, dan riwayat.
+- Pesan bot Telegram dilacak di tabel `bot_messages` (tahan restart). `/logout` dan **sesi idle kedaluwarsa** (sweep 30 dtk) menghapus pesan bot. Batas Telegram: hanya pesan bot yang bisa dihapus, maksimal 48 jam; pesan user tak bisa dihapus.
 
 ## Peta file
 
