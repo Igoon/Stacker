@@ -92,9 +92,14 @@
       const d = document.createElement("div");
       d.className = "tx";
       const sign = tx.tipe === "masuk" ? "+" : "-";
-      d.innerHTML =
-        "<b>" + sign + tx.rupiah + "</b> · " + tx.kategori +
-        (tx.akun ? " · " + tx.akun : "") + " · #" + tx.id;
+      const strong = document.createElement("b");
+      strong.textContent = sign + tx.rupiah;
+      d.appendChild(strong);
+      d.appendChild(
+        document.createTextNode(
+          " · " + tx.kategori + (tx.akun ? " · " + tx.akun : "") + " · #" + tx.id
+        )
+      );
       const btn = document.createElement("button");
       btn.textContent = "Hapus";
       btn.onclick = async () => {

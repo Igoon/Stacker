@@ -19,6 +19,15 @@ const WEB_PASSWORD = (process.env.WEB_PASSWORD ?? "").trim();
 const WEB_MAX_FAIL = Math.max(1, Number(process.env.WEB_MAX_FAIL ?? 5));
 const WEB_LOCK_MS = Math.max(1, Number(process.env.WEB_LOCK_MINUTES ?? 15)) * 60_000;
 
+const IS_LOCAL = ["127.0.0.1", "localhost", "::1"].includes(HOST);
+if (!IS_LOCAL && !WEB_PASSWORD) {
+  console.error(
+    `Tolak start: HOST="${HOST}" (non-lokal) tetapi WEB_PASSWORD kosong. ` +
+      "Set WEB_PASSWORD, atau bind ke 127.0.0.1. Akses jauh wajib lewat VPN/HTTPS."
+  );
+  process.exit(1);
+}
+
 function safeEqual(a: string, b: string): boolean {
   const ab = Buffer.from(a);
   const bb = Buffer.from(b);
@@ -27,6 +36,14 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 const webFails = new Map<string, { count: number; lockUntil: number }>();
+
+function pruneFails(): void {
+  const now = Date.now();
+  for (const [ip, a] of webFails) {
+    if (a.count === 0 && a.lockUntil < now) webFails.delete(ip);
+  }
+  if (webFails.size > 5000) webFails.clear();
+}
 
 function lockRemainMs(ip: string): number {
   const a = webFails.get(ip);
@@ -38,16 +55,24 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.disable("x-powered-by");
 app.use(express.json({ limit: "256kb" }));
-app.use((_req, res, next) => {
+app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
+      "img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+  );
+  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  if (req.path.startsWith("/api")) res.setHeader("Cache-Control", "no-store");
   next();
 });
 
 if (WEB_PASSWORD) {
   app.use((req, res, next) => {
     const ip = req.ip ?? req.socket.remoteAddress ?? "?";
+    pruneFails();
 
     const remain = lockRemainMs(ip);
     if (remain > 0) {
