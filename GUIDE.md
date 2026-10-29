@@ -201,6 +201,9 @@ ubah 3 jadi 60rb               → ubah nominal
 hapus 3                        → hapus #3
 hapus 24 25                    → hapus beberapa (boleh #24)
 undo                           → batalkan aksi terakhir (maks 20 langkah)
+berulang listrik 350rb tiap 5  → catat otomatis tiap bulan
+berulang                       → daftar transaksi berulang
+berulang hapus 1               → hentikan yang #1
 reset transaksi                → hapus semua (file backup JSON terunduh otomatis)
 ```
 
@@ -261,6 +264,20 @@ Catatan:
   menghapus. Simpan file itu — bisa di-restore lewat tombol **⬆ Restore**.
 - Hapus akun tidak menghapus transaksi: transaksinya dipindah ke akun **Cash**
   supaya total saldo tetap sama dengan jumlah saldo akun.
+- Transaksi berulang (`berulang ...`) ikut tersimpan di file backup.
+
+### Transaksi berulang
+
+```
+berulang                       → daftar
+berulang listrik 350rb tiap 5  → otomatis tiap tgl 5
+berulang bsi sewa 1,5jt tiap 1 → dengan akun
+berulang hapus 2               → hentikan
+```
+
+Dicatat otomatis saat app dibuka (dan saat cek saldo). Idempotent — tak akan
+dobel di bulan yang sama, dan bulan yang terlewat akan diisi saat app dibuka
+lagi. Tanggal dibatasi 1–28 supaya aman di bulan pendek.
 
 Lakukan backup rutin, terutama di iOS (storage bisa kena *eviction*).
 

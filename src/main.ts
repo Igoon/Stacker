@@ -135,6 +135,9 @@ function addBubble(text: string, side: "me" | "bot", txs?: Tx[], file?: { name: 
 async function refresh(): Promise<Record<string, unknown>> {
   const r = await call({ type: "state" });
   saldoEl.textContent = "Saldo: " + r.saldoRupiah;
+  // Notice dari worker (mis. transaksi berulang yang baru dicatat).
+  const notes = Array.isArray(r.notices) ? (r.notices as string[]) : [];
+  for (const n of notes) addBubble(n, "bot");
   return r;
 }
 

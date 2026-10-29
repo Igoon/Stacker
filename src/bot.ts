@@ -3,10 +3,13 @@ import {
   accountBalances,
   addAccount,
   addCategory,
+  addRecurring,
   addTx,
   deleteAccount,
   deleteAllTx,
+  deleteBudget,
   deleteCategory,
+  deleteRecurring,
   deleteTx,
   dailySeries,
   getAccountByName,
@@ -18,12 +21,14 @@ import {
   listBudgets,
   listCategories,
   listRange,
+  listRecurring,
   listTx,
   ringkasRange,
   reconcileAccount,
   renameAccount,
   rupiah,
   rupiahSigned,
+  runRecurring,
   saldo,
   searchTx,
   setAccountSaldoAwal,
@@ -32,7 +37,6 @@ import {
   transferRange,
   updateCategoryKeywords,
   updateTx,
-  deleteBudget,
   type Account,
   type Tx,
 } from "./db";
@@ -108,6 +112,8 @@ const HELP =
   "  hapus 3\n" +
   "  hapus 24 25                 (beberapa sekaligus, boleh #24)\n" +
   "  undo                        (batalkan aksi terakhir)\n" +
+  "  berulang listrik 350rb tiap 5   (auto tiap bulan)\n" +
+  "  berulang | berulang hapus 1\n" +
   "  ai | ai reset               (pemakaian AI)\n" +
   "  versi                       (versi aplikasi)\n" +
   "  reset transaksi            (hapus semua, ada backup)\n" +
@@ -743,6 +749,55 @@ async function handleMessageInner(input: string): Promise<Reply> {
       return { text: `Anggaran ${nama} = ${rupiah(jumlah)}/bulan.` };
     }
     return { text: "Format: `anggaran Makanan 2jt`, `anggaran hapus Makanan`, `anggaran`." };
+  }
+
+  if (low === "berulang" || low === "berulang list" || low === "transaksi berulang") {
+    const rows = listRecurring();
+    if (rows.length === 0) {
+      return { text: "Belum ada transaksi berulang. Contoh: `berulang listrik 350rb tiap 5`." };
+    }
+    const lines = rows.map((r) => {
+      const acc = r.account_id != null ? ` · ${listAccounts().find((a) => a.id === r.account_id)?.nama ?? "?"}` : "";
+      const status = r.aktif ? "aktif" : "nonaktif";
+      return `  #${r.id} ${r.catatan} ${r.tipe === "masuk" ? "+" : "-"}${rupiah(r.jumlah)} tiap tgl ${r.hari}${acc} (${status})${r.terakhir ? ` · terakhir ${r.terakhir}` : ""}`;
+    });
+    return { text: `Transaksi berulang:\n${lines.join("\n")}` };
+  }
+
+  if ((m = text.match(/^berulang hapus\s+#?(\d+)$/i))) {
+    const id = Number(m[1]);
+    return { text: deleteRecurring(id) ? `Transaksi berulang #${id} dihapus.` : `Tidak ada #${id}.` };
+  }
+
+  if ((m = text.match(/^berulang\s+(.+)$/i))) {
+    let rest = m[1].trim();
+    let hari = 1;
+    const tiap = rest.match(/\btiap\s+(?:tgl\s+|tanggal\s+)?(\d{1,2})\b/i);
+    if (tiap && tiap.index != null) {
+      hari = Number(tiap[1]);
+      rest = (rest.slice(0, tiap.index) + rest.slice(tiap.index + tiap[0].length)).trim();
+    }
+    if (hari < 1 || hari > 28) return { text: "Tanggal harus 1-28 (biar aman di semua bulan)." };
+    const { account, query } = parseFilter(rest);
+    const parsed = parseLocal(query || rest);
+    if (!parsed || parsed.result.jumlah <= 0) {
+      return { text: "Format: `berulang listrik 350rb tiap 5` (opsional: `bsi listrik 350rb tiap 5`)." };
+    }
+    const rec = addRecurring({
+      catatan: query || parsed.result.catatan,
+      jumlah: parsed.result.jumlah,
+      tipe: parsed.result.tipe,
+      kategori: parsed.result.kategori,
+      account_id: account?.id ?? null,
+      hari,
+    });
+    const ran = runRecurring();
+    const tail = ran.created > 0 ? `\nLangsung dicatat: ${ran.entries.join(", ")}` : "";
+    return {
+      text:
+        `Berulang #${rec.id}: ${rec.catatan} ${rupiah(rec.jumlah)} tiap tgl ${hari}` +
+        `${account ? ` · ${account.nama}` : ""} → ${rec.kategori}.${tail}`,
+    };
   }
 
   const CMD_WORDS = [

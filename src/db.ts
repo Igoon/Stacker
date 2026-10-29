@@ -48,6 +48,20 @@ CREATE TABLE IF NOT EXISTS budgets (
   kategori TEXT PRIMARY KEY,
   jumlah   INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS recurring (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  catatan    TEXT    NOT NULL,
+  jumlah     INTEGER NOT NULL,
+  tipe       TEXT    NOT NULL CHECK (tipe IN ('masuk','keluar')),
+  kategori   TEXT    NOT NULL,
+  account_id INTEGER REFERENCES accounts(id),
+  hari       INTEGER NOT NULL DEFAULT 1,
+  mulai      TEXT    NOT NULL,
+  terakhir   TEXT,
+  aktif      INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
 `);
 
   function hasColumn(table: string, col: string): boolean {
@@ -554,6 +568,108 @@ export function deleteBudget(kategori: string): boolean {
     .run(kategori.trim()).changes > 0;
 }
 
+// ---------- Transaksi berulang (bulanan) ----------
+export interface Recurring {
+  id: number;
+  catatan: string;
+  jumlah: number;
+  tipe: "masuk" | "keluar";
+  kategori: string;
+  account_id: number | null;
+  hari: number;
+  mulai: string;
+  terakhir: string | null;
+  aktif: number;
+}
+
+export function listRecurring(): Recurring[] {
+  return db.prepare(`SELECT * FROM recurring ORDER BY id ASC`).all() as Recurring[];
+}
+
+export function addRecurring(input: {
+  catatan: string;
+  jumlah: number;
+  tipe: "masuk" | "keluar";
+  kategori: string;
+  account_id?: number | null;
+  hari: number;
+  mulai?: string;
+}): Recurring {
+  const info = db
+    .prepare(
+      `INSERT INTO recurring (catatan, jumlah, tipe, kategori, account_id, hari, mulai)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      input.catatan.trim(),
+      input.jumlah,
+      input.tipe,
+      input.kategori,
+      input.account_id ?? null,
+      Math.min(28, Math.max(1, Math.round(input.hari))),
+      input.mulai ?? isoLocal()
+    );
+  return db.prepare(`SELECT * FROM recurring WHERE id = ?`).get(Number(info.lastInsertRowid)) as Recurring;
+}
+
+export function deleteRecurring(id: number): boolean {
+  return db.prepare(`DELETE FROM recurring WHERE id = ?`).run(id).changes > 0;
+}
+
+function daysInMonth(y: number, m: number): number {
+  return new Date(y, m, 0).getDate();
+}
+
+// Catat transaksi berulang yang sudah jatuh tempo. Idempotent: `terakhir`
+// menyimpan tanggal posting terakhir, jadi pemanggilan berulang tak menduplikasi.
+export function runRecurring(today = isoLocal()): { created: number; entries: string[] } {
+  const t = today.split("-").map(Number);
+  const ty = t[0];
+  const tm = t[1];
+  let created = 0;
+  const entries: string[] = [];
+
+  for (const rec of listRecurring().filter((r) => r.aktif)) {
+    const anchor = rec.terakhir ?? rec.mulai;
+    const a = anchor.split("-").map(Number);
+    if (a.length < 2 || !a[0] || !a[1]) continue;
+
+    // Mulai dari bulan setelah posting terakhir (atau bulan `mulai` bila belum pernah).
+    let y = a[0];
+    let m = a[1] + (rec.terakhir ? 1 : 0);
+    while (m > 12) {
+      m -= 12;
+      y += 1;
+    }
+
+    let guard = 0;
+    while ((y < ty || (y === ty && m <= tm)) && guard++ < 24) {
+      const day = Math.min(rec.hari, daysInMonth(y, m));
+      const tanggal = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      if (tanggal > today) break;
+
+      addTx({
+        jumlah: rec.jumlah,
+        tipe: rec.tipe,
+        kategori: rec.kategori,
+        catatan: rec.catatan,
+        tanggal,
+        account_id: rec.account_id,
+      });
+      db.prepare(`UPDATE recurring SET terakhir = ? WHERE id = ?`).run(tanggal, rec.id);
+      created++;
+      entries.push(`${rec.catatan} ${rupiah(rec.jumlah)} (${tanggal})`);
+      m += 1;
+      if (m > 12) {
+        m = 1;
+        y += 1;
+      }
+    }
+  }
+
+  return { created, entries };
+}
+
 // Key settings yang TIDAK ikut export: kredensial + penanda snapshot internal.
 const SETTING_EXPORT_SKIP = new Set(["ai_key"]);
 const settingExportable = (key: string): boolean =>
@@ -573,6 +689,7 @@ export function exportAll(): string {
       .prepare(`SELECT id, nama, keywords, tipe, created_at FROM categories ORDER BY id ASC`)
       .all() as unknown[],
     budgets: listBudgets(),
+    recurring: listRecurring(),
     settings,
   };
   return JSON.stringify({ version: 2, tables });
@@ -588,7 +705,7 @@ export function importAll(json: string): void {
   const localAiKey = getSetting("ai_key");
 
   db.transaction(() => {
-    db.exec(`DELETE FROM transactions; DELETE FROM accounts; DELETE FROM categories; DELETE FROM budgets; DELETE FROM settings;`);
+    db.exec(`DELETE FROM transactions; DELETE FROM accounts; DELETE FROM categories; DELETE FROM budgets; DELETE FROM recurring; DELETE FROM settings;`);
 
     const insAcc = db.prepare(
       `INSERT INTO accounts (id, nama, tipe, saldo_awal, created_at) VALUES (?, ?, ?, ?, ?)`
@@ -622,6 +739,27 @@ export function importAll(json: string): void {
     for (const r of t.budgets ?? []) {
       const b = r as { kategori: string; jumlah: number };
       insBudget.run(b.kategori, b.jumlah);
+    }
+
+    const insRec = db.prepare(
+      `INSERT INTO recurring (id, catatan, jumlah, tipe, kategori, account_id, hari, mulai, terakhir, aktif, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    for (const r of t.recurring ?? []) {
+      const x = r as Recurring;
+      insRec.run(
+        x.id,
+        x.catatan,
+        x.jumlah,
+        x.tipe,
+        x.kategori,
+        x.account_id ?? null,
+        x.hari,
+        x.mulai,
+        x.terakhir ?? null,
+        x.aktif ?? 1,
+        (x as unknown as { created_at: string }).created_at
+      );
     }
 
     const insSetting = db.prepare(`INSERT INTO settings (key, value) VALUES (?, ?)`);

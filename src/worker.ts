@@ -10,6 +10,7 @@ import {
   countTx,
   accountBalances,
   deleteTxWithIds,
+  runRecurring,
 } from "./db";
 import { handleMessage } from "./bot";
 import { aiEnabled, aiStats, getAiConfig, setAiConfig } from "./ai";
@@ -68,6 +69,7 @@ async function boot(): Promise<void> {
   const db = new poolUtil.OpfsSAHPoolDb("/stacker.db");
   mini = createMiniDb(sqlite3, db as never);
   initDb(mini);
+  runRecurring();
 }
 
 function reply(id: number, payload: unknown): void {
@@ -75,6 +77,13 @@ function reply(id: number, payload: unknown): void {
 }
 
 function state() {
+  // Catat transaksi berulang yang jatuh tempo (idempotent). Bila ada yang
+  // tercatat, kirim sebagai notice sekali ke UI.
+  const rec = runRecurring();
+  const notices: string[] = [];
+  if (rec.created > 0) {
+    notices.push(`Transaksi berulang otomatis dicatat (${rec.created}):\n${rec.entries.join("\n")}`);
+  }
   // Chat bersifat ephemeral: jangan kirim riwayat lengkap. Cukup jumlah baris
   // supaya UI bisa menampilkan hint singkat saat pertama dibuka.
   return {
@@ -92,6 +101,7 @@ function state() {
       rupiah: a.rupiah,
     })),
     txCount: countTx(),
+    notices,
   };
 }
 

@@ -236,6 +236,24 @@ await check("undo mengembalikan aksi terakhir", async () => {
   assert.equal(count(), before, "jumlah tx kembali");
 });
 
+await check("berulang: catat otomatis, idempotent, hapus", async () => {
+  const before = count();
+  const r = await handleMessage("berulang listrik 350rb tiap 1");
+  assert(r.text.includes("Berulang #"), "harus terdaftar");
+  assert.equal(count(), before + 1, "bulan berjalan langsung dicatat");
+
+  const recs = dbmod.listRecurring();
+  const rec = recs[recs.length - 1];
+  assert(rec && rec.catatan.includes("listrik"), "recurring tersimpan");
+
+  const again = dbmod.runRecurring();
+  assert.equal(again.created, 0, "tak boleh dobel di bulan yang sama");
+  assert.equal(count(), before + 1);
+
+  await handleMessage(`berulang hapus ${rec.id}`);
+  assert(!dbmod.listRecurring().some((x) => x.id === rec.id), "harus terhapus");
+});
+
 await check("anggaran: set, peringatan 80%/tembus, list, hapus", async () => {
   await handleMessage("anggaran Hiburan 100rb");
   assert((await handleMessage("anggaran")).text.includes("Hiburan"));
