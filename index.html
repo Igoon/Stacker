@@ -29,9 +29,14 @@
       <button id="import" title="Muat backup JSON">⬆ Restore</button>
       <button id="wall" title="Atur wallpaper chat">🎨</button>
       <button id="aikey" title="Atur AI (Gemini / OpenAI-compatible)">⚙ AI</button>
+      <button id="info" title="Info penyimpanan & auto-backup">ℹ</button>
       <span id="busy" hidden>…</span>
     </div>
   </header>
+  <div id="update" class="updatebar" hidden>
+    <span>Versi baru tersedia.</span>
+    <button id="updateReload">Muat ulang</button>
+  </div>
   <div id="chat"></div>
   <footer>
     <input id="input" placeholder="makan siang 50rb..." autocomplete="off" />
@@ -107,6 +112,25 @@
     <div class="modal-actions">
       <button id="passCancel">Batal</button>
       <button id="passOk">Buka</button>
+    </div>
+  </div>
+</div>
+
+<div id="infoModal" class="modal" hidden>
+  <div class="modal-box">
+    <h3>Info & penyimpanan</h3>
+    <div id="infoLines" class="info-lines"></div>
+    <div class="info-actions">
+      <button id="pickDir">Pilih folder auto-backup</button>
+      <button id="backupNow">Backup ke folder sekarang</button>
+      <button id="clearDir">Matikan auto-backup</button>
+    </div>
+    <p class="info-note">
+      Auto-backup hanya menulis ke folder yang kamu pilih (Chrome/Edge/Android).
+      Data tidak dikirim ke mana pun. Di iPhone/iPad, pakai tombol Backup.
+    </p>
+    <div class="modal-actions">
+      <button id="infoClose">Tutup</button>
     </div>
   </div>
 </div>

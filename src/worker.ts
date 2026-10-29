@@ -6,12 +6,12 @@ import { createMiniDb, type MiniDb } from "./mini-sqlite";
 import {
   initDb,
   saldo,
-  rupiah,
   rupiahSigned,
   countTx,
   accountBalances,
   deleteTxWithIds,
   getSetting,
+  setSetting,
   runRecurring,
 } from "./db";
 import { handleMessage } from "./bot";
@@ -49,6 +49,11 @@ interface PinCheckMsg {
   id: number;
   pin: string;
 }
+interface MarkBackupMsg {
+  type: "markbackup";
+  id: number;
+  tanggal?: string;
+}
 interface GetAiMsg {
   type: "getai";
   id: number;
@@ -69,7 +74,8 @@ type InMsg =
   | ImportMsg
   | GetAiMsg
   | SetAiMsg
-  | PinCheckMsg;
+  | PinCheckMsg
+  | MarkBackupMsg;
 
 let mini: MiniDb;
 
@@ -101,6 +107,25 @@ function state() {
   if (rec.created > 0) {
     notices.push(`Transaksi berulang otomatis dicatat (${rec.created}):\n${rec.entries.join("\n")}`);
   }
+
+  // Pengingat backup: makin lama makin penting, terutama di iOS (storage bisa
+  // dibersihkan). Cukup sekali per pembukaan app.
+  const n = countTx();
+  const lastBackup = getSetting("last_backup_at");
+  if (n > 0) {
+    if (!lastBackup) {
+      notices.push(
+        "Belum pernah backup. Ketuk ⬇ Backup (atau ketik `backup`) supaya data aman."
+      );
+    } else {
+      const ts = new Date(lastBackup + "T00:00:00").getTime();
+      const days = Math.floor((Date.now() - ts) / 86_400_000);
+      if (Number.isFinite(days) && days >= 14) {
+        notices.push(`Backup terakhir ${days} hari lalu. Ketuk ⬇ Backup atau ketik \`backup\`.`);
+      }
+    }
+  }
+
   // Chat bersifat ephemeral: jangan kirim riwayat lengkap. Cukup jumlah baris
   // supaya UI bisa menampilkan hint singkat saat pertama dibuka.
   return {
@@ -117,8 +142,9 @@ function state() {
       saldo: a.saldo ?? 0,
       rupiah: a.rupiah,
     })),
-    txCount: countTx(),
+    txCount: n,
     pinSet: !!getSetting("pin_hash"),
+    lastBackupAt: lastBackup,
     notices,
   };
 }
@@ -139,8 +165,14 @@ async function onMessage(msg: InMsg): Promise<void> {
       break;
     }
     case "export":
+      setSetting("last_backup_at", new Date().toISOString().slice(0, 10));
       reply(msg.id, { ok: true, json: exportJson() });
       break;
+    case "markbackup": {
+      setSetting("last_backup_at", msg.tanggal ?? new Date().toISOString().slice(0, 10));
+      reply(msg.id, { ok: true });
+      break;
+    }
     case "import": {
       try {
         let json = msg.json;

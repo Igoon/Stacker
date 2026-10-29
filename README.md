@@ -34,6 +34,12 @@ npm run e2e        # E2E Playwright (Chrome terpasang, OPFS + worker + UI)
 E2E memakai `channel: "chrome"` sehingga tak perlu mengunduh browser
 Playwright. Server dev dijalankan otomatis di `localhost:5199`.
 
+## CI
+
+`.github/workflows/ci.yml` menjalankan `npm run verify` + `npm run e2e`
+(Chromium) untuk setiap push/PR ke `main`. Workflow deploy juga menjalankan
+`npm run verify` sebelum build, jadi situs tak ter-deploy kalau logika rusak.
+
 ## Persyaratan runtime
 
 - OPFS butuh **secure context**: `https://` atau `localhost`. Buka lewat
@@ -64,7 +70,11 @@ Playwright. Server dev dijalankan otomatis di `localhost:5199`.
 - **PIN + auto-lock** (2 menit idle / app ditinggalkan) — kunci tampilan, hash
   PBKDF2, bukan enkripsi disk.
 - **Backup terenkripsi** (`backup kunci <sandi>`, AES-GCM 256 + PBKDF2).
+- **Auto-backup folder** (File System Access API) + pengingat backup 14 hari,
+  status storage permanen (`navigator.storage.persist()`) di modal **ℹ**.
+- **Update prompt** service worker ("Versi baru tersedia → Muat ulang").
 - Share target PWA (Android/desktop) dan wallpaper chat lokal.
+- Parser diuji dengan korpus 20 kalimat (`src/parser-cases.ts`).
 
 ## Backup / migrasi
 
@@ -107,5 +117,5 @@ Tidak perlu header COOP/COEP karena memakai `opfs-sahpool`.
 
 ## Versi
 
-`v2.3.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
+`v2.4.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
 Nilai versi di-hardcode di `src/version.ts` (browser tak bisa baca `package.json`).

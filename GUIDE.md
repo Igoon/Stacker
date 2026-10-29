@@ -328,6 +328,24 @@ Catatan:
   supaya total saldo tetap sama dengan jumlah saldo akun.
 - Transaksi berulang (`berulang ...`) ikut tersimpan di file backup.
 
+### Penyimpanan permanen & auto-backup
+
+Ketuk **ℹ** di toolbar:
+
+- **Penyimpanan permanen** — app meminta `navigator.storage.persist()` saat
+  dibuka supaya browser tidak membersihkan data saat storage menipis. Status
+  "ya/belum" tampil di modal; kalau "belum", tetap backup rutin.
+- **Pemakaian storage** — perkiraan ruang terpakai vs kuota.
+- **Auto-backup folder** (Chrome/Edge/Android) — pilih folder sekali; app
+  menulis `stacker-auto-YYYY-MM-DD.json` otomatis saat dibuka (sekali per hari)
+  dan saat tombol **Backup ke folder sekarang**. Tidak ada data yang dikirim
+  ke internet. File ditulis plaintext JSON — kalau perlu terenkripsi, pakai
+  `backup kunci <sandi>` manual.
+- **Pengingat** — chat menampilkan notice bila belum pernah backup atau backup
+  terakhir ≥ 14 hari.
+- **Bar "Versi baru tersedia"** — saat service worker memperbarui cache, app
+  menampilkan tombol **Muat ulang** (tidak auto-reload supaya ketikan tak hilang).
+
 ### Transaksi berulang
 
 ```
@@ -355,6 +373,9 @@ Lakukan backup rutin, terutama di iOS (storage bisa kena *eviction*).
 | Tidak bisa install (banner tak muncul) | Pastikan HTTPS/localhost. Chrome butuh icon 192 & 512 (sudah ada). |
 | iOS tak muncul "Add to Home Screen" | Pakai Safari, bukan Chrome. |
 | Data hilang setelah lama | Restore dari file backup. |
+| Muncul bar "Versi baru tersedia" | Ketuk **Muat ulang** untuk memakai versi terbaru (data tidak hilang). |
+| Tombol auto-backup folder tak ada | File System Access API hanya Chrome/Edge/Android. Di iOS/Safari pakai **⬇ Backup**. |
+| Auto-backup tidak jalan otomatis | Buka **ℹ** → **Pilih folder auto-backup** sekali (izin folder bisa dicabut browser). Tombol **Backup ke folder sekarang** memaksa tulis. |
 | AI tidak aktif | Provider Gemini butuh key. Provider OpenAI butuh base URL. |
 
 ---

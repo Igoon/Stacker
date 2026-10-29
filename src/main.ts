@@ -1,6 +1,15 @@
 // main.ts — UI chat di main thread. Semua logika + DB berjalan di worker.
 import "./style.css";
 import type { Tx } from "./db";
+import {
+  folderPermission,
+  forgetFolder,
+  getFolder,
+  pickFolder,
+  supportsFolderBackup,
+  writeBackupFile,
+  type FolderHandle,
+} from "./folder";
 
 interface Reply {
   id: number;
@@ -14,7 +23,15 @@ interface Reply {
 
 const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
 
+// Service worker: cache app shell. Kalau SW baru mengambil alih, tampilkan bar
+// "Muat ulang" — jangan reload otomatis supaya input user tak hilang.
 if ("serviceWorker" in navigator) {
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController) return;
+    const bar = document.getElementById("update");
+    if (bar) bar.hidden = false;
+  });
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register(new URL(/* @vite-ignore */ "../sw.js", import.meta.url), { scope: "./" })
@@ -39,15 +56,9 @@ worker.onmessage = (ev: MessageEvent<{ id: number } & Record<string, unknown>>) 
   if (m.id === -1) {
     if (m.type === "ready") {
       ready = true;
+      appVersion = String(m.version ?? "");
       setSub(`v${m.version}`);
-      void refresh().then((s) => {
-        if (s.pinSet) {
-          lockNow();
-        } else {
-          showStartupHint(s);
-          handleSharedText();
-        }
-      });
+      void nowReady();
     } else if (m.type === "error") {
       setSub("gagal inisialisasi DB");
       addBubble(
@@ -187,6 +198,8 @@ async function refresh(): Promise<Record<string, unknown>> {
   const r = await call({ type: "state" });
   saldoEl.textContent = "Saldo: " + r.saldoRupiah;
   pinSet = !!r.pinSet;
+  txCount = Number(r.txCount ?? 0);
+  lastBackupAt = typeof r.lastBackupAt === "string" ? r.lastBackupAt : null;
   // Notice dari worker (mis. transaksi berulang yang baru dicatat).
   const notes = Array.isArray(r.notices) ? (r.notices as string[]) : [];
   for (const n of notes) addBubble(n, "bot");
@@ -507,6 +520,7 @@ function unlockUi(): void {
   void refresh().then((s) => {
     showStartupHint(s);
     handleSharedText();
+    void autoBackup();
   });
 }
 
@@ -590,6 +604,151 @@ passInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") document.getElementById("passOk")!.click();
 });
 
+// ---------- Info, storage permanen, auto-backup folder ----------
+let appVersion = "";
+let txCount = 0;
+let lastBackupAt: string | null = null;
+let persisted = false;
+let folder: FolderHandle | null = null;
+let storageText = "";
+
+const todayStr = (): string => new Date().toISOString().slice(0, 10);
+
+const infoModal = document.getElementById("infoModal")!;
+const infoLines = document.getElementById("infoLines")!;
+const pickDirBtn = document.getElementById("pickDir") as HTMLButtonElement;
+const backupNowBtn = document.getElementById("backupNow") as HTMLButtonElement;
+const clearDirBtn = document.getElementById("clearDir") as HTMLButtonElement;
+
+async function nowReady(): Promise<void> {
+  const s = await refresh();
+  if (s.pinSet) {
+    lockNow();
+  } else {
+    showStartupHint(s);
+    handleSharedText();
+  }
+  await initStorage();
+}
+
+async function initStorage(): Promise<void> {
+  try {
+    const st = navigator.storage;
+    if (st) {
+      persisted = (await st.persisted?.()) ?? false;
+      // Minta storage permanen supaya OPFS tak dibersihkan browser saat
+      // penyimpanan menipis. Bisa ditolak (mis. mode privat) — abaikan.
+      if (!persisted && st.persist) persisted = await st.persist();
+    }
+  } catch {
+    // Storage API dibatasi; lanjut tanpa status permanen.
+  }
+  folder = await getFolder();
+  if (!lockEl.hidden) return; // tunggu dibuka dulu kalau PIN aktif
+  await autoBackup();
+}
+
+async function autoBackup(force = false): Promise<void> {
+  if (!folder) return;
+  if (!force && lastBackupAt === todayStr()) return;
+  if (!(await folderPermission(folder, false))) return;
+  try {
+    const dir = folder;
+    const r = await call({ type: "export" });
+    const name = `stacker-${force ? "backup" : "auto"}-${todayStr()}.json`;
+    await writeBackupFile(dir, name, r.json as string);
+    lastBackupAt = todayStr();
+    addBubble(
+      `${force ? "Backup disimpan" : "Auto-backup disimpan"}: ${name} (folder ${dir.name}).`,
+      "bot"
+    );
+    renderInfo();
+  } catch (e) {
+    addBubble("Auto-backup gagal: " + (e as Error).message, "bot");
+  }
+}
+
+async function refreshStorageText(): Promise<void> {
+  try {
+    const est = await navigator.storage?.estimate?.();
+    const mb = (n?: number) => (n && n > 0 ? (n / 1048576).toFixed(1) + " MB" : "?");
+    storageText =
+      `Pemakaian storage: ${mb(est?.usage)} / ${mb(est?.quota)}\n` +
+      `Penyimpanan permanen: ${persisted ? "ya" : "belum"}`;
+  } catch {
+    storageText = "";
+  }
+}
+
+function renderInfo(): void {
+  infoLines.textContent = [
+    `Versi: v${appVersion || "-"}`,
+    `Transaksi: ${txCount}`,
+    `Backup terakhir: ${lastBackupAt ?? "belum pernah"}`,
+    `Auto-backup: ${folder ? folder.name : "nonaktif"}`,
+    storageText ? "\n" + storageText : "",
+  ]
+    .filter((x) => x !== "")
+    .join("\n");
+  pickDirBtn.disabled = !supportsFolderBackup();
+  backupNowBtn.disabled = !folder;
+  clearDirBtn.disabled = !folder;
+}
+
+document.getElementById("info")!.onclick = async () => {
+  await refreshStorageText();
+  await refresh();
+  renderInfo();
+  infoModal.hidden = false;
+};
+
+document.getElementById("infoClose")!.onclick = () => {
+  infoModal.hidden = true;
+};
+
+document.getElementById("updateReload")!.onclick = () => location.reload();
+
+pickDirBtn.onclick = async () => {
+  if (!supportsFolderBackup()) {
+    addBubble("Browser ini tak mendukung auto-backup folder. Pakai tombol ⬇ Backup.", "bot");
+    return;
+  }
+  try {
+    folder = await pickFolder();
+    const ok = await folderPermission(folder, true);
+    if (!ok) {
+      folder = null;
+      await forgetFolder();
+      addBubble("Izin folder ditolak. Auto-backup tidak aktif.", "bot");
+      renderInfo();
+      return;
+    }
+    await autoBackup(true);
+    renderInfo();
+  } catch (e) {
+    if ((e as Error).name !== "AbortError") {
+      addBubble("Gagal memilih folder: " + (e as Error).message, "bot");
+    }
+  }
+};
+
+backupNowBtn.onclick = async () => {
+  if (!folder) return;
+  const ok = await folderPermission(folder, true);
+  if (!ok) {
+    addBubble("Izin folder ditolak. Pilih folder lagi lewat ℹ.", "bot");
+    return;
+  }
+  await autoBackup(true);
+};
+
+clearDirBtn.onclick = async () => {
+  folder = null;
+  await forgetFolder();
+  addBubble("Auto-backup dimatikan.", "bot");
+  renderInfo();
+};
+
 // Share target (PWA): teks yang dibagikan dari app lain (notifikasi SMS,
 // WhatsApp, dsb.) langsung diisi ke kolom chat lalu dikirim.
 function handleSharedText(): void {
@@ -608,4 +767,3 @@ addBubble(
   "Halo! Catat transaksi tinggal ketik.\nContoh: `makan siang 50rb` / `gaji 5jt`\nKetik `help` buat perintah.",
   "bot"
 );
-void refresh();

@@ -50,7 +50,7 @@ import {
   type Tx,
 } from "./db";
 import { parseLocal, MASUK, type ParseResult } from "./parser";
-import { parsePeriod, type Period } from "./dates";
+import { isoLocal, parsePeriod, type Period } from "./dates";
 import { toCSV } from "./csv";
 import { buildDailyRange, buildGrafik, shortRp } from "./chart";
 import { exportJson, importJson } from "./backup";
@@ -342,6 +342,7 @@ async function handleMessageInner(input: string): Promise<Reply> {
     const stamp = new Date().toISOString().slice(0, 10);
     const plain = exportJson();
     if (!pass) {
+      setSetting("last_backup_at", isoLocal());
       return {
         text:
           "Backup JSON biasa siap diunduh.\n" +
@@ -353,6 +354,7 @@ async function handleMessageInner(input: string): Promise<Reply> {
       return { text: "Kata sandi minimal 8 karakter. Contoh: `backup kunci rahasia-panjang-2026`" };
     }
     const enc = await encryptJson(plain, pass);
+    setSetting("last_backup_at", isoLocal());
     return {
       text:
         "Backup terenkripsi siap diunduh (AES-GCM 256, PBKDF2).\n" +
