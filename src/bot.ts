@@ -109,12 +109,6 @@ const HELP =
   "  versi                       (versi aplikasi)\n" +
   "  reset transaksi            (hapus semua, ada backup)\n" +
   "  help\n\n" +
-  "Keamanan (Telegram):\n" +
-  "  /login                     (keypad angka, PIN tak tampil di chat)\n" +
-  "  /logout                    (bersihkan balasan bot + keluar)\n" +
-  "  /setpin                    (keypad buat PIN)\n" +
-  "  /changepin                 (keypad ganti PIN)\n" +
-  "  /resetpin                  (keypad hapus PIN)\n\n" +
   "Nominal: 50rb, 1,5jt, 50000, 45.001.889\n" +
   "Periode: september, 2026-08, minggu ini, minggu lalu, bulan lalu, tahun ini, hari ini, kemarin";
 

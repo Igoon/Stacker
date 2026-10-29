@@ -7,6 +7,8 @@ API key bawaan.
 Subproyek terpisah; project desktop (`../src`, `../web`, `../data.db`) tidak
 disentuh.
 
+> **Panduan install/uninstall + penggunaan lengkap:** lihat [`GUIDE.md`](GUIDE.md).
+
 ## Stack
 
 - `@sqlite.org/sqlite-wasm` `3.54.1-build1` — SQLite di browser.

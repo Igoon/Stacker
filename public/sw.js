@@ -1,6 +1,14 @@
 // Service worker: cache app shell untuk offline (data tetap di OPFS).
 const CACHE = "duit-bot-v2";
-const PRECACHE = ["./", "./manifest.webmanifest", "./icon.svg"];
+const PRECACHE = [
+  "./",
+  "./manifest.webmanifest",
+  "./icon.svg",
+  "./icon-192.png",
+  "./icon-512.png",
+  "./icon-maskable-512.png",
+  "./apple-touch-icon.png",
+];
 
 const ASSET_DEST = new Set(["script", "style", "worker", "image", "font", "manifest"]);
 

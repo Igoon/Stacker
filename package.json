@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "icons": "node scripts/gen-icons.mjs",
     "typecheck": "tsc --noEmit",
     "smoke": "tsx src/smoke.ts",
     "verify": "npm run typecheck && npm run smoke"
@@ -16,6 +17,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
+    "sharp": "^0.35.5",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "vite": "^5.4.11"
