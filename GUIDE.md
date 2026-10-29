@@ -72,6 +72,47 @@ tanpa akun, tanpa kirim data ke luar. Bisa dipasang seperti aplikasi biasa.
 
 ## 4. Penggunaan Dasar
 
+> **Catatan:** Stacker **tanpa login/logout/PIN**. Buka langsung pakai, tutup
+> saja kalau selesai — data tersimpan otomatis di perangkat.
+
+### Alur pertama kali (dari nol)
+
+1. Buka app (atau `https://igoon.github.io/Stacker/`).
+2. Set saldo awal akun (opsional; akun default sudah ada: Cash, BSI, Jago,
+   GoPay, OVO, DANA, ShopeePay, Flip):
+   ```
+   saldo awal bsi 5.000.000
+   ```
+3. Catat transaksi (kategori auto ditebak dari kata kunci; default kategori
+   sudah siap — tidak perlu buat kategori dulu):
+   ```
+   makan siang 50rb
+   gaji 5jt
+   parkir 5rb sama kopi 18rb
+   ```
+4. Buat kategori custom kalau default kurang:
+   ```
+   kategori tambah keluar Jimpitan | jimpitan, infak
+   ```
+5. Transfer antar akun:
+   ```
+   transfer 100rb bsi ke gopay
+   ```
+6. Anggaran (peringatan otomatis 80% / tembus):
+   ```
+   anggaran Makanan 2jt
+   ```
+7. Cek laporan / grafik / export:
+   ```
+   laporan
+   grafik
+   csv
+   ```
+8. Backup rutin: tombol **⬇ Backup** → file JSON.
+9. Keluar: tidak ada logout. Tutup app/tab. Data aman di perangkat (OPFS).
+
+### Contoh transaksi
+
 Ketik di kolom chat, kirim. Contoh:
 
 ```
