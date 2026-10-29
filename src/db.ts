@@ -62,6 +62,17 @@ CREATE TABLE IF NOT EXISTS recurring (
   aktif      INTEGER NOT NULL DEFAULT 1,
   created_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS debts (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  arah       TEXT    NOT NULL CHECK (arah IN ('utang','piutang')),
+  nama       TEXT    NOT NULL,
+  jumlah     INTEGER NOT NULL,
+  sisa       INTEGER NOT NULL,
+  catatan    TEXT,
+  tanggal    TEXT    NOT NULL,
+  created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
 `);
 
   function hasColumn(table: string, col: string): boolean {
@@ -343,6 +354,30 @@ export function deleteCategory(id: number): boolean {
 
 export function updateCategoryKeywords(id: number, keywords: string[]): void {
   db.prepare(`UPDATE categories SET keywords = ? WHERE id = ?`).run(JSON.stringify(keywords), id);
+}
+
+export function renameCategory(id: number, nama: string): void {
+  const baru = nama.trim();
+  const cat = db.prepare(`SELECT nama FROM categories WHERE id = ?`).get(id) as
+    | { nama: string }
+    | undefined;
+  if (!cat) return;
+  const lama = cat.nama;
+  db.transaction(() => {
+    db.prepare(`UPDATE categories SET nama = ? WHERE id = ?`).run(baru, id);
+    // Riwayat transaksi & anggaran ikut diganti supaya laporan tetap konsisten.
+    db.prepare(`UPDATE transactions SET kategori = ? WHERE lower(kategori) = lower(?)`).run(baru, lama);
+    const bOld = db
+      .prepare(`SELECT kategori FROM budgets WHERE lower(kategori) = lower(?)`)
+      .get(lama) as { kategori: string } | undefined;
+    if (bOld) {
+      const bNew = db
+        .prepare(`SELECT kategori FROM budgets WHERE lower(kategori) = lower(?)`)
+        .get(baru) as { kategori: string } | undefined;
+      if (bNew) db.prepare(`DELETE FROM budgets WHERE kategori = ?`).run(bOld.kategori);
+      else db.prepare(`UPDATE budgets SET kategori = ? WHERE kategori = ?`).run(baru, bOld.kategori);
+    }
+  });
 }
 
 export function getAccountByName(nama: string): Account | undefined {
@@ -670,8 +705,91 @@ export function runRecurring(today = isoLocal()): { created: number; entries: st
   return { created, entries };
 }
 
+// ---------- Utang / piutang (ledger terpisah, tidak mengubah saldo) ----------
+export interface Debt {
+  id: number;
+  arah: "utang" | "piutang";
+  nama: string;
+  jumlah: number;
+  sisa: number;
+  catatan: string | null;
+  tanggal: string;
+}
+
+export function listDebts(onlyOutstanding = true): Debt[] {
+  return db
+    .prepare(
+      `SELECT * FROM debts ${onlyOutstanding ? "WHERE sisa > 0" : ""} ORDER BY arah ASC, nama ASC, id ASC`
+    )
+    .all() as Debt[];
+}
+
+export function addDebt(input: {
+  arah: "utang" | "piutang";
+  nama: string;
+  jumlah: number;
+  catatan?: string;
+  tanggal?: string;
+}): Debt {
+  const info = db
+    .prepare(
+      `INSERT INTO debts (arah, nama, jumlah, sisa, catatan, tanggal)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      input.arah,
+      input.nama.trim(),
+      input.jumlah,
+      input.jumlah,
+      input.catatan ?? null,
+      input.tanggal ?? isoLocal()
+    );
+  return db.prepare(`SELECT * FROM debts WHERE id = ?`).get(Number(info.lastInsertRowid)) as Debt;
+}
+
+// Bayar/terima pembayaran: alokasikan ke baris tertua lebih dulu.
+export function payDebt(
+  arah: "utang" | "piutang",
+  nama: string,
+  jumlah: number
+): { paid: number; sisaTotal: number; nama: string } {
+  const rows = db
+    .prepare(
+      `SELECT * FROM debts WHERE arah = ? AND lower(nama) = lower(?) AND sisa > 0 ORDER BY id ASC`
+    )
+    .all(arah, nama.trim()) as Debt[];
+  let left = jumlah;
+  for (const r of rows) {
+    if (left <= 0) break;
+    const take = Math.min(left, r.sisa);
+    db.prepare(`UPDATE debts SET sisa = sisa - ? WHERE id = ?`).run(take, r.id);
+    left -= take;
+  }
+  const paid = jumlah - left;
+  const rest = db
+    .prepare(`SELECT COALESCE(SUM(sisa),0) AS s FROM debts WHERE arah = ? AND lower(nama) = lower(?)`)
+    .get(arah, nama.trim()) as { s: number };
+  return { paid, sisaTotal: rest.s, nama: nama.trim() };
+}
+
+export function deleteDebt(id: number): boolean {
+  return db.prepare(`DELETE FROM debts WHERE id = ?`).run(id).changes > 0;
+}
+
+export function debtTotals(): { utang: number; piutang: number } {
+  const row = db
+    .prepare(
+      `SELECT
+         COALESCE(SUM(CASE WHEN arah='utang'   THEN sisa ELSE 0 END),0) AS utang,
+         COALESCE(SUM(CASE WHEN arah='piutang' THEN sisa ELSE 0 END),0) AS piutang
+       FROM debts`
+    )
+    .get() as { utang: number; piutang: number };
+  return row;
+}
+
 // Key settings yang TIDAK ikut export: kredensial + penanda snapshot internal.
-const SETTING_EXPORT_SKIP = new Set(["ai_key"]);
+const SETTING_EXPORT_SKIP = new Set(["ai_key", "pin_hash", "pin_salt", "pin_iter"]);
 const settingExportable = (key: string): boolean =>
   !SETTING_EXPORT_SKIP.has(key) && !key.startsWith("backup_") && key !== "_backup_keys";
 
@@ -690,6 +808,7 @@ export function exportAll(): string {
       .all() as unknown[],
     budgets: listBudgets(),
     recurring: listRecurring(),
+    debts: listDebts(false),
     settings,
   };
   return JSON.stringify({ version: 2, tables });
@@ -705,7 +824,7 @@ export function importAll(json: string): void {
   const localAiKey = getSetting("ai_key");
 
   db.transaction(() => {
-    db.exec(`DELETE FROM transactions; DELETE FROM accounts; DELETE FROM categories; DELETE FROM budgets; DELETE FROM recurring; DELETE FROM settings;`);
+    db.exec(`DELETE FROM transactions; DELETE FROM accounts; DELETE FROM categories; DELETE FROM budgets; DELETE FROM recurring; DELETE FROM debts; DELETE FROM settings;`);
 
     const insAcc = db.prepare(
       `INSERT INTO accounts (id, nama, tipe, saldo_awal, created_at) VALUES (?, ?, ?, ?, ?)`
@@ -759,6 +878,24 @@ export function importAll(json: string): void {
         x.terakhir ?? null,
         x.aktif ?? 1,
         (x as unknown as { created_at: string }).created_at
+      );
+    }
+
+    const insDebt = db.prepare(
+      `INSERT INTO debts (id, arah, nama, jumlah, sisa, catatan, tanggal, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    for (const r of t.debts ?? []) {
+      const x = r as Debt & { created_at?: string };
+      insDebt.run(
+        x.id,
+        x.arah,
+        x.nama,
+        x.jumlah,
+        x.sisa,
+        x.catatan ?? null,
+        x.tanggal,
+        x.created_at ?? new Date().toISOString()
       );
     }
 

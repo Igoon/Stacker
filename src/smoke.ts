@@ -254,6 +254,38 @@ await check("berulang: catat otomatis, idempotent, hapus", async () => {
   assert(!dbmod.listRecurring().some((x) => x.id === rec.id), "harus terhapus");
 });
 
+await check("utang/piutang: catat, bayar sebagian, lunas", async () => {
+  const r = await handleMessage("utang 100rb ke budi");
+  assert(r.text.includes("Utang #"), "utang tercatat");
+  const p = await handleMessage("piutang dari andi 40rb");
+  assert(p.text.includes("Piutang #"), "piutang tercatat");
+
+  const list = await handleMessage("utang");
+  assert(list.text.includes("budi") && list.text.includes("andi"));
+  assert.equal(dbmod.debtTotals().utang, 100000);
+  assert.equal(dbmod.debtTotals().piutang, 40000);
+
+  const sebagian = await handleMessage("bayar utang budi 40rb");
+  assert(sebagian.text.includes("Sisa"), "harus ada sisa");
+  assert.equal(dbmod.debtTotals().utang, 60000);
+
+  const lunas = await handleMessage("bayar utang budi 100rb");
+  assert(lunas.text.includes("Lunas"), "kelebihan bayar = lunas");
+  assert.equal(dbmod.debtTotals().utang, 0);
+
+  for (const d of dbmod.listDebts(false)) dbmod.deleteDebt(d.id);
+});
+
+await check("kategori ubah nama (riwayat ikut)", async () => {
+  const t = last(await handleMessage("bioskop 20rb"));
+  assert.equal(t!.kategori, "Hiburan");
+  await handleMessage("kategori ubah Hiburan jadi HiburanX");
+  assert(dbmod.getCategoryByName("HiburanX"), "nama baru harus ada");
+  assert.equal(dbmod.getTx(t!.id)!.kategori, "HiburanX", "riwayat ikut berganti");
+  await handleMessage("kategori ubah HiburanX jadi Hiburan");
+  dbmod.deleteTx(t!.id); // biar tak mengganggu tes anggaran Hiburan
+});
+
 await check("anggaran: set, peringatan 80%/tembus, list, hapus", async () => {
   await handleMessage("anggaran Hiburan 100rb");
   assert((await handleMessage("anggaran")).text.includes("Hiburan"));

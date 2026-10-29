@@ -3,12 +3,15 @@ import {
   accountBalances,
   addAccount,
   addCategory,
+  addDebt,
   addRecurring,
   addTx,
+  debtTotals,
   deleteAccount,
   deleteAllTx,
   deleteBudget,
   deleteCategory,
+  deleteDebt,
   deleteRecurring,
   deleteTx,
   dailySeries,
@@ -20,12 +23,15 @@ import {
   listAll,
   listBudgets,
   listCategories,
+  listDebts,
   listRange,
   listRecurring,
   listTx,
+  payDebt,
   ringkasRange,
   reconcileAccount,
   renameAccount,
+  renameCategory,
   rupiah,
   rupiahSigned,
   runRecurring,
@@ -38,6 +44,7 @@ import {
   updateCategoryKeywords,
   updateTx,
   type Account,
+  type Debt,
   type Tx,
 } from "./db";
 import { parseLocal, MASUK, type ParseResult } from "./parser";
@@ -114,6 +121,9 @@ const HELP =
   "  undo                        (batalkan aksi terakhir)\n" +
   "  berulang listrik 350rb tiap 5   (auto tiap bulan)\n" +
   "  berulang | berulang hapus 1\n" +
+  "  utang 100rb ke budi         (ledger utang/piutang)\n" +
+  "  piutang 50rb dari andi\n" +
+  "  bayar utang budi 50rb | utang hapus 3\n" +
   "  ai | ai reset               (pemakaian AI)\n" +
   "  versi                       (versi aplikasi)\n" +
   "  reset transaksi            (hapus semua, ada backup)\n" +
@@ -442,6 +452,16 @@ async function handleMessageInner(input: string): Promise<Reply> {
     if (!cat) return { text: `Kategori "${nama}" tidak ada.` };
     setCategoryTipe(cat.id, tipe);
     return { text: `Kategori ${cat.nama} → ${tipe}.` };
+  }
+
+  if ((m = text.match(/^kategori ubah\s+(.+?)\s+jadi\s+(.+)$/i))) {
+    const lama = m[1].trim();
+    const baru = m[2].trim();
+    const cat = getCategoryByName(lama);
+    if (!cat) return { text: `Kategori "${lama}" tidak ada.` };
+    if (getCategoryByName(baru)) return { text: `Kategori "${baru}" sudah ada.` };
+    renameCategory(cat.id, baru);
+    return { text: `Kategori ${lama} → ${baru}. Riwayat transaksi & anggaran ikut diganti.` };
   }
 
   if ((m = text.match(/^kategori ubah\s+(.+)$/i))) {
@@ -800,11 +820,80 @@ async function handleMessageInner(input: string): Promise<Reply> {
     };
   }
 
+  if (low === "utang" || low === "piutang" || low === "utang piutang" || low === "hutang") {
+    const rows = listDebts();
+    const t = debtTotals();
+    if (rows.length === 0) {
+      return { text: "Belum ada utang/piutang.\nContoh: `utang 100rb ke budi`, `piutang 50rb dari andi`." };
+    }
+    const fmt = (d: Debt) =>
+      `  #${d.id} ${d.nama}: ${rupiah(d.sisa)}${d.sisa !== d.jumlah ? ` (dari ${rupiah(d.jumlah)})` : ""} · ${d.tanggal}`;
+    const u = rows.filter((d) => d.arah === "utang");
+    const p = rows.filter((d) => d.arah === "piutang");
+    return {
+      text:
+        `Utang saya: ${rupiah(t.utang)} · Piutang saya: ${rupiah(t.piutang)}\n\n` +
+        `Utang (harus dibayar):\n${u.map(fmt).join("\n") || "  -"}\n\n` +
+        `Piutang (harus diterima):\n${p.map(fmt).join("\n") || "  -"}\n\n` +
+        "Bayar: `bayar utang budi 50rb` · `bayar piutang andi 50rb` · `utang hapus 3`",
+    };
+  }
+
+  if ((m = text.match(/^utang hapus\s+#?(\d+)$/i))) {
+    const id = Number(m[1]);
+    return { text: deleteDebt(id) ? `Utang/piutang #${id} dihapus.` : `Tidak ada #${id}.` };
+  }
+
+  if ((m = text.match(/^bayar\s+(utang|piutang)\s+(.+?)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k))?)$/i))) {
+    const arah = m[1].toLowerCase() === "utang" ? "utang" : "piutang";
+    const nama = m[2].trim();
+    const nominal = parseAmount(m[3]);
+    if (nominal == null || nominal <= 0) return { text: "Nominal tidak kebaca. Contoh: `bayar utang budi 50rb`" };
+    const res = payDebt(arah, nama, nominal);
+    if (res.paid === 0) return { text: `Tidak ada ${arah} aktif untuk "${nama}".` };
+    const tail = res.sisaTotal > 0 ? `Sisa ${rupiah(res.sisaTotal)}.` : "Lunas.";
+    return {
+      text: `${arah === "utang" ? "Utang" : "Piutang"} ${res.nama} dibayar ${rupiah(res.paid)}. ${tail}`,
+    };
+  }
+
+  if ((m = text.match(/^(utang|piutang|hutang)\s+(.+)$/i))) {
+    const arah: "utang" | "piutang" = m[1].toLowerCase() === "piutang" ? "piutang" : "utang";
+    const rest = m[2].trim();
+    const prep = arah === "utang" ? "ke" : "dari";
+    let nama = "";
+    let amountRaw = "";
+
+    let km = rest.match(new RegExp(`^(.+?)\\s+${prep}\\s+(.+)$`, "i"));
+    if (km) {
+      amountRaw = km[1].trim();
+      nama = km[2].trim();
+    } else {
+      km = rest.match(new RegExp(`^${prep}\\s+(.+?)\\s+([\\d][\\d.,]*(?:\\s*(?:jt|juta|rb|ribu|k))?)$`, "i"));
+      if (km) {
+        nama = km[1].trim();
+        amountRaw = km[2].trim();
+      }
+    }
+
+    if (!nama || !amountRaw) {
+      return { text: `Format: \`${arah} 100rb ${prep} budi\` atau \`${arah} ${prep} budi 100rb\`.` };
+    }
+    const nominal = parseAmount(amountRaw);
+    if (nominal == null || nominal <= 0) return { text: "Nominal tidak kebaca. Contoh: `utang 100rb ke budi`" };
+    const d = addDebt({ arah, nama, jumlah: nominal });
+    return {
+      text:
+        `${arah === "utang" ? "Utang" : "Piutang"} #${d.id}: ${rupiah(d.jumlah)} ${arah === "utang" ? "ke" : "dari"} ${d.nama} dicatat.` +
+        "\n(ledger utang/piutang terpisah — tidak mengubah saldo akun)",
+    };
+  }
+
   const CMD_WORDS = [
     "hapus", "ubah", "lihat", "cari", "laporan", "ringkasan", "report", "csv", "export",
     "grafik", "chart", "dashboard", "anggaran",
     "riwayat", "history", "list", "akun", "kategori", "saldo", "transfer", "reset", "ai",
-    "versi", "version", "help", "bantuan",
+    "versi", "version", "help", "bantuan", "utang", "piutang", "hutang", "bayar",
   ];
   const word = low.split(/\s+/)[0];
   if (CMD_WORDS.includes(word)) {

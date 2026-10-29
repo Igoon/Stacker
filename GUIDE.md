@@ -187,6 +187,7 @@ kategori sisi Sedekah keduanya
 kategori tambahkata Sedekah | infak
 kategori hapuskata Sedekah | zakat
 kategori ubah Sedekah | sedekah, donasi, zakat
+kategori ubah Hiburan jadi HiburanX  → ganti nama (riwayat + anggaran ikut)
 kategori hapus Sedekah
 ```
 
@@ -212,6 +213,19 @@ cari jimpitan bsi
 cari kopi september 50         → 50 = jumlah hasil
 lihat 12                       → detail transaksi #12
 ```
+
+### Utang & piutang
+```
+utang 100rb ke budi            → saya berutang ke budi
+utang ke budi 100rb            → urutan nominal/nama bebas
+piutang 50rb dari andi         → andi berutang ke saya
+utang | piutang                → daftar + total sisa
+bayar utang budi 50rb          → cicil / lunas otomatis
+bayar piutang andi 50rb
+utang hapus 3                  → hapus catatan #3
+```
+Ledger utang/piutang **terpisah** dari saldo akun: mencatat utang tidak
+mengubah saldo. Pembayaran mengalokasikan ke catatan tertua lebih dulu.
 
 ### Kelola transaksi
 ```
