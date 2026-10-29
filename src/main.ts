@@ -18,6 +18,7 @@ interface Reply {
   txs?: Tx[];
   file?: { name: string; content: string };
   pre?: boolean;
+  svg?: string;
   error?: string;
 }
 
@@ -122,12 +123,25 @@ function saveFile(name: string, content: string): void {
   downloadBlob(blob, name);
 }
 
-function addBubble(text: string, side: "me" | "bot", txs?: Tx[], file?: { name: string; content: string }) {
+function addBubble(
+  text: string,
+  side: "me" | "bot",
+  txs?: Tx[],
+  file?: { name: string; content: string },
+  svg?: string
+) {
   const row = document.createElement("div");
   row.className = "row " + side;
   const b = document.createElement("div");
   b.className = "bubble";
   b.textContent = text;
+  if (svg) {
+    // SVG dibuat lokal dari angka (tanpa lib, tanpa request keluar).
+    const wrap = document.createElement("div");
+    wrap.className = "chart";
+    wrap.innerHTML = svg;
+    b.appendChild(wrap);
+  }
   for (const tx of txs || []) {
     const d = document.createElement("div");
     d.className = "tx";
@@ -215,7 +229,7 @@ async function send(): Promise<void> {
   const r = await call({ type: "chat", text });
   busyEl.hidden = true;
   if (r.ok) {
-    addBubble(r.text ?? "", "bot", r.txs, r.file);
+    addBubble(r.text ?? "", "bot", r.txs, r.file, r.svg);
     if (r.lock) {
       pinSet = true;
       lockNow();

@@ -374,3 +374,15 @@ footer button {
   line-height: 1.5;
   color: #8696a0;
 }
+
+/* ---------- Grafik SVG di bubble ---------- */
+.chart {
+  margin-top: 8px;
+  color: #e9edef;
+}
+.chart svg {
+  display: block;
+  width: 100%;
+  max-width: 340px;
+  height: auto;
+}

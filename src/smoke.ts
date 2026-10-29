@@ -185,7 +185,7 @@ await check("anggaran case-insensitive: tak bikin baris ganda", async () => {
   const rows = dbmod.listBudgets().filter((b) => b.kategori.toLowerCase() === "perabot");
   assert.equal(rows.length, 1, "hanya boleh satu baris anggaran");
   assert.equal(rows[0].jumlah, 300000, "nilai terakhir harus menimpa");
-  assert.equal(dbmod.getBudget("PERABOT"), 300000);
+  assert.equal(dbmod.getBudget("PERABOT")!.jumlah, 300000);
   await handleMessage("anggaran hapus perabot");
 });
 
@@ -388,6 +388,78 @@ await check("laporan / grafik / cari tidak kosong", async () => {
   assert((await handleMessage("laporan")).text.length > 0);
   assert((await handleMessage("grafik")).text.length > 0);
   assert((await handleMessage("cari kopi")).text.length > 0);
+});
+
+await check("laporan paket: banding, arus kas, top, akun", async () => {
+  const banding = await handleMessage("laporan banding");
+  assert(banding.text.includes("Banding"), "banding harus ada");
+  assert(banding.text.includes("vs"), "harus ada pembanding");
+
+  const kas = await handleMessage("laporan arus kas 6");
+  assert(kas.text.includes("Arus kas 6 bulan"), "arus kas");
+  assert(kas.svg?.startsWith("<svg") && kas.svg!.endsWith("</svg>"), "arus kas punya svg valid");
+
+  const top = await handleMessage("laporan top 5");
+  assert(top.text.includes("Top"), "top pengeluaran");
+
+  const akun = await handleMessage("laporan akun bsi");
+  assert(akun.text.includes("Akun BSI"), "laporan per akun");
+  assert(akun.text.includes("Saldo sekarang"), "saldo akun ikut");
+
+  const bad = await handleMessage("laporan banding zzz");
+  assert(bad.text.includes("tidak dikenali"), "periode ngawur ditolak");
+});
+
+await check("grafik SVG: donut komposisi & tren 6 bulan", async () => {
+  const donut = await handleMessage("grafik komposisi");
+  assert(donut.svg?.startsWith("<svg") && donut.svg!.endsWith("</svg>"), "donut svg valid");
+  assert(donut.text.includes("Komposisi"), "legend komposisi");
+
+  const tren = await handleMessage("grafik tren 6");
+  assert(tren.svg?.startsWith("<svg") && tren.svg!.endsWith("</svg>"), "tren svg valid");
+  assert((tren.svg!.match(/<rect /g) ?? []).length >= 12, "6 bulan x 2 bar");
+  assert(!tren.svg!.includes("NaN"), "tak boleh ada NaN");
+});
+
+await check("anggaran mingguan: cap minggu ini", async () => {
+  await handleMessage("kategori tambah keluar UjiMinggu | ujiminggu");
+  await handleMessage("anggaran UjiMinggu 100rb mingguan");
+  const b = dbmod.getBudget("UjiMinggu")!;
+  assert.equal(b.periode, "mingguan", "periode mingguan tersimpan");
+  assert.equal(b.rollover, 0, "rollover default mati");
+
+  const r80 = await handleMessage("ujiminggu 90rb");
+  assert(r80.text.includes("Anggaran UjiMinggu") && r80.text.includes("minggu ini"), "peringatan mingguan");
+  const r100 = await handleMessage("ujiminggu 20rb");
+  assert(r100.text.includes("tembus minggu ini"), "tembus mingguan");
+
+  await handleMessage("anggaran hapus UjiMinggu");
+  for (const t of dbmod.listAll()) if (t.kategori === "UjiMinggu") dbmod.deleteTx(t.id);
+});
+
+await check("anggaran rollover: carry periode lalu bisa negatif", async () => {
+  const { parsePeriod, previousPeriod } = await import("./dates");
+  const prev = previousPeriod(parsePeriod("")!);
+  await handleMessage("anggaran UjiRoll 100rb");
+  await handleMessage("anggaran rollover UjiRoll");
+  const b = dbmod.getBudget("UjiRoll")!;
+  assert.equal(b.rollover, 1, "rollover aktif");
+
+  const t = dbmod.addTx({
+    tanggal: prev.from,
+    jumlah: 120_000,
+    tipe: "keluar",
+    kategori: "UjiRoll",
+  });
+  const list = await handleMessage("anggaran");
+  assert(list.text.includes("UjiRoll [bulanan ↻]"), "badge periode + rollover");
+  assert(list.text.includes("Rp80.000"), "limit efektif = 100rb - 20rb carry");
+  assert(list.text.includes("carry -Rp20.000"), "carry negatif tampil");
+
+  await handleMessage("anggaran no-rollover UjiRoll");
+  assert.equal(dbmod.getBudget("UjiRoll")!.rollover, 0, "rollover bisa dimatikan");
+  await handleMessage("anggaran hapus UjiRoll");
+  dbmod.deleteTx(t.id);
 });
 
 console.log(`\n${pass} ok, ${fail} fail`);

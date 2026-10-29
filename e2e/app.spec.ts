@@ -35,6 +35,21 @@ test("catat transaksi, saldo akurat, undo mengembalikan", async ({ page }) => {
   await expect(page.locator("#chat .bubble").filter({ hasText: "transaksi tersimpan" })).toHaveCount(0);
 });
 
+test("grafik SVG & laporan banding tampil di chat", async ({ page }) => {
+  await boot(page);
+  await chat(page, "makan 50rb");
+  await chat(page, "grafik komposisi");
+
+  const svg = page.locator("#chat .bubble .chart svg").last();
+  await expect(svg).toBeVisible();
+  const box = await svg.boundingBox();
+  expect(box?.width ?? 0).toBeGreaterThan(80);
+  expect(box?.height ?? 0).toBeGreaterThan(80);
+
+  await chat(page, "laporan banding");
+  await expect(page.locator("#chat .bubble").filter({ hasText: "Banding" })).toBeVisible();
+});
+
 test("ekspor backup JSON lewat tombol", async ({ page }) => {
   await boot(page);
   await chat(page, "kopi 15rb");

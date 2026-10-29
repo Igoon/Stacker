@@ -89,6 +89,12 @@ CREATE TABLE IF NOT EXISTS debts (
   if (!hasColumn("categories", "tipe")) {
     db.exec(`ALTER TABLE categories ADD COLUMN tipe TEXT NOT NULL DEFAULT 'keluar'`);
   }
+  if (!hasColumn("budgets", "periode")) {
+    db.exec(`ALTER TABLE budgets ADD COLUMN periode TEXT NOT NULL DEFAULT 'bulanan'`);
+  }
+  if (!hasColumn("budgets", "rollover")) {
+    db.exec(`ALTER TABLE budgets ADD COLUMN rollover INTEGER NOT NULL DEFAULT 0`);
+  }
   db.prepare(`UPDATE categories SET tipe='masuk' WHERE lower(nama)='gaji' AND tipe='keluar'`).run();
 
   const DEFAULTS: { nama: string; tipe: string }[] = [
@@ -566,35 +572,56 @@ export function setSetting(key: string, value: string | null): void {
   ).run(key, value);
 }
 
+export type BudgetPeriode = "bulanan" | "mingguan";
+
 export interface Budget {
   kategori: string;
   jumlah: number;
+  periode: BudgetPeriode;
+  rollover: number;
 }
 
 export function listBudgets(): Budget[] {
-  return db.prepare(`SELECT kategori, jumlah FROM budgets ORDER BY kategori ASC`).all() as Budget[];
+  return db
+    .prepare(`SELECT kategori, jumlah, periode, rollover FROM budgets ORDER BY kategori ASC`)
+    .all() as Budget[];
 }
 
-export function getBudget(kategori: string): number | undefined {
-  const row = db
-    .prepare(`SELECT jumlah FROM budgets WHERE lower(kategori) = lower(?)`)
-    .get(kategori.trim()) as { jumlah: number } | undefined;
-  return row?.jumlah;
+export function getBudget(kategori: string): Budget | undefined {
+  return db
+    .prepare(`SELECT kategori, jumlah, periode, rollover FROM budgets WHERE lower(kategori) = lower(?)`)
+    .get(kategori.trim()) as Budget | undefined;
 }
 
 // PK budgets case-sensitive, tapi lookup pakai lower(). Upsert manual: cari dulu
 // baris yang cocok tanpa peduli huruf besar/kecil supaya tak muncul duplikat
-// "Makanan" vs "makanan".
-export function setBudget(kategori: string, jumlah: number): void {
+// "Makanan" vs "makanan". Opsi periode/rollover dipertahankan bila tak diisi.
+export function setBudget(
+  kategori: string,
+  jumlah: number,
+  opts?: { periode?: BudgetPeriode; rollover?: boolean }
+): void {
   const nama = kategori.trim();
   const row = db
     .prepare(`SELECT kategori FROM budgets WHERE lower(kategori) = lower(?)`)
     .get(nama) as { kategori: string } | undefined;
   if (row) {
-    db.prepare(`UPDATE budgets SET jumlah = ? WHERE kategori = ?`).run(jumlah, row.kategori);
+    if (opts?.periode) {
+      db.prepare(`UPDATE budgets SET jumlah = ?, periode = ? WHERE kategori = ?`).run(jumlah, opts.periode, row.kategori);
+    } else {
+      db.prepare(`UPDATE budgets SET jumlah = ? WHERE kategori = ?`).run(jumlah, row.kategori);
+    }
+    if (opts?.rollover != null) {
+      db.prepare(`UPDATE budgets SET rollover = ? WHERE kategori = ?`).run(opts.rollover ? 1 : 0, row.kategori);
+    }
     return;
   }
-  db.prepare(`INSERT INTO budgets (kategori, jumlah) VALUES (?, ?)`).run(nama, jumlah);
+  db.prepare(`INSERT INTO budgets (kategori, jumlah, periode, rollover) VALUES (?, ?, ?, ?)`).run(
+    nama,
+    jumlah,
+    opts?.periode ?? "bulanan",
+    opts?.rollover ? 1 : 0
+  );
 }
 
 export function deleteBudget(kategori: string): boolean {
@@ -860,10 +887,12 @@ export function importAll(json: string): void {
       insTx.run(x.id, x.tanggal, x.jumlah, x.tipe, x.kategori, x.catatan ?? null, x.account_id ?? null, x.transfer_id ?? null, x.created_at);
     }
 
-    const insBudget = db.prepare(`INSERT INTO budgets (kategori, jumlah) VALUES (?, ?)`);
+    const insBudget = db.prepare(
+      `INSERT INTO budgets (kategori, jumlah, periode, rollover) VALUES (?, ?, ?, ?)`
+    );
     for (const r of t.budgets ?? []) {
-      const b = r as { kategori: string; jumlah: number };
-      insBudget.run(b.kategori, b.jumlah);
+      const b = r as { kategori: string; jumlah: number; periode?: string; rollover?: number };
+      insBudget.run(b.kategori, b.jumlah, b.periode === "mingguan" ? "mingguan" : "bulanan", b.rollover ? 1 : 0);
     }
 
     const insRec = db.prepare(

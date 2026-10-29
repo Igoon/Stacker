@@ -98,6 +98,33 @@ function monthPeriod(y: number, m: number): Period {
   return { from, to, label: `${BULAN[m - 1]} ${y}` };
 }
 
+function addDaysIso(iso: string, n: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return isoLocal(new Date(y, m - 1, d + n));
+}
+
+// Jarak hari inklusif: 1–31 = 31.
+export function dayCount(per: Period): number {
+  return Math.round((Date.parse(per.to) - Date.parse(per.from)) / 86_400_000) + 1;
+}
+
+// Periode tepat sebelum `per` dengan panjang hari sama.
+export function previousPeriod(per: Period): Period {
+  const to = addDaysIso(per.from, -1);
+  const from = addDaysIso(to, -(dayCount(per) - 1));
+  return { from, to, label: "periode sebelumnya" };
+}
+
+// `n` bulan terakhir (termasuk bulan berjalan), urut lama → baru.
+export function lastMonths(n: number, ref = new Date()): Period[] {
+  const out: Period[] = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(ref.getFullYear(), ref.getMonth() - i, 1);
+    out.push(monthPeriod(d.getFullYear(), d.getMonth() + 1));
+  }
+  return out;
+}
+
 export function parsePeriod(arg: string, ref = new Date()): Period | null {
   const a = arg.trim().toLowerCase();
   const y = ref.getFullYear();

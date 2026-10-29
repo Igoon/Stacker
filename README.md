@@ -65,6 +65,12 @@ Playwright. Server dev dijalankan otomatis di `localhost:5199`.
 
 - Chat pencatatan transaksi (parser lokal + fallback AI opsional), akun, transfer,
   anggaran + peringatan, laporan/grafik/CSV, cari.
+- **Laporan lanjutan**: `laporan banding` (vs periode sebelumnya), `laporan
+  arus kas 6`, `laporan top 10`, `laporan akun <nama>`.
+- **Grafik SVG inline** (tanpa library, tanpa data keluar): `grafik komposisi`
+  (donut) dan `grafik tren 6` (bar masuk/keluar).
+- **Anggaran rollover + cap mingguan**: carry dari periode lalu (bisa negatif),
+  periode `bulanan`/`mingguan` per kategori.
 - **Utang/piutang** ledger terpisah (tidak mengubah saldo akun).
 - **Transaksi berulang** bulanan (idempotent), **undo** 20 langkah.
 - **PIN + auto-lock** (2 menit idle / app ditinggalkan) — kunci tampilan, hash
@@ -117,5 +123,5 @@ Tidak perlu header COOP/COEP karena memakai `opfs-sahpool`.
 
 ## Versi
 
-`v2.4.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
+`v2.5.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
 Nilai versi di-hardcode di `src/version.ts` (browser tak bisa baca `package.json`).

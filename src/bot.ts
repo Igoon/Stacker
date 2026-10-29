@@ -46,13 +46,14 @@ import {
   updateCategoryKeywords,
   updateTx,
   type Account,
+  type Budget,
   type Debt,
   type Tx,
 } from "./db";
 import { parseLocal, MASUK, type ParseResult } from "./parser";
-import { isoLocal, parsePeriod, type Period } from "./dates";
+import { isoLocal, lastMonths, parsePeriod, previousPeriod, type Period } from "./dates";
 import { toCSV } from "./csv";
-import { buildDailyRange, buildGrafik, shortRp } from "./chart";
+import { buildDailyRange, buildDonutSvg, buildGrafik, buildTrendSvg, shortRp } from "./chart";
 import { exportJson, importJson } from "./backup";
 import { encryptJson, hashPin, safeEqual } from "./crypto";
 import { aiEnabled, aiResetUsage, aiStats, parseGemini } from "./ai";
@@ -64,6 +65,7 @@ export interface Reply {
   file?: { name: string; content: string };
   pre?: boolean;
   lock?: boolean;
+  svg?: string;
 }
 
 const TIPE_AKUN = ["bank", "ewallet", "cash"];
@@ -108,10 +110,17 @@ const HELP =
   "  kategori hapus Sedekah\n\n" +
   "Laporan & export:\n" +
   "  laporan | laporan september | laporan gopay september\n" +
+  "  laporan banding [bulan]      (vs periode sebelumnya)\n" +
+  "  laporan arus kas 6           (6 bulan terakhir)\n" +
+  "  laporan top 10 [bulan]       (pengeluaran terbesar)\n" +
+  "  laporan akun bsi [bulan]\n" +
   "  grafik | grafik september | grafik gopay\n" +
+  "  grafik komposisi [bulan] | grafik tren 6\n" +
   "  csv | csv september | csv gopay\n\n" +
   "Anggaran:\n" +
-  "  anggaran | anggaran Makanan 2jt | anggaran hapus Makanan\n\n" +
+  "  anggaran | anggaran Makanan 2jt | anggaran Makanan 500rb mingguan\n" +
+  "  anggaran rollover Makanan | anggaran no-rollover Makanan\n" +
+  "  anggaran hapus Makanan\n\n" +
   "Cari:\n" +
   "  cari kopi\n" +
   "  cari jimpitan bsi\n" +
@@ -168,26 +177,47 @@ function parseAmount(raw: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-function monthSpent(kategori: string): number {
-  const per = parsePeriod("");
-  if (!per) return 0;
+function budgetWindow(b: Budget): Period | null {
+  return b.periode === "mingguan" ? parsePeriod("minggu ini") : parsePeriod("");
+}
+
+function spentIn(kategori: string, per: Period): number {
   const k = kategori.toLowerCase();
   return ringkasRange(per.from, per.to)
     .filter((r) => r.tipe === "keluar" && r.kategori.toLowerCase() === k)
     .reduce((a, b) => a + b.total, 0);
 }
 
+// Carry = sisa periode lalu (bisa negatif). Hanya dipakai bila rollover aktif.
+function budgetCarry(b: Budget): number {
+  if (!b.rollover) return 0;
+  const cur = budgetWindow(b);
+  if (!cur) return 0;
+  return b.jumlah - spentIn(b.kategori, previousPeriod(cur));
+}
+
+function budgetEffective(b: Budget): number {
+  return Math.max(0, b.jumlah + budgetCarry(b));
+}
+
 function budgetWarn(t: Tx): string | null {
   if (t.tipe !== "keluar") return null;
-  const budget = getBudget(t.kategori);
-  if (budget == null || budget <= 0) return null;
-  const spent = monthSpent(t.kategori);
+  const b = getBudget(t.kategori);
+  if (!b) return null;
+  const limit = budgetEffective(b);
+  if (limit <= 0) return null;
+  const cur = budgetWindow(b);
+  if (!cur) return null;
+  const spent = spentIn(b.kategori, cur);
   const prev = spent - t.jumlah;
-  if (prev < budget && spent >= budget) {
-    return `⚠️ Anggaran ${t.kategori} tembus: ${rupiah(spent)} / ${rupiah(budget)}`;
+  const per = b.periode === "mingguan" ? "minggu ini" : "bulan ini";
+  const carry = budgetCarry(b);
+  const carryNote = carry !== 0 ? ` (limit ${rupiah(limit)}, carry ${carry > 0 ? "+" : "-"}${rupiah(Math.abs(carry))})` : "";
+  if (prev < limit && spent >= limit) {
+    return `⚠️ Anggaran ${t.kategori} tembus ${per}: ${rupiah(spent)} / ${rupiah(limit)}${carryNote}`;
   }
-  if (prev < budget * 0.8 && spent >= budget * 0.8) {
-    return `⚠️ Anggaran ${t.kategori} ${Math.floor((spent / budget) * 100)}%: ${rupiah(spent)} / ${rupiah(budget)}`;
+  if (prev < limit * 0.8 && spent >= limit * 0.8) {
+    return `⚠️ Anggaran ${t.kategori} ${Math.floor((spent / limit) * 100)}% ${per}: ${rupiah(spent)} / ${rupiah(limit)}${carryNote}`;
   }
   return null;
 }
@@ -631,6 +661,146 @@ async function handleMessageInner(input: string): Promise<Reply> {
 
   if (/^(laporan|ringkasan|report)\b/.test(low)) {
     const arg = text.replace(/^\s*(laporan|ringkasan|report)\s*/i, "").trim();
+
+    if (/^banding\b/i.test(arg)) {
+      const rest = arg.replace(/^banding\s*/i, "").trim();
+      const { account, per: perParsed, query } = parseFilter(rest);
+      if (query) return { text: "Periode tidak dikenali. Contoh: `laporan banding september`." };
+      const per = perParsed ?? parsePeriod("");
+      if (!per) return { text: "Periode tidak dikenali." };
+      const prev = previousPeriod(per);
+      const totals = (p: Period) => {
+        const rows = ringkasRange(p.from, p.to, account?.id);
+        const masuk = rows.filter((r) => r.tipe === "masuk").reduce((a, b) => a + b.total, 0);
+        const keluar = rows.filter((r) => r.tipe === "keluar").reduce((a, b) => a + b.total, 0);
+        return { masuk, keluar, rows };
+      };
+      const now = totals(per);
+      const before = totals(prev);
+      if (now.rows.length === 0 && before.rows.length === 0) {
+        return { text: `Belum ada transaksi ${per.label}.` };
+      }
+      const pct = (a: number, b: number) =>
+        b === 0 ? (a === 0 ? "0%" : "baru") : `${a >= b ? "+" : ""}${Math.round(((a - b) / Math.abs(b)) * 100)}%`;
+      const catMap = new Map<string, { now: number; before: number }>();
+      for (const r of now.rows.filter((r) => r.tipe === "keluar")) {
+        const e = catMap.get(r.kategori) ?? { now: 0, before: 0 };
+        e.now += r.total;
+        catMap.set(r.kategori, e);
+      }
+      for (const r of before.rows.filter((r) => r.tipe === "keluar")) {
+        const e = catMap.get(r.kategori) ?? { now: 0, before: 0 };
+        e.before += r.total;
+        catMap.set(r.kategori, e);
+      }
+      const movers = [...catMap.entries()]
+        .map(([k, v]) => ({ k, d: v.now - v.before, now: v.now, before: v.before }))
+        .filter((x) => x.d !== 0)
+        .sort((a, b) => Math.abs(b.d) - Math.abs(a.d))
+        .slice(0, 5)
+        .map((x) => `  ${x.k}: ${x.d > 0 ? "+" : "-"}${rupiah(Math.abs(x.d))} (${shortRp(x.before)} → ${shortRp(x.now)})`);
+      const acc = account ? ` · ${account.nama}` : "";
+      return {
+        text:
+          `Banding ${per.label}${acc}\n` +
+          `vs ${prev.from} s/d ${prev.to}\n\n` +
+          `Masuk   ${rupiah(now.masuk)} vs ${rupiah(before.masuk)} (${pct(now.masuk, before.masuk)})\n` +
+          `Keluar  ${rupiah(now.keluar)} vs ${rupiah(before.keluar)} (${pct(now.keluar, before.keluar)})\n` +
+          `Selisih ${rupiahSigned(now.masuk - now.keluar)} vs ${rupiahSigned(before.masuk - before.keluar)} ` +
+          `(${rupiahSigned((now.masuk - now.keluar) - (before.masuk - before.keluar))})` +
+          (movers.length ? `\n\nPerubahan per kategori:\n${movers.join("\n")}` : ""),
+      };
+    }
+
+    if (/^arus\s*kas\b/i.test(arg)) {
+      const rest = arg.replace(/^arus\s*kas\s*/i, "").trim();
+      const nm = rest.match(/\b(\d{1,2})\b/);
+      if (rest && !nm) return { text: "Format: `laporan arus kas 6` (jumlah bulan 2–24)." };
+      const n = Math.min(24, Math.max(2, nm ? Number(nm[1]) : 6));
+      const rows = lastMonths(n).map((p) => {
+        const r = ringkasRange(p.from, p.to);
+        const masuk = r.filter((x) => x.tipe === "masuk").reduce((a, b) => a + b.total, 0);
+        const keluar = r.filter((x) => x.tipe === "keluar").reduce((a, b) => a + b.total, 0);
+        return { per: p, masuk, keluar, net: masuk - keluar };
+      });
+      const tMasuk = rows.reduce((a, r) => a + r.masuk, 0);
+      const tKeluar = rows.reduce((a, r) => a + r.keluar, 0);
+      const w = Math.max(...rows.map((r) => r.per.label.length), 7);
+      const lines = rows.map(
+        (r) =>
+          `  ${r.per.label.padEnd(w)}  +${shortRp(r.masuk).padStart(6)}  -${shortRp(r.keluar).padStart(6)}  ` +
+          `${r.net < 0 ? "-" : "+"}${shortRp(r.net)}`
+      );
+      return {
+        text:
+          `Arus kas ${n} bulan terakhir (tanpa transfer)\n\n${lines.join("\n")}\n\n` +
+          `Total masuk ${rupiah(tMasuk)} · keluar ${rupiah(tKeluar)} · net ${rupiahSigned(tMasuk - tKeluar)}`,
+        svg: buildTrendSvg(
+          rows.map((r) => ({ label: r.per.label.slice(0, 3), masuk: r.masuk, keluar: r.keluar }))
+        ),
+        pre: true,
+      };
+    }
+
+    if (/^top\b/i.test(arg)) {
+      let rest = arg.replace(/^top\s*/i, "").trim();
+      let n = 10;
+      const nm = rest.match(/^(\d{1,3})\b\s*/);
+      if (nm) {
+        n = Math.min(100, Math.max(1, Number(nm[1])));
+        rest = rest.slice(nm[0].length);
+      }
+      const { account, per: perParsed, query } = parseFilter(rest);
+      if (query) return { text: "Periode tidak dikenali. Contoh: `laporan top 10 september`." };
+      const per = perParsed ?? parsePeriod("");
+      if (!per) return { text: "Periode tidak dikenali." };
+      const rows = listRange(per.from, per.to)
+        .filter((t) => t.tipe === "keluar" && !t.transfer_id && (!account || t.account_id === account.id))
+        .sort((a, b) => b.jumlah - a.jumlah)
+        .slice(0, n);
+      if (rows.length === 0) return { text: `Belum ada pengeluaran ${per.label}.` };
+      const lines = rows.map((t, i) => {
+        const note = t.catatan ? ` · ${t.catatan}` : "";
+        return `  ${String(i + 1).padStart(2)}. ${t.tanggal.slice(5)} ${t.kategori}${note} — ${rupiah(t.jumlah)}`;
+      });
+      const total = rows.reduce((a, t) => a + t.jumlah, 0);
+      return {
+        text:
+          `Top ${rows.length} pengeluaran ${per.label}${account ? ` · ${account.nama}` : ""}\n\n` +
+          `${lines.join("\n")}\n\nTotal ${rupiah(total)}`,
+      };
+    }
+
+    if (/^akun\b/i.test(arg)) {
+      const rest = arg.replace(/^akun\s*/i, "").trim();
+      const { account, per: perParsed, query } = parseFilter(rest);
+      if (query) return { text: "Periode tidak dikenali. Contoh: `laporan akun bsi september`." };
+      if (!account) return { text: "Sebut akunnya. Contoh: `laporan akun bsi september`." };
+      const per = perParsed ?? parsePeriod("");
+      if (!per) return { text: "Periode tidak dikenali." };
+      const rows = ringkasRange(per.from, per.to, account.id);
+      const tr = transferRange(per.from, per.to, account.id);
+      if (rows.length === 0 && tr.masuk === 0 && tr.keluar === 0) {
+        return { text: `Belum ada transaksi ${account.nama} ${per.label}.` };
+      }
+      const masuk = rows.filter((r) => r.tipe === "masuk");
+      const keluar = rows.filter((r) => r.tipe === "keluar");
+      const tMasuk = masuk.reduce((a, b) => a + b.total, 0);
+      const tKeluar = keluar.reduce((a, b) => a + b.total, 0);
+      const fmt = (rs: typeof rows) => rs.map((r) => `  ${r.kategori}: ${rupiah(r.total)}`).join("\n");
+      const saldoNow = accountBalances().find((a) => a.id === account.id)?.saldo ?? 0;
+      return {
+        text:
+          `Akun ${account.nama} · ${per.label}\n\nMasuk (${rupiah(tMasuk)})\n${fmt(masuk) || "  -"}\n\n` +
+          `Keluar (${rupiah(tKeluar)})\n${fmt(keluar) || "  -"}\n\n` +
+          `Arus bersih: ${rupiahSigned(tMasuk - tKeluar)}` +
+          (tr.masuk || tr.keluar
+            ? `\nTransfer: masuk ${rupiah(tr.masuk)} · keluar ${rupiah(tr.keluar)}`
+            : "") +
+          `\nSaldo sekarang: ${rupiahSigned(saldoNow)}`,
+      };
+    }
+
     const { account, per: perParsed, query } = parseFilter(arg);
     if (arg && !perParsed && query) {
       return {
@@ -783,6 +953,67 @@ async function handleMessageInner(input: string): Promise<Reply> {
 
   if (/^(grafik|chart|dashboard)\b/.test(low)) {
     const arg = text.replace(/^\s*(grafik|chart|dashboard)\s*/i, "").trim();
+
+    if (/^komposisi\b/i.test(arg)) {
+      const rest = arg.replace(/^komposisi\s*/i, "").trim();
+      const { account, per: perParsed, query } = parseFilter(rest);
+      if (query) return { text: "Periode tidak dikenali. Contoh: `grafik komposisi september`." };
+      const per = perParsed ?? parsePeriod("");
+      if (!per) return { text: "Periode tidak dikenali." };
+      const rows = ringkasRange(per.from, per.to, account?.id);
+      const cats = rows
+        .filter((r) => r.tipe === "keluar")
+        .map((r) => ({ kategori: r.kategori, total: r.total }))
+        .sort((a, b) => b.total - a.total);
+      const total = cats.reduce((a, c) => a + c.total, 0);
+      const label = per.label + (account ? ` · ${account.nama}` : "");
+      if (cats.length === 0) return { text: `Belum ada pengeluaran ${label}.` };
+      const maxCats = 6;
+      const shown = cats.slice(0, maxCats);
+      const restSum = cats.slice(maxCats).reduce((a, c) => a + c.total, 0);
+      if (restSum > 0) shown.push({ kategori: "Lainnya", total: restSum });
+      const legend = shown.map((c) => {
+        const pct = total > 0 ? Math.round((c.total / total) * 100) : 0;
+        return `  ${c.kategori}: ${rupiah(c.total)} (${pct}%)`;
+      });
+      return {
+        text: `Komposisi pengeluaran ${label}\nTotal ${rupiah(total)}\n${legend.join("\n")}`,
+        svg: buildDonutSvg(cats, { maxCats, centerLabel: "keluar" }),
+      };
+    }
+
+    if (/^tren\b/i.test(arg)) {
+      const rest = arg.replace(/^tren\s*/i, "").trim();
+      const nm = rest.match(/\b(\d{1,2})\b/);
+      if (rest && !nm) return { text: "Format: `grafik tren 6` (jumlah bulan 2–24)." };
+      const n = Math.min(24, Math.max(2, nm ? Number(nm[1]) : 6));
+      const rows = lastMonths(n).map((p) => {
+        const r = ringkasRange(p.from, p.to);
+        return {
+          per: p,
+          masuk: r.filter((x) => x.tipe === "masuk").reduce((a, b) => a + b.total, 0),
+          keluar: r.filter((x) => x.tipe === "keluar").reduce((a, b) => a + b.total, 0),
+        };
+      });
+      const totalMasuk = rows.reduce((a, r) => a + r.masuk, 0);
+      const totalKeluar = rows.reduce((a, r) => a + r.keluar, 0);
+      const lines = rows.map(
+        (r) =>
+          `  ${r.per.label.padEnd(14)} masuk ${shortRp(r.masuk)} · keluar ${shortRp(r.keluar)} · ` +
+          `${r.masuk - r.keluar < 0 ? "-" : "+"}${shortRp(r.masuk - r.keluar)}`
+      );
+      return {
+        text:
+          `Tren ${n} bulan terakhir\n${lines.join("\n")}\n\n` +
+          `Total masuk ${rupiah(totalMasuk)} · keluar ${rupiah(totalKeluar)} · ` +
+          `net ${rupiahSigned(totalMasuk - totalKeluar)}`,
+        svg: buildTrendSvg(
+          rows.map((r) => ({ label: r.per.label.slice(0, 3), masuk: r.masuk, keluar: r.keluar }))
+        ),
+        pre: true,
+      };
+    }
+
     const { account, per: perParsed, query } = parseFilter(arg);
     if (query) {
       return { text: "Periode/akun tidak dikenali. Contoh: `grafik`, `grafik september`, `grafik gopay september`." };
@@ -821,36 +1052,54 @@ async function handleMessageInner(input: string): Promise<Reply> {
     if (!arg || arg.toLowerCase() === "list") {
       const bs = listBudgets();
       if (!bs.length) return { text: "Belum ada anggaran. Contoh: `anggaran Makanan 2jt`" };
-      const per = parsePeriod("");
-      const rows = per ? ringkasRange(per.from, per.to) : [];
-      const spend = (k: string) =>
-        rows
-          .filter((r) => r.tipe === "keluar" && r.kategori.toLowerCase() === k.toLowerCase())
-          .reduce((a, b) => a + b.total, 0);
       const lines = bs.map((b) => {
-        const s = spend(b.kategori);
-        const pct = b.jumlah > 0 ? Math.round((s / b.jumlah) * 100) : 0;
-        const sisa = b.jumlah - s;
+        const win = budgetWindow(b);
+        const s = win ? spentIn(b.kategori, win) : 0;
+        const limit = budgetEffective(b);
+        const carry = budgetCarry(b);
+        const pct = limit > 0 ? Math.round((s / limit) * 100) : 0;
+        const sisa = limit - s;
         const tail = sisa < 0 ? `tembus ${rupiah(-sisa)}` : `sisa ${rupiah(sisa)}`;
-        return `  ${b.kategori}: ${rupiah(s)} / ${rupiah(b.jumlah)} (${pct}%) ${tail}`;
+        const carryNote =
+          b.rollover && carry !== 0 ? ` carry ${carry > 0 ? "+" : "-"}${rupiah(Math.abs(carry))}` : "";
+        const badge = `${b.periode}${b.rollover ? " ↻" : ""}`;
+        return `  ${b.kategori} [${badge}]: ${rupiah(s)} / ${rupiah(limit)} (${pct}%) ${tail}${carryNote}`;
       });
-      return { text: `Anggaran bulan ini:\n${lines.join("\n")}` };
+      return { text: `Anggaran bulanan/mingguan:\n${lines.join("\n")}` };
     }
     let bm: RegExpMatchArray | null;
     if ((bm = arg.match(/^hapus\s+(.+)$/i))) {
       const ok = deleteBudget(bm[1]);
       return { text: ok ? `Anggaran ${bm[1]} dihapus.` : `Anggaran "${bm[1]}" tidak ada.` };
     }
-    if ((bm = arg.match(/^(.+?)\s+([\d][\d.,]*(?:\s*(?:jt|juta|rb|ribu|k))?)$/i))) {
+    if ((bm = arg.match(/^(?:rollover)\s+(.+)$/i))) {
+      const b = getBudget(bm[1]);
+      if (!b) return { text: `Anggaran "${bm[1]}" belum ada. Set dulu: \`anggaran ${bm[1]} 2jt\`.` };
+      setBudget(b.kategori, b.jumlah, { rollover: true });
+      return { text: `Rollover ${b.kategori} aktif: sisa periode lalu menambah/mengurangi limit.` };
+    }
+    if ((bm = arg.match(/^(?:no-rollover|tanpa\s+rollover)\s+(.+)$/i))) {
+      const b = getBudget(bm[1]);
+      if (!b) return { text: `Anggaran "${bm[1]}" belum ada.` };
+      setBudget(b.kategori, b.jumlah, { rollover: false });
+      return { text: `Rollover ${b.kategori} dimatikan.` };
+    }
+    if ((bm = arg.match(/^(.+?)\s+([\d][\d.,]*(?:\s*(?:jt|juta|rb|ribu|k))?)(?:\s+(mingguan|bulanan))?$/i))) {
       const nama = bm[1].trim();
       const jumlah = parseAmount(bm[2]);
+      const periode = (bm[3]?.toLowerCase() as "mingguan" | "bulanan" | undefined) ?? undefined;
       if (jumlah == null || jumlah <= 0) {
         return { text: "Nominal anggaran tidak kebaca. Contoh: `anggaran Makanan 2jt`" };
       }
-      setBudget(nama, jumlah);
-      return { text: `Anggaran ${nama} = ${rupiah(jumlah)}/bulan.` };
+      setBudget(nama, jumlah, { periode });
+      const suffix = periode === "mingguan" ? "/minggu" : periode === "bulanan" ? "/bulan" : "";
+      return { text: `Anggaran ${nama} = ${rupiah(jumlah)}${suffix || "/bulan"}.` };
     }
-    return { text: "Format: `anggaran Makanan 2jt`, `anggaran hapus Makanan`, `anggaran`." };
+    return {
+      text:
+        "Format: `anggaran Makanan 2jt`, `anggaran Makanan 500rb mingguan`, " +
+        "`anggaran rollover Makanan`, `anggaran no-rollover Makanan`, `anggaran hapus Makanan`, `anggaran`.",
+    };
   }
 
   if (low === "berulang" || low === "berulang list" || low === "transaksi berulang") {

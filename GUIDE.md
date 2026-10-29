@@ -115,8 +115,9 @@ Catatan iOS:
    ```
 7. Cek laporan / grafik / export:
    ```
-   laporan
-   grafik
+   laporan banding
+   laporan arus kas 6
+   grafik komposisi
    csv
    ```
 8. Backup rutin: tombol **⬇ Backup** → file JSON.
@@ -196,16 +197,34 @@ kategori hapus Sedekah
 ```
 anggaran                      → lihat semua anggaran
 anggaran Makanan 2jt          → set anggaran bulanan
+anggaran Makanan 500rb mingguan → set cap mingguan (Senin–Minggu)
+anggaran rollover Makanan     → sisa periode lalu menambah/mengurangi limit
+anggaran no-rollover Makanan  → matikan rollover
 anggaran hapus Makanan        → hapus anggaran
 ```
 Peringatan otomatis muncul saat pemakaian 80% dan saat tembus.
 
+- **Rollover**: carry = batas − pemakaian periode sebelumnya (bisa negatif).
+  Limit efektif = `max(0, batas + carry)`, jadi kelebihan bulan lalu
+  mengurangi jatah bulan ini.
+- Periode anggaran per kategori: `bulanan` atau `mingguan`. Satu kategori
+  hanya punya satu anggaran (tidak bisa bulanan + mingguan sekaligus).
+
 ### Laporan, grafik, export
 ```
 laporan | laporan september | laporan gopay september
+laporan banding [bulan]       → banding vs periode sebelumnya + top perubahan
+laporan arus kas 6            → masuk/keluar/net 6 bulan terakhir
+laporan top 10 [bulan]        → 10 pengeluaran terbesar
+laporan akun bsi [bulan]      → statement satu akun
 grafik | grafik september | grafik gopay
+grafik komposisi [bulan]      → donut pengeluaran per kategori (SVG)
+grafik tren 6                 → bar masuk/keluar 6 bulan (SVG)
 csv | csv september | csv gopay
 ```
+Grafik SVG dibuat lokal dari angka di perangkat — tanpa library, tanpa
+mengirim data ke pihak ketiga. Transfer antar akun tidak dihitung sebagai
+pengeluaran/pemasukan di laporan.
 
 ### Cari & lihat
 ```
