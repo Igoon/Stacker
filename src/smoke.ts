@@ -209,6 +209,24 @@ await check("reset transaksi menyertakan file backup", async () => {
   assert(count() > 0, "restore dari file backup harus jalan");
 });
 
+await check("parser: typo 1 huruf tetap lokal (tanpa AI)", async () => {
+  const gojex = parseLocal("bsi gojex 8rb");
+  assert.equal(gojex!.result.kategori, "Transportasi", "gojex -> gojek");
+  assert.equal(gojex!.confidence, "high", "typo wajar tak perlu AI");
+  assert.equal(gojex!.result.jumlah, 8000);
+
+  const gajii = parseLocal("gajii 5jt");
+  assert.equal(gajii!.result.tipe, "masuk", "gajii -> gaji");
+  assert.equal(gajii!.result.kategori, "Gaji");
+});
+
+await check("parser: fuzzy tak mengacak kategori", async () => {
+  const p = parseLocal("servis motor 150rb");
+  assert.equal(p!.confidence, "low", "kata jauh tetap ke AI");
+  assert.equal(parseLocal("makanan 50rb")!.result.kategori, "Makanan");
+  assert.equal(parseLocal("tabungan kosong 10rb")!.result.kategori !== "Tagihan", true);
+});
+
 await check("anggaran: set, peringatan 80%/tembus, list, hapus", async () => {
   await handleMessage("anggaran Hiburan 100rb");
   assert((await handleMessage("anggaran")).text.includes("Hiburan"));

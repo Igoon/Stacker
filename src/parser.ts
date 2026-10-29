@@ -42,6 +42,43 @@ function kwMatch(low: string, kw: string): boolean {
   return re.test(low);
 }
 
+// Toleransi typo 1 huruf (Levenshtein ≤ 1) untuk kata ≥ 5 huruf yang huruf
+// pertamanya sama. Menangkap "gojex" -> "gojek", "gajii" -> "gaji" secara lokal
+// supaya tak perlu memanggil AI.
+function offByOne(a: string, b: string): boolean {
+  const la = a.length;
+  const lb = b.length;
+  if (Math.abs(la - lb) > 1 || a[0] !== b[0]) return false;
+  let i = 0;
+  let j = 0;
+  let diff = 0;
+  while (i < la && j < lb) {
+    if (a[i] === b[j]) {
+      i++;
+      j++;
+      continue;
+    }
+    if (++diff > 1) return false;
+    if (la > lb) i++;
+    else if (lb > la) j++;
+    else {
+      i++;
+      j++;
+    }
+  }
+  return true;
+}
+
+function fuzzyKwMatch(low: string, kw: string): boolean {
+  const k = kw.toLowerCase().trim();
+  if (k.length < 5 || /\s/.test(k)) return false;
+  for (const tok of low.match(/[a-z]+/g) ?? []) {
+    if (tok.length < 5 || Math.abs(tok.length - k.length) > 1) continue;
+    if (offByOne(tok, k)) return true;
+  }
+  return false;
+}
+
 const UNITS: Record<string, number> = {
   nol: 0, satu: 1, dua: 2, tiga: 3, empat: 4, lima: 5, enam: 6, tujuh: 7, delapan: 8, sembilan: 9,
 };
@@ -136,7 +173,9 @@ export function parseLocal(text: string): LocalParse | null {
     tipe = "masuk";
     explicitTipe = true;
   } else {
-    tipe = MASUK.some((k) => kwMatch(low, k)) ? "masuk" : "keluar";
+    const masuk =
+      MASUK.some((k) => kwMatch(low, k)) || MASUK.some((k) => fuzzyKwMatch(low, k));
+    tipe = masuk ? "masuk" : "keluar";
   }
 
   let kategori = "Lainnya";
@@ -150,6 +189,21 @@ export function parseLocal(text: string): LocalParse | null {
         bestLen = kk.length;
         kategori = cat.nama;
         kategoriKetemu = true;
+      }
+    }
+  }
+
+  // Fallback typo 1 huruf (hanya kalau tak ada kecocokan persis).
+  if (!kategoriKetemu) {
+    for (const cat of listCategories(tipe)) {
+      for (const k of cat.keywords) {
+        const kk = k.toLowerCase().trim();
+        if (!kk) continue;
+        if (kk.length > bestLen && fuzzyKwMatch(low, kk)) {
+          bestLen = kk.length;
+          kategori = cat.nama;
+          kategoriKetemu = true;
+        }
       }
     }
   }
