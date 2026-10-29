@@ -1,6 +1,6 @@
-# Duit Bot — Panduan Instalasi & Penggunaan
+# Stacker — Panduan Instalasi & Penggunaan
 
-Duit Bot versi PWA (Progressive Web App). Berjalan penuh di browser, data
+Stacker versi PWA (Progressive Web App). Berjalan penuh di browser, data
 keuangan tersimpan **lokal di perangkat kamu** (SQLite + OPFS). Tanpa server,
 tanpa akun, tanpa kirim data ke luar. Bisa dipasang seperti aplikasi biasa.
 
@@ -20,7 +20,7 @@ tanpa akun, tanpa kirim data ke luar. Bisa dipasang seperti aplikasi biasa.
 ### Android — Chrome (paling umum)
 
 1. Buka URL aplikasi di Chrome.
-2. Tunggu sebentar, muncul banner **"Tambahkan Duit Bot ke layar utama"**
+2. Tunggu sebentar, muncul banner **"Tambahkan Stacker ke layar utama"**
    atau ikon **⊕ Install** di menu.
 3. Kalau tidak muncul: ketuk menu **⋮ (tiga titik)** → **Tambahkan ke layar utama**
    (atau **Install app**).
@@ -63,7 +63,7 @@ tanpa akun, tanpa kirim data ke luar. Bisa dipasang seperti aplikasi biasa.
 ### Desktop
 
 1. Di jendela aplikasi, klik menu **⋮** (atau **⋯** di Edge).
-2. Pilih **Uninstall Duit Bot** / **Hapus**.
+2. Pilih **Uninstall Stacker** / **Hapus**.
 
 > **Penting:** Uninstall = data lokal hilang. Ekspor dulu lewat tombol
 > **⬇ Backup** kalau data mau dipindah/disimpan.

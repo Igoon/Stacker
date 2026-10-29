@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "Duit Bot",
-  "short_name": "Duit Bot",
+  "name": "Stacker",
+  "short_name": "Stacker",
   "description": "Catat keuangan lewat chat, data tersimpan lokal di perangkat.",
   "lang": "id",
   "dir": "ltr",

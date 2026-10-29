@@ -65,7 +65,7 @@ async function boot(): Promise<void> {
   });
 
   const poolUtil = await sqlite3.installOpfsSAHPoolVfs({});
-  const db = new poolUtil.OpfsSAHPoolDb("/duit.db");
+  const db = new poolUtil.OpfsSAHPoolDb("/stacker.db");
   mini = createMiniDb(sqlite3, db as never);
   initDb(mini);
 }

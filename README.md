@@ -1,6 +1,6 @@
-# Duit Bot — Mobile (PWA)
+# Stacker — Mobile (PWA)
 
-Versi gadget dari Duit Bot. Berjalan penuh di browser, data tersimpan **lokal
+Versi gadget bernama **Stacker** (dari project desktop Duit Bot). Berjalan penuh di browser, data tersimpan **lokal
 per perangkat** lewat SQLite WASM + OPFS. Tanpa server, tanpa Telegram, tanpa
 API key bawaan.
 

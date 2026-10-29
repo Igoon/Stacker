@@ -53,7 +53,7 @@ export interface Reply {
 const TIPE_AKUN = ["bank", "ewallet", "cash"];
 
 const HELP =
-  `Duit Bot v${APP_VERSION}\n\n` +
+  `Stacker v${APP_VERSION}\n\n` +
   "Catat transaksi:\n" +
   "  makan siang 50rb\n" +
   "  gaji 5jt\n" +
@@ -214,7 +214,7 @@ export async function handleMessage(input: string): Promise<Reply> {
   if (!text) return { text: "Tulis sesuatu, contoh: makan siang 50rb" };
   if (["help", "bantuan", "?"].includes(low)) return { text: HELP };
 
-  if (["versi", "version", "v"].includes(low)) return { text: `Duit Bot v${APP_VERSION}` };
+  if (["versi", "version", "v"].includes(low)) return { text: `Stacker v${APP_VERSION}` };
 
   if (low === "ai reset") {
     aiResetUsage();

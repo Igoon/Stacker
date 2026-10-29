@@ -140,7 +140,7 @@ document.getElementById("export")!.onclick = async () => {
   const url = URL.createObjectURL(new Blob([r.json as string], { type: "application/json" }));
   const a = document.createElement("a");
   a.href = url;
-  a.download = `duit-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `stacker-backup-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
 };

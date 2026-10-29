@@ -1,5 +1,5 @@
 // Service worker: cache app shell untuk offline (data tetap di OPFS).
-const CACHE = "duit-bot-v2";
+const CACHE = "stacker-v1";
 const PRECACHE = [
   "./",
   "./manifest.webmanifest",
