@@ -20,7 +20,7 @@
     <div class="toolbar">
       <button id="export" title="Unduh backup JSON">⬇ Backup</button>
       <button id="import" title="Muat backup JSON">⬆ Restore</button>
-      <button id="aikey" title="Atur API key Gemini (opsional)">⚙ AI</button>
+      <button id="aikey" title="Atur AI (Gemini / OpenAI-compatible)">⚙ AI</button>
       <span id="busy" hidden>…</span>
     </div>
   </header>
@@ -30,6 +30,31 @@
     <button id="send">&#10148;</button>
   </footer>
   <input type="file" id="importFile" accept="application/json,.json" hidden />
+</div>
+
+<div id="aiModal" class="modal" hidden>
+  <div class="modal-box">
+    <h3>Pengaturan AI</h3>
+    <label>Provider
+      <select id="aiProvider">
+        <option value="gemini">Gemini</option>
+        <option value="openai">OpenAI-compatible (Ollama / Groq / dll)</option>
+      </select>
+    </label>
+    <label>Base URL (hanya OpenAI-compatible)
+      <input id="aiBase" placeholder="http://localhost:11434/v1" />
+    </label>
+    <label>Model
+      <input id="aiModel" placeholder="gemini-2.0-flash" />
+    </label>
+    <label>API key (kosong = nonaktif / Ollama tanpa key)
+      <input id="aiKey" type="password" placeholder="..." />
+    </label>
+    <div class="modal-actions">
+      <button id="aiCancel">Batal</button>
+      <button id="aiSave">Simpan</button>
+    </div>
+  </div>
 </div>
 <script type="module" src="/src/main.ts"></script>
 </body>

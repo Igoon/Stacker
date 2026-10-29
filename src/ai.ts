@@ -1,51 +1,79 @@
-// ai.ts (mobile) — fallback Gemini via fetch REST. Tanpa SDK & tanpa node:fs.
+// ai.ts (mobile) — fallback AI: Gemini (default, gratis) atau OpenAI-compatible
+// (Ollama lokal / Groq / OpenRouter / dll). Tanpa SDK, tanpa node:fs.
 // API key opsional, disimpan di tabel settings (bukan bundel). Cache di memori.
 import { isoLocal } from "./dates";
 import { categoryNames, getSetting, setSetting } from "./db";
 import type { ParseResult } from "./parser";
 
-const K_KEY = "gemini_api_key";
-const K_MODEL = "gemini_model";
+const K_PROVIDER = "ai_provider";
+const K_MODEL = "ai_model";
+const K_BASE = "ai_base_url";
+const K_KEY = "ai_key";
 
-const DEFAULT_MODEL = "gemini-2.0-flash";
+const DEFAULT_MODEL_GEMINI = "gemini-2.0-flash";
+const DEFAULT_BASE_OPENAI = "http://localhost:11434/v1";
+
 const TIMEOUT_MS = 6000;
 const CACHE_TTL = 1000 * 60 * 60 * 6;
 const DAILY_LIMIT = 100;
 
-function getKey(): string {
-  return (getSetting(K_KEY) ?? "").trim();
+export type AiProvider = "gemini" | "openai";
+
+export interface AiConfig {
+  provider: AiProvider;
+  model: string;
+  baseUrl: string;
+  key: string;
 }
 
-export function setAiKey(key: string): void {
-  setSetting(K_KEY, key.trim() || null);
+function getConfig(): AiConfig {
+  const provider: AiProvider = getSetting(K_PROVIDER) === "openai" ? "openai" : "gemini";
+  const model =
+    (getSetting(K_MODEL) ?? "").trim() || (provider === "gemini" ? DEFAULT_MODEL_GEMINI : "");
+  const baseUrl = (getSetting(K_BASE) ?? "").trim() || DEFAULT_BASE_OPENAI;
+  const key = (getSetting(K_KEY) ?? "").trim();
+  return { provider, model, baseUrl, key };
 }
 
-export const aiEnabled = () => getKey().length > 0;
-
-function getModel(): string {
-  return (getSetting(K_MODEL) ?? "").trim() || DEFAULT_MODEL;
+export function getAiConfig(): AiConfig {
+  return getConfig();
 }
+
+export function setAiConfig(cfg: Partial<AiConfig>): void {
+  if (cfg.provider != null) setSetting(K_PROVIDER, cfg.provider);
+  if (cfg.model != null) setSetting(K_MODEL, cfg.model.trim() || null);
+  if (cfg.baseUrl != null) setSetting(K_BASE, cfg.baseUrl.trim() || null);
+  if (cfg.key != null) setSetting(K_KEY, cfg.key.trim() || null);
+}
+
+export const aiEnabled = (): boolean => {
+  const c = getConfig();
+  return c.provider === "gemini" ? c.key.length > 0 : c.baseUrl.length > 0;
+};
 
 const SYSTEM_PROMPT =
   "Kamu parser transaksi keuangan berbahasa Indonesia. " +
   "Ubah pesan user jadi daftar transaksi. Pisahkan bila ada beberapa transaksi. " +
   "Nominal dalam Rupiah, integer, tanpa titik. Contoh: '50rb'=50000, '1,5jt'=1500000. " +
   "tipe 'masuk' untuk pemasukan (gaji, bonus, terima uang), selain itu 'keluar'. " +
-  "catatan = teks singkat transaksi. tanggal format YYYY-MM-DD bila disebut, jika tidak kosongkan.\n\n" +
-  "Pesan user: ";
+  "catatan = teks singkat transaksi. tanggal format YYYY-MM-DD bila disebut, jika tidak kosongkan.";
 
 function buildPrompt(masuk: string[], keluar: string[]): string {
-  return SYSTEM_PROMPT.replace(
-    "tanggal format YYYY-MM-DD bila disebut, jika tidak kosongkan.",
-    `Kategori MASUK wajib salah satu dari: ${masuk.join(", ")}. ` +
-      `Kategori KELUAR wajib salah satu dari: ${keluar.join(", ")}. ` +
-      "Pastikan kategori cocok dengan tipe: pemasukan pakai daftar masuk, pengeluaran pakai daftar keluar. " +
-      `Hari ini ${isoLocal()}. ` +
-      "Hitung tanggal relatif ('kemarin','2 hari lalu','3 september') dari hari ini; " +
-      "tahun memakai tahun hari ini bila tidak disebut. " +
-      "tanggal format YYYY-MM-DD bila disebut, jika tidak kosongkan."
+  return (
+    SYSTEM_PROMPT +
+    `\nKategori MASUK wajib salah satu dari: ${masuk.join(", ")}. ` +
+    `Kategori KELUAR wajib salah satu dari: ${keluar.join(", ")}. ` +
+    "Pastikan kategori cocok dengan tipe: pemasukan pakai daftar masuk, pengeluaran pakai daftar keluar. " +
+    `Hari ini ${isoLocal()}. ` +
+    "Hitung tanggal relatif ('kemarin','2 hari lalu','3 september') dari hari ini; " +
+    "tahun memakai tahun hari ini bila tidak disebut. " +
+    "tanggal format YYYY-MM-DD bila disebut, jika tidak kosongkan."
   );
 }
+
+const JSON_INSTRUCTION =
+  '\n\nJawab HANYA satu objek JSON valid tanpa markdown, format persis:\n' +
+  '{"transactions":[{"jumlah":50000,"tipe":"keluar","kategori":"Makanan","catatan":"makan siang","tanggal":""}]}';
 
 function buildSchema(names: string[]) {
   return {
@@ -107,7 +135,9 @@ function bumpUsage(): void {
 
 export interface AiStats {
   enabled: boolean;
+  provider: AiProvider;
   model: string;
+  baseUrl: string;
   callsToday: number;
   dailyLimit: number;
   cacheSize: number;
@@ -115,10 +145,13 @@ export interface AiStats {
 }
 
 export function aiStats(): AiStats {
+  const c = getConfig();
   const calls = callsToday();
   return {
     enabled: aiEnabled(),
-    model: getModel(),
+    provider: c.provider,
+    model: c.model,
+    baseUrl: c.baseUrl,
     callsToday: calls,
     dailyLimit: DAILY_LIMIT,
     cacheSize: cache.size,
@@ -151,12 +184,95 @@ function validate(raw: unknown, allowed: Record<"masuk" | "keluar", Set<string>>
   return out;
 }
 
+function extractJson(s: string): unknown {
+  const t = s.trim();
+  const fenced = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const body = fenced ? fenced[1] : t;
+  const start = body.indexOf("{");
+  const end = body.lastIndexOf("}");
+  if (start >= 0 && end > start) return JSON.parse(body.slice(start, end + 1));
+  return JSON.parse(body);
+}
+
+async function callGemini(
+  cfg: AiConfig,
+  masuk: string[],
+  keluar: string[],
+  union: string[],
+  text: string
+): Promise<unknown> {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model || DEFAULT_MODEL_GEMINI}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": cfg.key,
+      },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: buildPrompt(masuk, keluar) + "\n\n" + text }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: buildSchema(union),
+          temperature: 0,
+        },
+      }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    }
+  );
+  if (!res.ok) {
+    console.error("[ai] HTTP", res.status, await res.text().catch(() => ""));
+    throw new Error(`gemini HTTP ${res.status}`);
+  }
+  const j = (await res.json()) as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+  };
+  const txt = j.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+  return JSON.parse(txt);
+}
+
+async function callOpenAi(
+  cfg: AiConfig,
+  masuk: string[],
+  keluar: string[],
+  text: string
+): Promise<unknown> {
+  const base = cfg.baseUrl.replace(/\/+$/, "");
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (cfg.key) headers["Authorization"] = `Bearer ${cfg.key}`;
+
+  const res = await fetch(`${base}/chat/completions`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      model: cfg.model,
+      messages: [
+        { role: "system", content: buildPrompt(masuk, keluar) + JSON_INSTRUCTION },
+        { role: "user", content: text },
+      ],
+      temperature: 0,
+      response_format: { type: "json_object" },
+    }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  if (!res.ok) {
+    console.error("[ai] HTTP", res.status, await res.text().catch(() => ""));
+    throw new Error(`openai HTTP ${res.status}`);
+  }
+  const j = (await res.json()) as {
+    choices?: { message?: { content?: string } }[];
+  };
+  const txt = j.choices?.[0]?.message?.content ?? "{}";
+  return extractJson(txt);
+}
+
 export async function parseGemini(text: string): Promise<ParseResult[] | null> {
   loadUsage();
   if (!aiEnabled()) return null;
 
-  const key = text.trim().toLowerCase();
-  const hit = cache.get(key);
+  const cfg = getConfig();
+  const cacheKey = `${cfg.provider}|${cfg.model}|${text.trim().toLowerCase()}`;
+  const hit = cache.get(cacheKey);
   if (hit && Date.now() - hit.at < CACHE_TTL) return hit.value;
 
   if (callsToday() >= DAILY_LIMIT) {
@@ -171,39 +287,14 @@ export async function parseGemini(text: string): Promise<ParseResult[] | null> {
     const keluarNames = categoryNames("keluar");
     const union = [...new Set([...masukNames, ...keluarNames])];
 
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${getModel()}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": getKey(),
-        },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: buildPrompt(masukNames, keluarNames) + text }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: buildSchema(union),
-            temperature: 0,
-          },
-        }),
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      }
-    );
+    const raw =
+      cfg.provider === "gemini"
+        ? await callGemini(cfg, masukNames, keluarNames, union, text)
+        : await callOpenAi(cfg, masukNames, keluarNames, text);
 
-    if (!res.ok) {
-      console.error("[ai] HTTP", res.status, await res.text().catch(() => ""));
-      return null;
-    }
-
-    const j = (await res.json()) as {
-      candidates?: { content?: { parts?: { text?: string }[] } }[];
-    };
-    const txt = j.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
-    const parsed = JSON.parse(txt);
-    const list = validate(parsed, { masuk: new Set(masukNames), keluar: new Set(keluarNames) });
+    const list = validate(raw, { masuk: new Set(masukNames), keluar: new Set(keluarNames) });
     if (list.length) {
-      cache.set(key, { at: Date.now(), value: list });
+      cache.set(cacheKey, { at: Date.now(), value: list });
     }
     return list.length ? list : null;
   } catch (e) {

@@ -12,7 +12,7 @@ import {
   deleteTx,
 } from "./db";
 import { handleMessage } from "./bot";
-import { aiEnabled, aiStats, setAiKey } from "./ai";
+import { aiEnabled, aiStats, getAiConfig, setAiConfig } from "./ai";
 import { exportJson, importJson } from "./backup";
 import { APP_VERSION } from "./version";
 
@@ -39,12 +39,19 @@ interface ImportMsg {
   id: number;
   json: string;
 }
-interface SetKeyMsg {
-  type: "setkey";
+interface GetAiMsg {
+  type: "getai";
   id: number;
+}
+interface SetAiMsg {
+  type: "setai";
+  id: number;
+  provider: string;
+  model: string;
+  baseUrl: string;
   key: string;
 }
-type InMsg = ChatMsg | StateMsg | DeleteMsg | ExportMsg | ImportMsg | SetKeyMsg;
+type InMsg = ChatMsg | StateMsg | DeleteMsg | ExportMsg | ImportMsg | GetAiMsg | SetAiMsg;
 
 let mini: MiniDb;
 
@@ -114,9 +121,17 @@ async function onMessage(msg: InMsg): Promise<void> {
       }
       break;
     }
-    case "setkey": {
-      setAiKey(msg.key);
-      reply(msg.id, { ok: true, aiEnabled: aiEnabled() });
+    case "getai":
+      reply(msg.id, { ok: true, config: getAiConfig() });
+      break;
+    case "setai": {
+      setAiConfig({
+        provider: msg.provider === "openai" ? "openai" : "gemini",
+        model: msg.model,
+        baseUrl: msg.baseUrl,
+        key: msg.key,
+      });
+      reply(msg.id, { ok: true, aiEnabled: aiEnabled(), config: getAiConfig() });
       break;
     }
     default:

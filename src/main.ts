@@ -17,7 +17,7 @@ const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "modu
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register(/* @vite-ignore */ new URL("../sw.js", import.meta.url), { scope: "./" })
+      .register(new URL(/* @vite-ignore */ "../sw.js", import.meta.url), { scope: "./" })
       .catch((e) => console.warn("[sw] gagal registrasi:", e));
   });
 }
@@ -158,9 +158,51 @@ document.getElementById("importFile")!.addEventListener("change", async (e) => {
   void refresh();
 });
 
-document.getElementById("aikey")!.onclick = () => {
-  const key = prompt("API key Gemini (kosongkan untuk nonaktifkan AI):") ?? "";
-  void call({ type: "setkey", key }).then(() => refresh());
+// Modal pengaturan AI.
+const aiModal = document.getElementById("aiModal")!;
+const aiProvider = document.getElementById("aiProvider") as HTMLSelectElement;
+const aiBase = document.getElementById("aiBase") as HTMLInputElement;
+const aiModel = document.getElementById("aiModel") as HTMLInputElement;
+const aiKey = document.getElementById("aiKey") as HTMLInputElement;
+
+function toggleBaseRow(): void {
+  const isOpenai = aiProvider.value === "openai";
+  aiBase.closest("label")!.style.display = isOpenai ? "" : "none";
+  if (!aiModel.value) aiModel.placeholder = isOpenai ? "llama3.2" : "gemini-2.0-flash";
+}
+
+aiProvider.addEventListener("change", toggleBaseRow);
+
+document.getElementById("aikey")!.onclick = async () => {
+  const r = await call({ type: "getai" });
+  const c = (r.config ?? {}) as {
+    provider?: string;
+    model?: string;
+    baseUrl?: string;
+    key?: string;
+  };
+  aiProvider.value = c.provider === "openai" ? "openai" : "gemini";
+  aiBase.value = c.baseUrl ?? "";
+  aiModel.value = c.model ?? "";
+  aiKey.value = c.key ?? "";
+  toggleBaseRow();
+  aiModal.hidden = false;
+};
+
+document.getElementById("aiCancel")!.onclick = () => {
+  aiModal.hidden = true;
+};
+
+document.getElementById("aiSave")!.onclick = async () => {
+  aiModal.hidden = true;
+  await call({
+    type: "setai",
+    provider: aiProvider.value,
+    model: aiModel.value.trim(),
+    baseUrl: aiBase.value.trim(),
+    key: aiKey.value.trim(),
+  });
+  void refresh();
 };
 
 addBubble(

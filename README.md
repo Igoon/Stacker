@@ -39,9 +39,15 @@ npm run smoke      # uji logika inti via sqlite-wasm build Node (in-memory)
 
 ## AI (opsional, default mati)
 
-- Tombol **AI** di toolbar → isi API key Gemini. Key disimpan di DB lokal
-  (tabel `settings`), bukan dibundel. Kosongkan untuk matikan.
-- Default `gemini-2.0-flash`, batas 100 panggilan/hari, cache 6 jam.
+- Tombol **AI** di toolbar → modal pengaturan. Dua provider:
+  - **Gemini** (default) — gratis pakai free tier (`gemini-2.0-flash`). Isi API key.
+  - **OpenAI-compatible** — `{base}/chat/completions` (Ollama lokal, Groq,
+    OpenRouter, dsb). Isi base URL + model + key (Ollama lokal tanpa key).
+- Konfigurasi disimpan di DB lokal (tabel `settings`), bukan dibundel.
+- Key kosong + provider Gemini = AI nonaktif. Provider OpenAI + base URL = aktif
+  (walau tanpa key, mis. Ollama).
+- Batas 100 panggilan/hari, cache 6 jam. Data keuangan **tidak** dikirim ke
+  pihak ketiga kalau pakai Ollama lokal.
 
 ## Backup / migrasi
 
