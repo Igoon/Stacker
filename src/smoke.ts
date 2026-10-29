@@ -15,6 +15,7 @@ initDb(mini);
 const { handleMessage } = await import("./bot");
 const dbmod = await import("./db");
 const { parseLocal } = await import("./parser");
+const { hashPin, safeEqual, encryptJson, decryptJson, isEncrypted } = await import("./crypto");
 
 let pass = 0;
 let fail = 0;
@@ -284,6 +285,68 @@ await check("kategori ubah nama (riwayat ikut)", async () => {
   assert.equal(dbmod.getTx(t!.id)!.kategori, "HiburanX", "riwayat ikut berganti");
   await handleMessage("kategori ubah HiburanX jadi Hiburan");
   dbmod.deleteTx(t!.id); // biar tak mengganggu tes anggaran Hiburan
+});
+
+await check("crypto: PIN hash & backup terenkripsi", async () => {
+  const h = await hashPin("1234");
+  const c = await hashPin("1234", h.salt, h.iter);
+  assert(safeEqual(c.hash, h.hash), "PIN benar harus cocok");
+  const d = await hashPin("9999", h.salt, h.iter);
+  assert(!safeEqual(d.hash, h.hash), "PIN salah tak boleh cocok");
+
+  const plain = '{"version":2,"tables":{}}';
+  const enc = await encryptJson(plain, "rahasia-panjang");
+  assert(isEncrypted(enc), "format envelope");
+  assert.equal(await decryptJson(enc, "rahasia-panjang"), plain, "dekripsi utuh");
+  let failed = false;
+  try {
+    await decryptJson(enc, "sandi-salah-xyz");
+  } catch {
+    failed = true;
+  }
+  assert(failed, "kata sandi salah harus gagal");
+});
+
+await check("PIN: atur, tolak format salah, ubah, hapus, tak ikut export", async () => {
+  const a = await handleMessage("pin atur 1234");
+  assert(a.lock === true, "UI harus langsung mengunci");
+  assert(dbmod.getSetting("pin_hash"), "hash tersimpan");
+
+  const bad = await handleMessage("pin atur 12");
+  assert(bad.text.includes("4-8"));
+
+  const wrong = await handleMessage("pin hapus 0000");
+  assert(wrong.text.includes("salah"));
+  assert(dbmod.getSetting("pin_hash"), "PIN tetap ada setelah salah");
+
+  const ch = await handleMessage("pin ubah 1234 5678");
+  assert(ch.text.includes("diganti"));
+  const h = dbmod.getSetting("pin_hash")!;
+  const s = dbmod.getSetting("pin_salt")!;
+  const it = Number(dbmod.getSetting("pin_iter"));
+  assert(safeEqual((await hashPin("5678", s, it)).hash, h), "PIN baru berlaku");
+
+  assert(!dbmod.exportAll().includes("pin_hash"), "PIN tak boleh ikut backup");
+
+  const del = await handleMessage("pin hapus 5678");
+  assert(del.text.includes("dihapus"));
+  assert.equal(dbmod.getSetting("pin_hash"), null);
+});
+
+await check("backup kunci: file terenkripsi & bisa dipulihkan", async () => {
+  const r = await handleMessage("backup kunci sandi-panjang-2026");
+  assert(!!r.file, "harus ada file");
+  assert(r.file!.name.endsWith(".enc.json"), "nama file terenkripsi");
+  assert(isEncrypted(r.file!.content), "isi harus envelope");
+  assert(!r.file!.content.includes("transactions"), "data tak boleh plaintext");
+
+  const plain = await decryptJson(r.file!.content, "sandi-panjang-2026");
+  const before = count();
+  dbmod.importAll(plain);
+  assert.equal(count(), before, "restore menghasilkan jumlah tx sama");
+
+  const short = await handleMessage("backup kunci pendek");
+  assert(!short.file && short.text.includes("minimal 8"), "tolak sandi pendek");
 });
 
 await check("anggaran: set, peringatan 80%/tembus, list, hapus", async () => {

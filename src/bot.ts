@@ -18,6 +18,7 @@ import {
   getAccountByName,
   getBudget,
   getCategoryByName,
+  getSetting,
   getTx,
   listAccounts,
   listAll,
@@ -40,6 +41,7 @@ import {
   setAccountSaldoAwal,
   setBudget,
   setCategoryTipe,
+  setSetting,
   transferRange,
   updateCategoryKeywords,
   updateTx,
@@ -52,6 +54,7 @@ import { parsePeriod, type Period } from "./dates";
 import { toCSV } from "./csv";
 import { buildDailyRange, buildGrafik, shortRp } from "./chart";
 import { exportJson, importJson } from "./backup";
+import { encryptJson, hashPin, safeEqual } from "./crypto";
 import { aiEnabled, aiResetUsage, aiStats, parseGemini } from "./ai";
 import { APP_VERSION } from "./version";
 
@@ -60,6 +63,7 @@ export interface Reply {
   txs?: Tx[];
   file?: { name: string; content: string };
   pre?: boolean;
+  lock?: boolean;
 }
 
 const TIPE_AKUN = ["bank", "ewallet", "cash"];
@@ -124,6 +128,9 @@ const HELP =
   "  utang 100rb ke budi         (ledger utang/piutang)\n" +
   "  piutang 50rb dari andi\n" +
   "  bayar utang budi 50rb | utang hapus 3\n" +
+  "  pin | pin atur 1234 | pin ubah 1234 5678\n" +
+  "  pin hapus 1234              (matikan kunci)\n" +
+  "  backup | backup kunci <sandi>   (JSON / terenkripsi)\n" +
   "  ai | ai reset               (pemakaian AI)\n" +
   "  versi                       (versi aplikasi)\n" +
   "  reset transaksi            (hapus semua, ada backup)\n" +
@@ -279,6 +286,81 @@ async function handleMessageInner(input: string): Promise<Reply> {
     };
   }
 
+  let m: RegExpMatchArray | null;
+
+  if (low === "pin" || low === "pin info") {
+    const set = !!getSetting("pin_hash");
+    return {
+      text: set
+        ? "PIN: aktif.\nApp mengunci otomatis setelah 2 menit idle atau saat pindah app.\nUbah: `pin ubah <lama> <baru>` · Matikan: `pin hapus <pin>`"
+        : "PIN: nonaktif.\nPasang: `pin atur 1234` (4-8 digit).\nPIN hanya mengunci tampilan — data tetap tersimpan di perangkat.",
+    };
+  }
+
+  if ((m = text.match(/^pin atur\s+(\S+)$/i))) {
+    const pin = m[1].trim();
+    if (!/^\d{4,8}$/.test(pin)) return { text: "PIN harus 4-8 digit angka. Contoh: `pin atur 1234`" };
+    const h = await hashPin(pin);
+    setSetting("pin_hash", h.hash);
+    setSetting("pin_salt", h.salt);
+    setSetting("pin_iter", String(h.iter));
+    return {
+      text: "PIN dipasang. App akan terkunci sekarang; masukkan PIN untuk membuka.\nLupa PIN = data tak bisa dibuka, tapi backup JSON tetap bisa di-restore di perangkat lain.",
+      lock: true,
+    };
+  }
+
+  if ((m = text.match(/^pin ubah\s+(\S+)\s+(\S+)$/i))) {
+    const lama = m[1].trim();
+    const baru = m[2].trim();
+    if (!/^\d{4,8}$/.test(baru)) return { text: "PIN baru harus 4-8 digit angka." };
+    const h = getSetting("pin_hash");
+    if (!h) return { text: "Belum ada PIN. Pasang dengan `pin atur 1234`." };
+    const c = await hashPin(lama, getSetting("pin_salt") ?? undefined, Number(getSetting("pin_iter") ?? 120000));
+    if (!safeEqual(c.hash, h)) return { text: "PIN lama salah." };
+    const n = await hashPin(baru);
+    setSetting("pin_hash", n.hash);
+    setSetting("pin_salt", n.salt);
+    setSetting("pin_iter", String(n.iter));
+    return { text: "PIN diganti.", lock: true };
+  }
+
+  if ((m = text.match(/^pin hapus\s+(\S+)$/i))) {
+    const pin = m[1].trim();
+    const h = getSetting("pin_hash");
+    if (!h) return { text: "Belum ada PIN." };
+    const c = await hashPin(pin, getSetting("pin_salt") ?? undefined, Number(getSetting("pin_iter") ?? 120000));
+    if (!safeEqual(c.hash, h)) return { text: "PIN salah. PIN tidak dihapus." };
+    setSetting("pin_hash", null);
+    setSetting("pin_salt", null);
+    setSetting("pin_iter", null);
+    return { text: "PIN dihapus. App tak lagi terkunci." };
+  }
+
+  if ((m = text.match(/^backup(?:\s+kunci\s+(.+))?$/i))) {
+    const pass = (m[1] ?? "").trim();
+    const stamp = new Date().toISOString().slice(0, 10);
+    const plain = exportJson();
+    if (!pass) {
+      return {
+        text:
+          "Backup JSON biasa siap diunduh.\n" +
+          "Ingin terenkripsi? `backup kunci <kata sandi>` (minimal 8 karakter).",
+        file: { name: `stacker-backup-${stamp}.json`, content: plain },
+      };
+    }
+    if (pass.length < 8) {
+      return { text: "Kata sandi minimal 8 karakter. Contoh: `backup kunci rahasia-panjang-2026`" };
+    }
+    const enc = await encryptJson(plain, pass);
+    return {
+      text:
+        "Backup terenkripsi siap diunduh (AES-GCM 256, PBKDF2).\n" +
+        "Simpan kata sandinya — tanpa itu file tak bisa dibuka.",
+      file: { name: `stacker-backup-${stamp}.enc.json`, content: enc },
+    };
+  }
+
   if (/^reset\s+(transaksi|laporan|semua)$/i.test(text)) {
     const bkp = exportJson();
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -304,8 +386,6 @@ async function handleMessageInner(input: string): Promise<Reply> {
     if (!acc) return { text: `Akun "${arg}" tidak ada. Lihat: \`akun\`` };
     return { text: `Saldo ${acc.nama}: ${rupiahSigned(saldo(acc.id))}` };
   }
-
-  let m: RegExpMatchArray | null;
 
   if (low === "akun" || low === "akun list" || low === "daftar akun") {
     const rows = accountBalances();
@@ -893,7 +973,7 @@ async function handleMessageInner(input: string): Promise<Reply> {
     "hapus", "ubah", "lihat", "cari", "laporan", "ringkasan", "report", "csv", "export",
     "grafik", "chart", "dashboard", "anggaran",
     "riwayat", "history", "list", "akun", "kategori", "saldo", "transfer", "reset", "ai",
-    "versi", "version", "help", "bantuan", "utang", "piutang", "hutang", "bayar",
+    "versi", "version", "help", "bantuan", "utang", "piutang", "hutang", "bayar", "pin", "backup",
   ];
   const word = low.split(/\s+/)[0];
   if (CMD_WORDS.includes(word)) {

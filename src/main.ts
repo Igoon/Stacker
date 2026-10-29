@@ -41,16 +41,12 @@ worker.onmessage = (ev: MessageEvent<{ id: number } & Record<string, unknown>>) 
       ready = true;
       setSub(`v${m.version}`);
       void refresh().then((s) => {
-        // Chat ephemeral: jangan render riwayat, cukup hint sekali di awal.
-        const n = Number(s.txCount ?? 0);
-        if (n > 0) {
-          addBubble(
-            `${n} transaksi tersimpan di perangkat ini.\n` +
-              "Ketik `riwayat` untuk melihat, `help` untuk daftar perintah.",
-            "bot"
-          );
+        if (s.pinSet) {
+          lockNow();
+        } else {
+          showStartupHint(s);
+          handleSharedText();
         }
-        handleSharedText();
       });
     } else if (m.type === "error") {
       setSub("gagal inisialisasi DB");
@@ -172,9 +168,25 @@ function addBubble(text: string, side: "me" | "bot", txs?: Tx[], file?: { name: 
   chat.scrollTop = chat.scrollHeight;
 }
 
+// Chat ephemeral: jangan render riwayat, cukup hint sekali di awal.
+let hintShown = false;
+function showStartupHint(s: Record<string, unknown>): void {
+  if (hintShown) return;
+  hintShown = true;
+  const n = Number(s.txCount ?? 0);
+  if (n > 0) {
+    addBubble(
+      `${n} transaksi tersimpan di perangkat ini.\n` +
+        "Ketik `riwayat` untuk melihat, `help` untuk daftar perintah.",
+      "bot"
+    );
+  }
+}
+
 async function refresh(): Promise<Record<string, unknown>> {
   const r = await call({ type: "state" });
   saldoEl.textContent = "Saldo: " + r.saldoRupiah;
+  pinSet = !!r.pinSet;
   // Notice dari worker (mis. transaksi berulang yang baru dicatat).
   const notes = Array.isArray(r.notices) ? (r.notices as string[]) : [];
   for (const n of notes) addBubble(n, "bot");
@@ -191,6 +203,11 @@ async function send(): Promise<void> {
   busyEl.hidden = true;
   if (r.ok) {
     addBubble(r.text ?? "", "bot", r.txs, r.file);
+    if (r.lock) {
+      pinSet = true;
+      lockNow();
+      return;
+    }
   } else {
     addBubble("Error: " + (r.error ?? "tidak diketahui"), "bot");
   }
@@ -213,12 +230,12 @@ document.getElementById("import")!.onclick = () => {
 };
 
 document.getElementById("importFile")!.addEventListener("change", async (e) => {
-  const file = (e.target as HTMLInputElement).files?.[0];
+  const inputEl = e.target as HTMLInputElement;
+  const file = inputEl.files?.[0];
   if (!file) return;
   const text = await file.text();
-  const r = await call({ type: "import", json: text });
-  addBubble(r.ok ? "Backup dimuat." : "Gagal impor: " + (r.error ?? "format salah"), "bot");
-  void refresh();
+  inputEl.value = "";
+  await doImport(text);
 });
 
 // Modal pengaturan AI.
@@ -459,6 +476,119 @@ wallFile.addEventListener("change", async () => {
 
 applyWall(currentWall);
 syncWallControls(currentWall);
+
+// ---------- PIN & auto-lock ----------
+// PIN hanya mengunci tampilan (bukan enkripsi disk): hash PBKDF2 + salt
+// disimpan di tabel settings dan tak ikut file backup.
+let pinSet = false;
+let lockFails = 0;
+let lockCooldownUntil = 0;
+let idleTimer: number | undefined;
+const IDLE_MS = 2 * 60 * 1000;
+
+const lockEl = document.getElementById("lock")!;
+const lockPin = document.getElementById("lockPin") as HTMLInputElement;
+const lockMsg = document.getElementById("lockMsg")!;
+
+function lockNow(): void {
+  if (!pinSet) return;
+  if (idleTimer) window.clearTimeout(idleTimer);
+  lockEl.hidden = false;
+  lockPin.value = "";
+  lockMsg.textContent = "";
+  window.setTimeout(() => lockPin.focus(), 60);
+}
+
+function unlockUi(): void {
+  lockEl.hidden = true;
+  lockPin.value = "";
+  lockMsg.textContent = "";
+  touchIdle();
+  void refresh().then((s) => {
+    showStartupHint(s);
+    handleSharedText();
+  });
+}
+
+function touchIdle(): void {
+  if (idleTimer) window.clearTimeout(idleTimer);
+  if (lockEl.hidden && pinSet) idleTimer = window.setTimeout(lockNow, IDLE_MS);
+}
+
+async function tryUnlock(): Promise<void> {
+  const now = Date.now();
+  if (now < lockCooldownUntil) {
+    lockMsg.textContent = `Tunggu ${Math.ceil((lockCooldownUntil - now) / 1000)} detik.`;
+    return;
+  }
+  const pin = lockPin.value.trim();
+  if (!pin) return;
+  const r = await call({ type: "pincheck", pin });
+  if (r.ok) {
+    lockFails = 0;
+    unlockUi();
+    return;
+  }
+  lockFails++;
+  lockPin.value = "";
+  if (lockFails >= 5) {
+    lockFails = 0;
+    lockCooldownUntil = Date.now() + 30_000;
+    lockMsg.textContent = "Terlalu banyak salah. Tunggu 30 detik.";
+  } else {
+    lockMsg.textContent = `PIN salah (${lockFails}/5).`;
+  }
+  lockPin.focus();
+}
+
+document.getElementById("lockBtn")!.onclick = () => void tryUnlock();
+lockPin.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") void tryUnlock();
+});
+for (const ev of ["pointerdown", "keydown", "touchstart"] as const) {
+  window.addEventListener(ev, touchIdle, { passive: true });
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) lockNow();
+});
+
+// ---------- Backup terenkripsi: minta kata sandi ----------
+const passModal = document.getElementById("passModal")!;
+const passInput = document.getElementById("passInput") as HTMLInputElement;
+let pendingImport: string | null = null;
+
+function askPass(text: string): void {
+  pendingImport = text;
+  passInput.value = "";
+  passModal.hidden = false;
+  passInput.focus();
+}
+
+async function doImport(text: string, pass?: string): Promise<void> {
+  const r = await call({ type: "import", json: text, pass });
+  if (r.needPass) {
+    askPass(text);
+    return;
+  }
+  addBubble(r.ok ? "Backup dimuat." : "Gagal impor: " + (r.error ?? "format salah"), "bot");
+  void refresh();
+}
+
+document.getElementById("passCancel")!.onclick = () => {
+  pendingImport = null;
+  passModal.hidden = true;
+};
+
+document.getElementById("passOk")!.onclick = () => {
+  const text = pendingImport;
+  pendingImport = null;
+  passModal.hidden = true;
+  if (text) void doImport(text, passInput.value);
+};
+
+passInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") document.getElementById("passOk")!.click();
+});
 
 // Share target (PWA): teks yang dibagikan dari app lain (notifikasi SMS,
 // WhatsApp, dsb.) langsung diisi ke kolom chat lalu dikirim.

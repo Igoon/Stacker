@@ -10,11 +10,13 @@ import {
   countTx,
   accountBalances,
   deleteTxWithIds,
+  getSetting,
   runRecurring,
 } from "./db";
 import { handleMessage } from "./bot";
 import { aiEnabled, aiStats, getAiConfig, setAiConfig } from "./ai";
 import { exportJson, importJson } from "./backup";
+import { decryptJson, hashPin, isEncrypted, safeEqual } from "./crypto";
 import { APP_VERSION } from "./version";
 
 interface ChatMsg {
@@ -39,6 +41,12 @@ interface ImportMsg {
   type: "import";
   id: number;
   json: string;
+  pass?: string;
+}
+interface PinCheckMsg {
+  type: "pincheck";
+  id: number;
+  pin: string;
 }
 interface GetAiMsg {
   type: "getai";
@@ -52,7 +60,15 @@ interface SetAiMsg {
   baseUrl: string;
   key: string;
 }
-type InMsg = ChatMsg | StateMsg | DeleteMsg | ExportMsg | ImportMsg | GetAiMsg | SetAiMsg;
+type InMsg =
+  | ChatMsg
+  | StateMsg
+  | DeleteMsg
+  | ExportMsg
+  | ImportMsg
+  | GetAiMsg
+  | SetAiMsg
+  | PinCheckMsg;
 
 let mini: MiniDb;
 
@@ -101,6 +117,7 @@ function state() {
       rupiah: a.rupiah,
     })),
     txCount: countTx(),
+    pinSet: !!getSetting("pin_hash"),
     notices,
   };
 }
@@ -125,11 +142,37 @@ async function onMessage(msg: InMsg): Promise<void> {
       break;
     case "import": {
       try {
-        importJson(msg.json);
+        let json = msg.json;
+        if (isEncrypted(json)) {
+          if (!msg.pass) {
+            reply(msg.id, {
+              ok: false,
+              needPass: true,
+              error: "File backup terenkripsi. Masukkan kata sandi.",
+            });
+            break;
+          }
+          json = await decryptJson(json, msg.pass);
+        }
+        importJson(json);
         reply(msg.id, { ok: true });
       } catch (e) {
         reply(msg.id, { ok: false, error: (e as Error).message });
       }
+      break;
+    }
+    case "pincheck": {
+      const h = getSetting("pin_hash");
+      if (!h) {
+        reply(msg.id, { ok: true, pinSet: false });
+        break;
+      }
+      const c = await hashPin(
+        msg.pin,
+        getSetting("pin_salt") ?? undefined,
+        Number(getSetting("pin_iter") ?? 120000)
+      );
+      reply(msg.id, { ok: safeEqual(c.hash, h) });
       break;
     }
     case "getai":

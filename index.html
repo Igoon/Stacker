@@ -40,6 +40,16 @@
   <input type="file" id="importFile" accept="application/json,.json" hidden />
 </div>
 
+<div id="lock" class="lock" hidden>
+  <div class="lock-box">
+    <div class="lock-logo">Stacker</div>
+    <p class="lock-hint">Masukkan PIN untuk membuka</p>
+    <input id="lockPin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="••••" />
+    <button id="lockBtn">Buka</button>
+    <div id="lockMsg" class="lock-msg"></div>
+  </div>
+</div>
+
 <div id="wallModal" class="modal" hidden>
   <div class="modal-box">
     <h3>Wallpaper chat</h3>
@@ -80,6 +90,23 @@
     <div class="modal-actions">
       <button id="aiCancel">Batal</button>
       <button id="aiSave">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<div id="passModal" class="modal" hidden>
+  <div class="modal-box">
+    <h3>Backup terenkripsi</h3>
+    <p style="font-size:13px;color:#8696a0;margin:0 0 10px">
+      File ini dilindungi kata sandi. Masukkan kata sandi yang dipakai saat
+      membuat backup.
+    </p>
+    <label>Kata sandi
+      <input id="passInput" type="password" autocomplete="off" />
+    </label>
+    <div class="modal-actions">
+      <button id="passCancel">Batal</button>
+      <button id="passOk">Buka</button>
     </div>
   </div>
 </div>

@@ -820,8 +820,14 @@ export function importAll(json: string): void {
   if (!t) throw new Error("Format backup tidak dikenali.");
 
   // API key AI tidak ikut di backup (lihat exportAll). Pertahankan key lokal
-  // yang sudah ada supaya restore tidak mematikan AI pengguna.
+  // yang sudah ada supaya restore tidak mematikan AI pengguna. PIN juga lokal:
+  // restore dari perangkat lain tak boleh membuka/menghapus kunci perangkat ini.
   const localAiKey = getSetting("ai_key");
+  const localPin = {
+    hash: getSetting("pin_hash"),
+    salt: getSetting("pin_salt"),
+    iter: getSetting("pin_iter"),
+  };
 
   db.transaction(() => {
     db.exec(`DELETE FROM transactions; DELETE FROM accounts; DELETE FROM categories; DELETE FROM budgets; DELETE FROM recurring; DELETE FROM debts; DELETE FROM settings;`);
@@ -905,5 +911,10 @@ export function importAll(json: string): void {
       insSetting.run(s.key, s.value ?? null);
     }
     if (localAiKey) insSetting.run("ai_key", localAiKey);
+    if (localPin.hash && localPin.salt) {
+      insSetting.run("pin_hash", localPin.hash);
+      insSetting.run("pin_salt", localPin.salt);
+      insSetting.run("pin_iter", localPin.iter ?? "120000");
+    }
   });
 }

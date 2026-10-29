@@ -82,8 +82,9 @@ Catatan iOS:
 
 ## 4. Penggunaan Dasar
 
-> **Catatan:** Stacker **tanpa login/logout/PIN**. Buka langsung pakai, tutup
-> saja kalau selesai — data tersimpan otomatis di perangkat.
+> **Catatan:** Stacker **tanpa login/logout**. Buka langsung pakai, tutup
+> saja kalau selesai — data tersimpan otomatis di perangkat. PIN kunci layar
+> **opsional** (lihat bagian 8).
 
 ### Alur pertama kali (dari nol)
 
@@ -244,6 +245,10 @@ reset transaksi                → hapus semua (file backup JSON terunduh otomat
 ```
 ai                            → statistik pemakaian AI
 ai reset                      → reset hitungan harian AI
+pin | pin atur 1234           → kunci layar (4-8 digit)
+pin ubah 1234 5678 | pin hapus 1234
+backup                        → unduh backup JSON
+backup kunci <kata sandi>     → backup terenkripsi (min 8 karakter)
 versi                         → versi aplikasi
 help                          → daftar perintah
 ```
@@ -285,10 +290,34 @@ tidak ikut file backup, dan tidak mempengaruhi data transaksi.
 
 ---
 
-## 8. Backup & Restore
+## 8. PIN, Backup & Restore
+
+### Kunci PIN (opsional)
+
+```
+pin                     → status kunci
+pin atur 1234           → pasang PIN (4-8 digit)
+pin ubah 1234 5678      → ganti PIN
+pin hapus 1234          → matikan kunci (butuh PIN lama)
+```
+
+- App mengunci otomatis setelah **2 menit tanpa aktivitas**, atau begitu app
+  ditinggalkan (pindah app / tab disembunyikan).
+- Salah PIN 5× → tunggu 30 detik sebelum bisa coba lagi.
+- PIN **hanya mengunci tampilan**, bukan mengenkripsi database. Hash PIN
+  (PBKDF2-SHA256, 120.000 iterasi + salt) disimpan lokal dan **tidak ikut
+  file backup**.
+- Lupa PIN? Data tetap ada di perangkat tapi tak bisa dibuka dari app ini.
+  Pulihkan dengan **⬆ Restore** file backup di perangkat lain (atau setelah
+  instal ulang PWA).
+
+### Backup & restore
 
 - **⬇ Backup** — unduh seluruh data jadi file JSON.
 - **⬆ Restore** — unggah file JSON untuk kembalikan/pindah data.
+- `backup kunci <sandi>` di chat — backup **terenkripsi** (AES-GCM 256 +
+  PBKDF2, minimal 8 karakter). Simpan kata sandinya; tanpa itu file tak bisa
+  dibuka. Saat restore, app meminta kata sandi otomatis.
 
 Catatan:
 - File backup **tidak memuat API key AI** (aman dibagikan). Key AI yang
