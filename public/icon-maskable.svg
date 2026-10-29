@@ -1,5 +1,52 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
   <rect width="128" height="128" fill="#0b141a"/>
-  <rect x="30" y="44" width="68" height="40" rx="8" fill="#00a884"/>
-  <text x="64" y="72" font-family="Arial, sans-serif" font-size="26" font-weight="bold" fill="#0b141a" text-anchor="middle">Rp</text>
+  <rect x="28.06" y="28.06" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="38.92" y="28.06" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="49.78" y="28.06" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="60.63" y="28.06" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="71.49" y="28.06" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="82.35" y="28.06" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="93.21" y="28.06" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="28.06" y="38.92" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="38.92" y="38.92" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="49.78" y="38.92" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="60.63" y="38.92" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="71.49" y="38.92" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="82.35" y="38.92" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="93.21" y="38.92" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="28.06" y="49.78" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="38.92" y="49.78" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="49.78" y="49.78" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="60.63" y="49.78" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="71.49" y="49.78" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="82.35" y="49.78" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="93.21" y="49.78" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="28.06" y="60.63" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="38.92" y="60.63" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="49.78" y="60.63" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="60.63" y="60.63" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="71.49" y="60.63" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="82.35" y="60.63" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="93.21" y="60.63" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="28.06" y="71.49" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="38.92" y="71.49" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="49.78" y="71.49" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="60.63" y="71.49" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="71.49" y="71.49" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="82.35" y="71.49" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="93.21" y="71.49" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="28.06" y="82.35" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="38.92" y="82.35" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="49.78" y="82.35" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="60.63" y="82.35" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="71.49" y="82.35" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="82.35" y="82.35" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="93.21" y="82.35" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="28.06" y="93.21" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
+  <rect x="38.92" y="93.21" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="49.78" y="93.21" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="60.63" y="93.21" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="71.49" y="93.21" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="82.35" y="93.21" width="6.73" height="6.73" rx="1.88" fill="#00a884"/>
+  <rect x="93.21" y="93.21" width="6.73" height="6.73" rx="1.88" fill="#14332b"/>
 </svg>

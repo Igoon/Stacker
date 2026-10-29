@@ -1,13 +1,13 @@
 {
   "name": "stacker",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "icons": "node scripts/gen-icons.mjs",
+    "icons": "node scripts/gen-icon-svg.mjs && node scripts/gen-icons.mjs",
     "typecheck": "tsc --noEmit",
     "smoke": "tsx src/smoke.ts",
     "verify": "npm run typecheck && npm run smoke"

@@ -1,5 +1,52 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
   <rect width="128" height="128" rx="24" fill="#0b141a"/>
-  <rect x="24" y="40" width="80" height="48" rx="8" fill="#00a884"/>
-  <text x="64" y="73" font-family="Arial, sans-serif" font-size="30" font-weight="bold" fill="#0b141a" text-anchor="middle">Rp</text>
+  <rect x="18.61" y="18.61" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="32.32" y="18.61" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="46.03" y="18.61" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="59.75" y="18.61" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="73.46" y="18.61" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="87.18" y="18.61" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="100.89" y="18.61" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="18.61" y="32.32" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="32.32" y="32.32" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="46.03" y="32.32" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="59.75" y="32.32" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="73.46" y="32.32" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="87.18" y="32.32" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="100.89" y="32.32" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="18.61" y="46.03" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="32.32" y="46.03" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="46.03" y="46.03" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="59.75" y="46.03" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="73.46" y="46.03" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="87.18" y="46.03" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="100.89" y="46.03" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="18.61" y="59.75" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="32.32" y="59.75" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="46.03" y="59.75" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="59.75" y="59.75" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="73.46" y="59.75" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="87.18" y="59.75" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="100.89" y="59.75" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="18.61" y="73.46" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="32.32" y="73.46" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="46.03" y="73.46" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="59.75" y="73.46" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="73.46" y="73.46" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="87.18" y="73.46" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="100.89" y="73.46" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="18.61" y="87.18" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="32.32" y="87.18" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="46.03" y="87.18" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="59.75" y="87.18" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="73.46" y="87.18" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="87.18" y="87.18" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="100.89" y="87.18" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="18.61" y="100.89" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
+  <rect x="32.32" y="100.89" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="46.03" y="100.89" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="59.75" y="100.89" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="73.46" y="100.89" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="87.18" y="100.89" width="8.50" height="8.50" rx="2.38" fill="#00a884"/>
+  <rect x="100.89" y="100.89" width="8.50" height="8.50" rx="2.38" fill="#14332b"/>
 </svg>
