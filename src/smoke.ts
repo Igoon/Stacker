@@ -227,6 +227,15 @@ await check("parser: fuzzy tak mengacak kategori", async () => {
   assert.equal(parseLocal("tabungan kosong 10rb")!.result.kategori !== "Tagihan", true);
 });
 
+await check("undo mengembalikan aksi terakhir", async () => {
+  const before = count();
+  await handleMessage("kopi 12rb");
+  assert.equal(count(), before + 1, "transaksi harus masuk");
+  const r = await handleMessage("undo");
+  assert(r.text.includes("Dibatalkan"), "pesan undo");
+  assert.equal(count(), before, "jumlah tx kembali");
+});
+
 await check("anggaran: set, peringatan 80%/tembus, list, hapus", async () => {
   await handleMessage("anggaran Hiburan 100rb");
   assert((await handleMessage("anggaran")).text.includes("Hiburan"));

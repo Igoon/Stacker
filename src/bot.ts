@@ -40,7 +40,7 @@ import { parseLocal, MASUK, type ParseResult } from "./parser";
 import { parsePeriod, type Period } from "./dates";
 import { toCSV } from "./csv";
 import { buildDailyRange, buildGrafik, shortRp } from "./chart";
-import { exportJson } from "./backup";
+import { exportJson, importJson } from "./backup";
 import { aiEnabled, aiResetUsage, aiStats, parseGemini } from "./ai";
 import { APP_VERSION } from "./version";
 
@@ -107,6 +107,7 @@ const HELP =
   "  ubah 3 jadi 60rb\n" +
   "  hapus 3\n" +
   "  hapus 24 25                 (beberapa sekaligus, boleh #24)\n" +
+  "  undo                        (batalkan aksi terakhir)\n" +
   "  ai | ai reset               (pemakaian AI)\n" +
   "  versi                       (versi aplikasi)\n" +
   "  reset transaksi            (hapus semua, ada backup)\n" +
@@ -209,7 +210,34 @@ const txLine = (r: Tx) =>
   `#${r.id} ${r.tanggal} ${r.tipe === "masuk" ? "+" : "-"}${rupiah(r.jumlah)} ${r.kategori}` +
   (r.akun ? ` · ${r.akun}` : "");
 
+// Undo berbasis snapshot penuh: sebelum tiap perintah, simpan hasil exportAll;
+// kalau data berubah, snapshot lama masuk stack. Sederhana, tahan terhadap
+// semua jenis mutasi (tambah/ubah/hapus/transfer/anggaran/akun).
+const UNDO_LIMIT = 20;
+const undoStack: string[] = [];
+
 export async function handleMessage(input: string): Promise<Reply> {
+  const text = input.trim();
+
+  if (/^(undo|batalkan|batal)$/i.test(text)) {
+    const snap = undoStack.pop();
+    if (!snap) return { text: "Tidak ada perubahan untuk dibatalkan." };
+    importJson(snap);
+    return {
+      text: `Dibatalkan. Data kembali ke kondisi sebelum perintah terakhir.${undoStack.length ? ` (bisa undo ${undoStack.length}× lagi)` : ""}`,
+    };
+  }
+
+  const before = exportJson();
+  const r = await handleMessageInner(text);
+  if (exportJson() !== before) {
+    undoStack.push(before);
+    if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+  }
+  return r;
+}
+
+async function handleMessageInner(input: string): Promise<Reply> {
   const text = input.trim();
   const low = text.toLowerCase();
 

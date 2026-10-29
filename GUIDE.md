@@ -200,6 +200,7 @@ riwayat | riwayat 30           → transaksi terakhir
 ubah 3 jadi 60rb               → ubah nominal
 hapus 3                        → hapus #3
 hapus 24 25                    → hapus beberapa (boleh #24)
+undo                           → batalkan aksi terakhir (maks 20 langkah)
 reset transaksi                → hapus semua (file backup JSON terunduh otomatis)
 ```
 
