@@ -334,6 +334,10 @@ export function deleteAccount(id: number): boolean {
   return db.prepare(`DELETE FROM accounts WHERE id = ?`).run(id).changes > 0;
 }
 
+export function renameAccount(id: number, nama: string): void {
+  db.prepare(`UPDATE accounts SET nama = ? WHERE id = ?`).run(nama.trim(), id);
+}
+
 export function setAccountSaldoAwal(id: number, value: number): void {
   db.prepare(`UPDATE accounts SET saldo_awal = ? WHERE id = ?`).run(value, id);
 }

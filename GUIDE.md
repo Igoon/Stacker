@@ -139,6 +139,7 @@ Ketik `help` untuk daftar perintah lengkap.
 ```
 akun                          → lihat akun + saldo
 akun tambah seabank bank saldo 1jt
+akun ubah seabank jadi bankjago → ganti nama akun
 akun hapus seabank
 saldo awal bsi 45.001.889      → set saldo awal
 sesuaikan bsi 100jt            → paksa saldo ke nilai nyata

@@ -21,6 +21,7 @@ import {
   listTx,
   ringkasRange,
   reconcileAccount,
+  renameAccount,
   rupiah,
   rupiahSigned,
   saldo,
@@ -74,6 +75,7 @@ const HELP =
   "Akun:\n" +
   "  akun\n" +
   "  akun tambah seabank bank saldo 1jt\n" +
+  "  akun ubah seabank jadi bankjago\n" +
   "  akun hapus seabank\n" +
   "  saldo awal bsi 45.001.889\n" +
   "  sesuaikan bsi 100jt         (paksa saldo ke nilai nyata)\n" +
@@ -277,6 +279,16 @@ export async function handleMessage(input: string): Promise<Reply> {
     const awal = saldoPart ? parseLocal(saldoPart[1])?.result.jumlah ?? 0 : 0;
     const acc = addAccount(nama, tipe, awal);
     return { text: `Akun ${acc.nama} (${acc.tipe}) ditambah.` };
+  }
+
+  if ((m = text.match(/^akun ubah\s+(.+?)\s+(?:jadi|menjadi)\s+(.+)$/i))) {
+    const lama = m[1].trim();
+    const baru = m[2].trim();
+    const acc = getAccountByName(lama);
+    if (!acc) return { text: `Akun "${lama}" tidak ada.` };
+    if (getAccountByName(baru)) return { text: `Akun "${baru}" sudah ada.` };
+    renameAccount(acc.id, baru);
+    return { text: `Akun ${lama} → ${baru}.` };
   }
 
   if ((m = text.match(/^akun hapus\s+(.+)$/i))) {

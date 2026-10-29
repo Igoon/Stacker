@@ -65,6 +65,17 @@ await check("hapus pakai # dan multi-id", async () => {
   assert(!dbmod.getTx(b!.id));
 });
 
+await check("akun ubah nama", async () => {
+  assert(dbmod.getAccountByName("GoPay"), "GoPay harus ada");
+  await handleMessage("akun ubah gopay jadi GoPayX");
+  assert(dbmod.getAccountByName("GoPayX"), "nama baru harus ada");
+  assert(!dbmod.getAccountByName("GoPay"), "nama lama harus hilang");
+  // akun baru tak boleh bentrok dengan akun lain
+  const r = await handleMessage("akun ubah gopayx jadi BSI");
+  assert(r.text.includes("sudah ada"), "harus tolak nama yang sudah dipakai");
+  await handleMessage("akun ubah gopayx jadi GoPay");
+});
+
 await check("kategori keduanya: dua arah", async () => {
   await handleMessage("kategori tambah keduanya Sedekah | sedekah, donasi");
   const out = last(await handleMessage("bsi sedekah 1jt"));
