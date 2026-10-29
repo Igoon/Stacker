@@ -50,6 +50,7 @@ worker.onmessage = (ev: MessageEvent<{ id: number } & Record<string, unknown>>) 
             "bot"
           );
         }
+        handleSharedText();
       });
     } else if (m.type === "error") {
       setSub("gagal inisialisasi DB");
@@ -424,6 +425,20 @@ wallFile.addEventListener("change", async () => {
 
 applyWall(currentWall);
 syncWallControls(currentWall);
+
+// Share target (PWA): teks yang dibagikan dari app lain (notifikasi SMS,
+// WhatsApp, dsb.) langsung diisi ke kolom chat lalu dikirim.
+function handleSharedText(): void {
+  const sp = new URLSearchParams(location.search);
+  const parts = [sp.get("text"), sp.get("title"), sp.get("url")].filter(
+    (x): x is string => !!x && x.trim().length > 0
+  );
+  if (parts.length === 0) return;
+  history.replaceState({}, "", location.pathname + location.hash);
+  input.value = parts.join(" ").slice(0, 500);
+  input.focus();
+  void send();
+}
 
 addBubble(
   "Halo! Catat transaksi tinggal ketik.\nContoh: `makan siang 50rb` / `gaji 5jt`\nKetik `help` buat perintah.",

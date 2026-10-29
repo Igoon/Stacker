@@ -1,6 +1,6 @@
 // Service worker: cache app shell untuk offline (data tetap di OPFS).
 // Naikkan CACHE setiap rilis supaya aset lama (hash lama) terhapus.
-const CACHE = "stacker-v3";
+const CACHE = "stacker-v4";
 const PRECACHE = [
   "./",
   "./manifest.webmanifest",

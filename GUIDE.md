@@ -132,6 +132,15 @@ kemarin makan 50rb              → tanggal relatif
 
 Ketik `help` untuk daftar perintah lengkap.
 
+### Bagikan dari app lain
+
+Kalau Stacker sudah ter-install, menu **Bagikan** di app lain (SMS, WhatsApp,
+notifikasi bank) memunculkan **Stacker**. Teks yang dibagikan otomatis masuk ke
+kolom chat dan langsung dicatat — praktis untuk menyalin nominal dari notifikasi.
+
+Parser lokal toleran salah ketik ringan (1 huruf, mis. `gojex` → `gojek`), jadi
+sebagian besar pesan selesai tanpa AI.
+
 ---
 
 ## 5. Daftar Perintah

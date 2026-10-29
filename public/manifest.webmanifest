@@ -12,6 +12,15 @@
   "background_color": "#0b141a",
   "theme_color": "#0b141a",
   "categories": ["finance", "productivity"],
+  "share_target": {
+    "action": "./",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
   "icons": [
     {
       "src": "./icon.svg",
