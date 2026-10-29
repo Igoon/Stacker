@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0b141a" />
+<link rel="manifest" href="./manifest.webmanifest" />
+<title>Duit Bot</title>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="top">
+      <div>
+        <div class="name">Duit Bot</div>
+        <div class="sub" id="sub">catat keuangan lewat chat</div>
+      </div>
+      <div class="saldo" id="saldo">Saldo: -</div>
+    </div>
+    <div class="toolbar">
+      <button id="export" title="Unduh backup JSON">⬇ Backup</button>
+      <button id="import" title="Muat backup JSON">⬆ Restore</button>
+      <button id="aikey" title="Atur API key Gemini (opsional)">⚙ AI</button>
+      <span id="busy" hidden>…</span>
+    </div>
+  </header>
+  <div id="chat"></div>
+  <footer>
+    <input id="input" placeholder="makan siang 50rb..." autocomplete="off" />
+    <button id="send">&#10148;</button>
+  </footer>
+  <input type="file" id="importFile" accept="application/json,.json" hidden />
+</div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

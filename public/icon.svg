@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="24" fill="#0b141a"/>
+  <rect x="24" y="40" width="80" height="48" rx="8" fill="#00a884"/>
+  <text x="64" y="73" font-family="Arial, sans-serif" font-size="30" font-weight="bold" fill="#0b141a" text-anchor="middle">Rp</text>
+</svg>
