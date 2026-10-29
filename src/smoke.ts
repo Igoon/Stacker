@@ -65,6 +65,23 @@ await check("hapus pakai # dan multi-id", async () => {
   assert(!dbmod.getTx(b!.id));
 });
 
+await check("kategori keduanya: dua arah", async () => {
+  await handleMessage("kategori tambah keduanya Sedekah | sedekah, donasi");
+  const out = last(await handleMessage("bsi sedekah 1jt"));
+  assert.equal(out!.tipe, "keluar");
+  assert.equal(out!.kategori, "Sedekah");
+  const inn = last(await handleMessage("bsi terima sedekah 1jt"));
+  assert.equal(inn!.tipe, "masuk");
+  assert.equal(inn!.kategori, "Sedekah");
+});
+
+await check("kata perintah tak jadi transaksi", async () => {
+  const before = count();
+  const r = await handleMessage("hapus apa");
+  assert(r.text.includes("Format"));
+  assert.equal(count(), before);
+});
+
 await check("parser: angka dalam kata", async () => {
   const p = parseLocal("makan lima ribu");
   assert(p, "harus terparse");
@@ -78,6 +95,33 @@ await check("parser: word-boundary (kosong bukan Tagihan)", async () => {
   const p = parseLocal("tabungan kosong 10rb");
   assert(p);
   assert.notEqual(p!.result.kategori, "Tagihan");
+});
+
+await check("parser: imbuhan tetap cocok (makanan -> Makanan)", async () => {
+  const p = parseLocal("makanan 50rb");
+  assert.equal(p!.result.kategori, "Makanan");
+});
+
+await check("parser: override arah eksplisit", async () => {
+  assert.equal(parseLocal("keluar 50rb")!.result.tipe, "keluar");
+  assert.equal(parseLocal("masuk 50rb")!.result.tipe, "masuk");
+});
+
+await check("parser: arah eksplisit tanpa kategori -> high (hemat AI)", async () => {
+  const kel = parseLocal("keluar 50rb");
+  assert.equal(kel!.confidence, "high");
+  assert.equal(kel!.result.tipe, "keluar");
+  assert.equal(kel!.result.kategori, "Lainnya");
+  assert.equal(kel!.explicitTipe, true);
+
+  const mas = parseLocal("masuk 50rb");
+  assert.equal(mas!.confidence, "high");
+  assert.equal(mas!.result.tipe, "masuk");
+});
+
+await check("parser: tetap low saat perlu AI", async () => {
+  assert.equal(parseLocal("keluar 50")!.confidence, "low");
+  assert.equal(parseLocal("servis motor 150rb")!.confidence, "low");
 });
 
 await check("transfer dikecualikan dari total laporan", async () => {
@@ -101,6 +145,17 @@ await check("export/import roundtrip utuh", async () => {
   assert.equal(count(), before, "import harus menghasilkan jumlah tx sama");
   const json2 = dbmod.exportAll();
   assert.equal(json, json2, "export ulang harus identik");
+});
+
+await check("anggaran: set, peringatan 80%/tembus, list, hapus", async () => {
+  await handleMessage("anggaran Hiburan 100rb");
+  assert((await handleMessage("anggaran")).text.includes("Hiburan"));
+  const r80 = await handleMessage("nonton 90rb");
+  assert(r80.text.includes("Anggaran") && !r80.text.includes("tembus"), "harus peringatan 80%");
+  const r100 = await handleMessage("nonton 20rb");
+  assert(r100.text.includes("tembus"), "harus peringatan tembus");
+  await handleMessage("anggaran hapus Hiburan");
+  assert(!(await handleMessage("anggaran")).text.includes("Hiburan"));
 });
 
 await check("laporan / grafik / cari tidak kosong", async () => {
