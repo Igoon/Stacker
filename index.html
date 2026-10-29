@@ -27,6 +27,7 @@
     <div class="toolbar">
       <button id="export" title="Unduh backup JSON">⬇ Backup</button>
       <button id="import" title="Muat backup JSON">⬆ Restore</button>
+      <button id="wall" title="Atur wallpaper chat">🎨</button>
       <button id="aikey" title="Atur AI (Gemini / OpenAI-compatible)">⚙ AI</button>
       <span id="busy" hidden>…</span>
     </div>
@@ -37,6 +38,25 @@
     <button id="send">&#10148;</button>
   </footer>
   <input type="file" id="importFile" accept="application/json,.json" hidden />
+</div>
+
+<div id="wallModal" class="modal" hidden>
+  <div class="modal-box">
+    <h3>Wallpaper chat</h3>
+    <label>Preset
+      <div class="swatches" id="wallSwatches"></div>
+    </label>
+    <label>Gambar sendiri (disimpan lokal, tak dikirim ke mana pun)
+      <input id="wallFile" type="file" accept="image/*" />
+    </label>
+    <label>Kegelapan lapisan <span id="wallDimVal">45%</span>
+      <input id="wallDim" type="range" min="0" max="80" step="5" value="45" />
+    </label>
+    <div class="modal-actions">
+      <button id="wallReset">Hapus wallpaper</button>
+      <button id="wallClose">Tutup</button>
+    </div>
+  </div>
 </div>
 
 <div id="aiModal" class="modal" hidden>

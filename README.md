@@ -58,6 +58,12 @@ npm run smoke      # uji logika inti via sqlite-wasm build Node (in-memory)
   `data.db`; kalau perlu, ekspor dari desktop lalu impor di sini (format JSON
   `version: 2` — belum tentu sama dengan format desktop; cek `src/db.ts`).
 
+## Tampilan (wallpaper)
+
+Tombol **🎨** di toolbar: pilih preset warna/gradien atau foto sendiri. Gambar
+dikecilkan ke maks 1280 px lalu disimpan **lokal** (localStorage) — tak dikirim
+ke mana pun, tak ikut file backup.
+
 ## Distribusi
 
 `npm run build` → host folder `dist/` di host statis mana pun (Netlify,

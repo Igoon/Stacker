@@ -230,6 +230,198 @@ document.getElementById("aiSave")!.onclick = async () => {
   void refresh();
 };
 
+// ---------- Wallpaper chat (preset + gambar sendiri, ala WA) ----------
+// Disimpan di localStorage (kosmetik, bukan data keuangan) supaya tak
+// memperbesar file backup dan tak menyentuh DB.
+interface WallPreset {
+  id: string;
+  label: string;
+  css: string;
+}
+
+const WALL_PRESETS: WallPreset[] = [
+  { id: "default", label: "Default", css: "" },
+  { id: "teal", label: "Teal", css: "linear-gradient(160deg,#0b141a,#12403d)" },
+  { id: "forest", label: "Hutan", css: "linear-gradient(160deg,#07160f,#145c3a)" },
+  { id: "ocean", label: "Laut", css: "linear-gradient(160deg,#061421,#124a6b)" },
+  { id: "plum", label: "Plum", css: "linear-gradient(160deg,#140b1a,#4a1a5c)" },
+  { id: "sand", label: "Pasir", css: "linear-gradient(160deg,#1a1410,#5c4326)" },
+  { id: "night", label: "Malam", css: "linear-gradient(160deg,#000000,#1f2c33)" },
+  { id: "rose", label: "Rose", css: "linear-gradient(160deg,#1a0b12,#6b2440)" },
+];
+
+const WALL_KEY = "stacker-wallpaper";
+
+type Wall =
+  | { kind: "default" }
+  | { kind: "preset"; id: string }
+  | { kind: "image"; image: string; dim: number };
+
+const wallModal = document.getElementById("wallModal")!;
+const wallSwatches = document.getElementById("wallSwatches")!;
+const wallFile = document.getElementById("wallFile") as HTMLInputElement;
+const wallDim = document.getElementById("wallDim") as HTMLInputElement;
+const wallDimVal = document.getElementById("wallDimVal")!;
+
+function readWall(): Wall {
+  try {
+    const raw = localStorage.getItem(WALL_KEY);
+    if (!raw) return { kind: "default" };
+    const w = JSON.parse(raw) as Wall;
+    if (w && w.kind === "image" && typeof w.image === "string") {
+      return { kind: "image", image: w.image, dim: Number(w.dim) || 0 };
+    }
+    if (w && w.kind === "preset" && WALL_PRESETS.some((p) => p.id === w.id)) {
+      return { kind: "preset", id: w.id };
+    }
+  } catch {
+    // localStorage diblokir / data rusak -> pakai default.
+  }
+  return { kind: "default" };
+}
+
+function saveWall(w: Wall): boolean {
+  try {
+    localStorage.setItem(WALL_KEY, JSON.stringify(w));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function applyWall(w: Wall): void {
+  const s = chat.style;
+  s.backgroundRepeat = "no-repeat";
+  s.backgroundPosition = "center";
+  if (w.kind === "image") {
+    s.backgroundColor = "#0b141a";
+    s.backgroundImage = `linear-gradient(rgba(0,0,0,${w.dim}), rgba(0,0,0,${w.dim})), url("${w.image}")`;
+    s.backgroundSize = "cover, cover";
+    return;
+  }
+  s.backgroundColor = "";
+  if (w.kind === "preset") {
+    const p = WALL_PRESETS.find((x) => x.id === w.id);
+    s.backgroundImage = p?.css || "";
+    s.backgroundSize = "";
+    return;
+  }
+  s.backgroundImage = "";
+  s.backgroundSize = "";
+}
+
+let currentWall: Wall = readWall();
+
+function syncWallControls(w: Wall): void {
+  const activeId = w.kind === "preset" ? w.id : w.kind === "default" ? "default" : "";
+  for (const btn of Array.from(wallSwatches.querySelectorAll<HTMLButtonElement>(".swatch"))) {
+    btn.setAttribute("aria-pressed", String(btn.dataset.preset === activeId));
+  }
+  const dim = w.kind === "image" ? w.dim : 45;
+  wallDim.value = String(Math.round(dim * 100));
+  wallDimVal.textContent = `${Math.round(dim * 100)}%`;
+}
+
+for (const p of WALL_PRESETS) {
+  const btn = document.createElement("button");
+  btn.className = "swatch";
+  btn.type = "button";
+  btn.dataset.preset = p.id;
+  btn.textContent = p.label;
+  if (p.css) btn.style.background = p.css;
+  btn.onclick = () => {
+    currentWall = p.id === "default" ? { kind: "default" } : { kind: "preset", id: p.id };
+    applyWall(currentWall);
+    saveWall(currentWall);
+    syncWallControls(currentWall);
+  };
+  wallSwatches.appendChild(btn);
+}
+
+document.getElementById("wall")!.onclick = () => {
+  currentWall = readWall();
+  syncWallControls(currentWall);
+  wallModal.hidden = false;
+};
+
+document.getElementById("wallClose")!.onclick = () => {
+  wallModal.hidden = true;
+};
+
+document.getElementById("wallReset")!.onclick = () => {
+  currentWall = { kind: "default" };
+  applyWall(currentWall);
+  saveWall(currentWall);
+  wallFile.value = "";
+  syncWallControls(currentWall);
+};
+
+wallDim.addEventListener("input", () => {
+  const dim = Number(wallDim.value) / 100;
+  wallDimVal.textContent = `${Math.round(dim * 100)}%`;
+  if (currentWall.kind === "image") {
+    currentWall = { kind: "image", image: currentWall.image, dim };
+    applyWall(currentWall);
+    saveWall(currentWall);
+  }
+});
+
+// Resize + kompres gambar di perangkat: maks 1280 px sisi terpanjang, JPEG q0.8.
+async function fileToWallImage(file: File): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("gagal muat gambar"));
+      img.src = url;
+    });
+    const max = 1280;
+    const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.max(1, Math.round(img.naturalWidth * scale));
+    const h = Math.max(1, Math.round(img.naturalHeight * scale));
+    const cv = document.createElement("canvas");
+    cv.width = w;
+    cv.height = h;
+    const ctx = cv.getContext("2d");
+    if (!ctx) throw new Error("canvas tidak tersedia");
+    // Latar gelap supaya PNG transparan tak jadi putih menyala.
+    ctx.fillStyle = "#0b141a";
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    return cv.toDataURL("image/jpeg", 0.8);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+wallFile.addEventListener("change", async () => {
+  const file = wallFile.files?.[0];
+  if (!file) return;
+  try {
+    const image = await fileToWallImage(file);
+    if (image.length > 3_000_000) {
+      addBubble("Gambar terlalu besar setelah dikompres. Pilih gambar lain.", "bot");
+      wallFile.value = "";
+      return;
+    }
+    const dim = Number(wallDim.value) / 100;
+    currentWall = { kind: "image", image, dim };
+    applyWall(currentWall);
+    if (!saveWall(currentWall)) {
+      addBubble("Gagal menyimpan wallpaper (penyimpanan browser penuh).", "bot");
+    }
+    syncWallControls(currentWall);
+  } catch {
+    addBubble("Gagal membaca gambar. Coba file lain (JPG/PNG).", "bot");
+  } finally {
+    wallFile.value = "";
+  }
+});
+
+applyWall(currentWall);
+syncWallControls(currentWall);
+
 addBubble(
   "Halo! Catat transaksi tinggal ketik.\nContoh: `makan siang 50rb` / `gaji 5jt`\nKetik `help` buat perintah.",
   "bot"

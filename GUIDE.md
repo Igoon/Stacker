@@ -109,7 +109,8 @@ tanpa akun, tanpa kirim data ke luar. Bisa dipasang seperti aplikasi biasa.
    csv
    ```
 8. Backup rutin: tombol **⬇ Backup** → file JSON.
-9. Keluar: tidak ada logout. Tutup app/tab. Data aman di perangkat (OPFS).
+9. Atur tampilan (opsional): tombol **🎨** → wallpaper preset atau foto sendiri.
+10. Keluar: tidak ada logout. Tutup app/tab. Data aman di perangkat (OPFS).
 
 ### Contoh transaksi
 
@@ -230,7 +231,24 @@ Contoh base URL Ollama lokal: `http://localhost:11434/v1`, model `llama3.2`.
 
 ---
 
-## 7. Backup & Restore
+## 7. Wallpaper Chat
+
+Ketuk **🎨** di toolbar.
+
+- **Preset** — pilih salah satu kotak warna (Default, Teal, Hutan, Laut, Plum,
+  Pasir, Malam, Rose). Langsung diterapkan.
+- **Gambar sendiri** — pilih foto dari galeri. Gambar dikecilkan otomatis
+  (maks 1280 px, JPEG) dan **disimpan di perangkat saja**, tidak dikirim ke
+  mana pun.
+- **Kegelapan lapisan** — geser slider supaya teks tetap kebaca di atas foto.
+- **Hapus wallpaper** — balik ke tampilan default.
+
+Wallpaper bersifat kosmetik: disimpan di penyimpanan browser (localStorage),
+tidak ikut file backup, dan tidak mempengaruhi data transaksi.
+
+---
+
+## 8. Backup & Restore
 
 - **⬇ Backup** — unduh seluruh data jadi file JSON.
 - **⬆ Restore** — unggah file JSON untuk kembalikan/pindah data.
@@ -247,7 +265,7 @@ Lakukan backup rutin, terutama di iOS (storage bisa kena *eviction*).
 
 ---
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 | Masalah | Solusi |
 |---|---|
@@ -259,7 +277,7 @@ Lakukan backup rutin, terutama di iOS (storage bisa kena *eviction*).
 
 ---
 
-## 9. Build & Host Sendiri
+## 10. Build & Host Sendiri
 
 ```sh
 cd mobile

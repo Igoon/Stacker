@@ -216,3 +216,29 @@ footer button {
   background: #00a884;
   color: #111b21;
 }
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 4px;
+}
+.swatch {
+  height: 40px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  background: #0b141a;
+  color: #e9edef;
+  font-size: 10px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 3px;
+}
+.swatch[aria-pressed="true"] {
+  border-color: #00a884;
+}
+#wallDim {
+  padding: 0;
+  background: transparent;
+}
