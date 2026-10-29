@@ -140,7 +140,7 @@ Ketik `help` untuk daftar perintah lengkap.
 akun                          → lihat akun + saldo
 akun tambah seabank bank saldo 1jt
 akun ubah seabank jadi bankjago → ganti nama akun
-akun hapus seabank
+akun hapus seabank             → tx ikut pindah ke Cash
 saldo awal bsi 45.001.889      → set saldo awal
 sesuaikan bsi 100jt            → paksa saldo ke nilai nyata
 ubah 1 akun bsi                → pindah transaksi #1 ke akun bsi
@@ -199,7 +199,7 @@ riwayat | riwayat 30           → transaksi terakhir
 ubah 3 jadi 60rb               → ubah nominal
 hapus 3                        → hapus #3
 hapus 24 25                    → hapus beberapa (boleh #24)
-reset transaksi                → hapus semua (auto backup dulu)
+reset transaksi                → hapus semua (file backup JSON terunduh otomatis)
 ```
 
 ### AI & lain
@@ -234,6 +234,14 @@ Contoh base URL Ollama lokal: `http://localhost:11434/v1`, model `llama3.2`.
 
 - **⬇ Backup** — unduh seluruh data jadi file JSON.
 - **⬆ Restore** — unggah file JSON untuk kembalikan/pindah data.
+
+Catatan:
+- File backup **tidak memuat API key AI** (aman dibagikan). Key AI yang
+  tersimpan di perangkat tetap dipakai setelah restore.
+- `reset transaksi` otomatis mengunduh file `backup-pre-reset-*.json` sebelum
+  menghapus. Simpan file itu — bisa di-restore lewat tombol **⬆ Restore**.
+- Hapus akun tidak menghapus transaksi: transaksinya dipindah ke akun **Cash**
+  supaya total saldo tetap sama dengan jumlah saldo akun.
 
 Lakukan backup rutin, terutama di iOS (storage bisa kena *eviction*).
 

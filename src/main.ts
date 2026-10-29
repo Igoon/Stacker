@@ -40,7 +40,17 @@ worker.onmessage = (ev: MessageEvent<{ id: number } & Record<string, unknown>>) 
     if (m.type === "ready") {
       ready = true;
       setSub(`v${m.version}`);
-      void refresh();
+      void refresh().then((s) => {
+        // Chat ephemeral: jangan render riwayat, cukup hint sekali di awal.
+        const n = Number(s.txCount ?? 0);
+        if (n > 0) {
+          addBubble(
+            `${n} transaksi tersimpan di perangkat ini.\n` +
+              "Ketik `riwayat` untuk melihat, `help` untuk daftar perintah.",
+            "bot"
+          );
+        }
+      });
     } else if (m.type === "error") {
       setSub("gagal inisialisasi DB");
       addBubble("Gagal buka database: " + (m.message ?? "tidak diketahui"), "bot");
@@ -73,6 +83,7 @@ function addBubble(text: string, side: "me" | "bot", txs?: Tx[], file?: { name: 
   for (const tx of txs || []) {
     const d = document.createElement("div");
     d.className = "tx";
+    d.dataset.txId = String(tx.id);
     const sign = tx.tipe === "masuk" ? "+" : "-";
     const strong = document.createElement("b");
     strong.textContent = sign + tx.rupiah;
@@ -85,8 +96,17 @@ function addBubble(text: string, side: "me" | "bot", txs?: Tx[], file?: { name: 
     const btn = document.createElement("button");
     btn.textContent = "Hapus";
     btn.onclick = async () => {
-      await call({ type: "delete", txId: tx.id });
-      d.remove();
+      const res = await call({ type: "delete", txId: tx.id });
+      // Transfer = dua baris; hapus semua bubble dengan id yang benar-benar
+      // terhapus supaya tampilan tak menyisakan pasangan basi.
+      const ids = Array.isArray(res.ids) ? (res.ids as number[]) : [tx.id];
+      for (const id of ids) {
+        chat.querySelectorAll(`.tx[data-tx-id="${id}"]`).forEach((el) => {
+          const host = el.closest(".bubble");
+          el.remove();
+          if (host && !host.querySelector(".tx")) host.remove();
+        });
+      }
       void refresh();
     };
     d.appendChild(document.createElement("br"));
@@ -94,7 +114,11 @@ function addBubble(text: string, side: "me" | "bot", txs?: Tx[], file?: { name: 
     b.appendChild(d);
   }
   if (file) {
-    const url = URL.createObjectURL(new Blob(["\ufeff" + file.content], { type: "text/csv" }));
+    const isJson = /\.json$/i.test(file.name);
+    const body = isJson ? file.content : "\ufeff" + file.content;
+    const url = URL.createObjectURL(
+      new Blob([body], { type: isJson ? "application/json" : "text/csv" })
+    );
     const a = document.createElement("a");
     a.className = "dl";
     a.href = url;
@@ -108,9 +132,10 @@ function addBubble(text: string, side: "me" | "bot", txs?: Tx[], file?: { name: 
   chat.scrollTop = chat.scrollHeight;
 }
 
-async function refresh(): Promise<void> {
+async function refresh(): Promise<Record<string, unknown>> {
   const r = await call({ type: "state" });
   saldoEl.textContent = "Saldo: " + r.saldoRupiah;
+  return r;
 }
 
 async function send(): Promise<void> {

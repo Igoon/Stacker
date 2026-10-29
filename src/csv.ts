@@ -1,8 +1,11 @@
 import { rupiah, type Tx } from "./db";
 
 function cell(v: string | number | null): string {
-  const s = String(v ?? "");
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  let s = String(v ?? "");
+  // Cegah formula injection di spreadsheet: nilai teks yang diawali salah satu
+  // karakter ini diberi prefix apostrof (ditampilkan sebagai teks biasa).
+  if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 export function toCSV(rows: Tx[]): string {

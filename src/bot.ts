@@ -40,7 +40,7 @@ import { parseLocal, MASUK, type ParseResult } from "./parser";
 import { parsePeriod, type Period } from "./dates";
 import { toCSV } from "./csv";
 import { buildDailyRange, buildGrafik, shortRp } from "./chart";
-import { backupTagged } from "./backup";
+import { exportJson } from "./backup";
 import { aiEnabled, aiResetUsage, aiStats, parseGemini } from "./ai";
 import { APP_VERSION } from "./version";
 
@@ -236,10 +236,16 @@ export async function handleMessage(input: string): Promise<Reply> {
   }
 
   if (/^reset\s+(transaksi|laporan|semua)$/i.test(text)) {
-    const bkp = await backupTagged("pre-reset").catch(() => null);
+    const bkp = exportJson();
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const name = `backup-pre-reset-${stamp}.json`;
     const n = deleteAllTx();
-    const tail = bkp ? `\nBackup: ${bkp.split(/[\\/]/).pop()}` : "";
-    return { text: `Semua transaksi dihapus (${n}). Saldo kini = saldo awal tiap akun.${tail}` };
+    return {
+      text:
+        `Semua transaksi dihapus (${n}). Saldo kini = saldo awal tiap akun.\n` +
+        `Backup sebelum reset: ${name} (file terunduh otomatis).`,
+      file: { name, content: bkp },
+    };
   }
 
   if ((low === "saldo" || low.startsWith("saldo ")) && !/^saldo\s+awal\b/.test(low)) {
@@ -294,8 +300,12 @@ export async function handleMessage(input: string): Promise<Reply> {
   if ((m = text.match(/^akun hapus\s+(.+)$/i))) {
     const acc = getAccountByName(m[1]);
     if (!acc) return { text: `Akun "${m[1]}" tidak ada.` };
-    deleteAccount(acc.id);
-    return { text: `Akun ${acc.nama} dihapus. Transaksinya tetap ada tanpa akun.` };
+    const res = deleteAccount(acc.id);
+    const movedTxt =
+      res.moved > 0 && res.to
+        ? ` ${res.moved} transaksi dipindah ke akun ${res.to}.`
+        : " Tidak ada transaksi terkait.";
+    return { text: `Akun ${acc.nama} dihapus.${movedTxt}` };
   }
 
   if (low === "kategori" || low === "kategori list" || low === "kategori daftar") {

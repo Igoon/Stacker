@@ -7,9 +7,9 @@ import {
   initDb,
   saldo,
   rupiah,
-  listTx,
+  countTx,
   accountBalances,
-  deleteTx,
+  deleteTxWithIds,
 } from "./db";
 import { handleMessage } from "./bot";
 import { aiEnabled, aiStats, getAiConfig, setAiConfig } from "./ai";
@@ -75,7 +75,8 @@ function reply(id: number, payload: unknown): void {
 }
 
 function state() {
-  const rows = listTx(50).map((t) => ({ ...t, rupiah: rupiah(t.jumlah) }));
+  // Chat bersifat ephemeral: jangan kirim riwayat lengkap. Cukup jumlah baris
+  // supaya UI bisa menampilkan hint singkat saat pertama dibuka.
   return {
     ok: true,
     version: APP_VERSION,
@@ -90,7 +91,7 @@ function state() {
       saldo: a.saldo ?? 0,
       rupiah: a.rupiah,
     })),
-    transactions: rows,
+    txCount: countTx(),
   };
 }
 
@@ -105,8 +106,8 @@ async function onMessage(msg: InMsg): Promise<void> {
       reply(msg.id, state());
       break;
     case "delete": {
-      const removed = deleteTx(msg.txId);
-      reply(msg.id, { ok: removed > 0, removed });
+      const res = deleteTxWithIds(msg.txId);
+      reply(msg.id, { ok: res.removed > 0, removed: res.removed, ids: res.ids });
       break;
     }
     case "export":

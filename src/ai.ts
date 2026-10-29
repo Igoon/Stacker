@@ -101,8 +101,10 @@ function buildSchema(names: string[]) {
 const cache = new Map<string, { at: number; value: ParseResult[] }>();
 
 let usage: { tanggal: string; count: number } = { tanggal: isoLocal(), count: 0 };
+let usageLoaded = false;
 
 function loadUsage(): void {
+  usageLoaded = true;
   const raw = getSetting("ai_usage");
   try {
     const parsed = JSON.parse(raw ?? "null") as { tanggal: string; count: number } | null;
@@ -121,6 +123,7 @@ function saveUsage(): void {
 }
 
 function callsToday(): number {
+  if (!usageLoaded) loadUsage();
   if (usage.tanggal !== isoLocal()) {
     usage = { tanggal: isoLocal(), count: 0 };
     saveUsage();

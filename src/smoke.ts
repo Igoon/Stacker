@@ -158,6 +158,57 @@ await check("export/import roundtrip utuh", async () => {
   assert.equal(json, json2, "export ulang harus identik");
 });
 
+await check("akun hapus: transaksi dipindah, saldo tetap konsisten", async () => {
+  await handleMessage("akun tambah TempHapus bank saldo 100rb");
+  const temp = dbmod.getAccountByName("TempHapus")!;
+  assert(temp, "akun temp harus ada");
+  const t = last(await handleMessage("TempHapus makan 25rb"));
+  assert.equal(t!.akun, "TempHapus");
+
+  const r = await handleMessage("akun hapus TempHapus");
+  assert(r.text.includes("dipindah"), "pesan harus menyebut transaksi dipindah");
+  assert(!dbmod.getAccountByName("TempHapus"), "akun harus hilang");
+
+  const moved = dbmod.getTx(t!.id)!;
+  assert.equal(moved.account_id, dbmod.getAccountByName("Cash")!.id, "tx pindah ke Cash");
+  assert.equal(dbmod.listTx().filter((x) => x.account_id == null).length, 0, "tak boleh ada tx yatim");
+
+  const sumAcc = dbmod.accountBalances().reduce((a, b) => a + (b.saldo ?? 0), 0);
+  assert.equal(sumAcc, dbmod.saldo(), "total saldo harus = jumlah saldo akun");
+});
+
+await check("anggaran case-insensitive: tak bikin baris ganda", async () => {
+  await handleMessage("anggaran Perabot 100rb");
+  await handleMessage("anggaran perabot 300rb");
+  const rows = dbmod.listBudgets().filter((b) => b.kategori.toLowerCase() === "perabot");
+  assert.equal(rows.length, 1, "hanya boleh satu baris anggaran");
+  assert.equal(rows[0].jumlah, 300000, "nilai terakhir harus menimpa");
+  assert.equal(dbmod.getBudget("PERABOT"), 300000);
+  await handleMessage("anggaran hapus perabot");
+});
+
+await check("export tak memuat api key AI", async () => {
+  dbmod.setSetting("ai_key", "SECRET-KEY-123");
+  const json = dbmod.exportAll();
+  assert(!json.includes("ai_key"), "ai_key tak boleh ikut export");
+  assert(!json.includes("SECRET-KEY-123"), "nilai key tak boleh bocor");
+  // Restore tak boleh menghapus key lokal.
+  dbmod.importAll(json);
+  assert.equal(dbmod.getSetting("ai_key"), "SECRET-KEY-123", "key lokal dipertahankan");
+  dbmod.setSetting("ai_key", null);
+});
+
+await check("reset transaksi menyertakan file backup", async () => {
+  const r = await handleMessage("reset transaksi");
+  assert(r.file, "harus ada file backup");
+  assert(/\.json$/.test(r.file!.name), "file harus json");
+  const parsed = JSON.parse(r.file!.content) as { tables?: { transactions?: unknown[] } };
+  assert(parsed.tables?.transactions, "backup harus memuat transaksi");
+  assert.equal(count(), 0, "semua transaksi terhapus");
+  dbmod.importAll(r.file!.content);
+  assert(count() > 0, "restore dari file backup harus jalan");
+});
+
 await check("anggaran: set, peringatan 80%/tembus, list, hapus", async () => {
   await handleMessage("anggaran Hiburan 100rb");
   assert((await handleMessage("anggaran")).text.includes("Hiburan"));

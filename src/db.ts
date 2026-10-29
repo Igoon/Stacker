@@ -8,6 +8,7 @@ let db: MiniDb;
 export function initDb(mini: MiniDb): void {
   db = mini;
   db.pragma("journal_mode = WAL"); // no-op di OPFS sahpool
+  db.exec("PRAGMA foreign_keys = ON");
 
   db.exec(`
 CREATE TABLE IF NOT EXISTS accounts (
@@ -189,6 +190,10 @@ export function listAll(): Tx[] {
   return db.prepare(`${TX_SELECT} ORDER BY t.tanggal ASC, t.id ASC`).all() as Tx[];
 }
 
+export function countTx(): number {
+  return (db.prepare(`SELECT COUNT(*) AS n FROM transactions`).get() as { n: number }).n;
+}
+
 export function listRange(from: string, to: string): Tx[] {
   return db
     .prepare(`${TX_SELECT} WHERE t.tanggal >= ? AND t.tanggal <= ? ORDER BY t.tanggal ASC, t.id ASC`)
@@ -249,13 +254,22 @@ export function updateTx(
   return getTx(id);
 }
 
-export function deleteTx(id: number): number {
+export function deleteTxWithIds(id: number): { removed: number; ids: number[] } {
   const tx = getTx(id);
-  if (!tx) return 0;
+  if (!tx) return { removed: 0, ids: [] };
   if (tx.transfer_id) {
-    return db.prepare(`DELETE FROM transactions WHERE transfer_id = ?`).run(tx.transfer_id).changes;
+    const rows = db
+      .prepare(`SELECT id FROM transactions WHERE transfer_id = ?`)
+      .all(tx.transfer_id) as { id: number }[];
+    db.prepare(`DELETE FROM transactions WHERE transfer_id = ?`).run(tx.transfer_id);
+    return { removed: rows.length, ids: rows.map((r) => r.id) };
   }
-  return db.prepare(`DELETE FROM transactions WHERE id = ?`).run(id).changes;
+  db.prepare(`DELETE FROM transactions WHERE id = ?`).run(id);
+  return { removed: 1, ids: [id] };
+}
+
+export function deleteTx(id: number): number {
+  return deleteTxWithIds(id).removed;
 }
 
 export function deleteAllTx(): number {
@@ -330,8 +344,30 @@ export function addAccount(nama: string, tipe: string, saldo_awal = 0): Account 
   return db.prepare(`SELECT * FROM accounts WHERE id = ?`).get(Number(info.lastInsertRowid)) as Account;
 }
 
-export function deleteAccount(id: number): boolean {
-  return db.prepare(`DELETE FROM accounts WHERE id = ?`).run(id).changes > 0;
+// Hapus akun. Transaksinya DIPINDAH ke akun fallback (Cash diutamakan) supaya
+// tak ada baris yatim: total saldo tetap sama dengan jumlah saldo akun.
+export function deleteAccount(id: number): { deleted: boolean; moved: number; to: string | null } {
+  return db.transaction(() => {
+    const acc = db.prepare(`SELECT * FROM accounts WHERE id = ?`).get(id) as Account | undefined;
+    if (!acc) return { deleted: false, moved: 0, to: null };
+
+    const fallback =
+      (db.prepare(`SELECT * FROM accounts WHERE id <> ? AND lower(nama) = 'cash'`).get(id) as
+        | Account
+        | undefined) ?? (db.prepare(`SELECT * FROM accounts WHERE id <> ? ORDER BY id ASC`).get(id) as
+        | Account
+        | undefined);
+
+    let moved = 0;
+    if (fallback) {
+      moved = db
+        .prepare(`UPDATE transactions SET account_id = ? WHERE account_id = ?`)
+        .run(fallback.id, id).changes;
+    }
+
+    const deleted = db.prepare(`DELETE FROM accounts WHERE id = ?`).run(id).changes > 0;
+    return { deleted, moved, to: fallback?.nama ?? null };
+  });
 }
 
 export function renameAccount(id: number, nama: string): void {
@@ -497,11 +533,19 @@ export function getBudget(kategori: string): number | undefined {
   return row?.jumlah;
 }
 
+// PK budgets case-sensitive, tapi lookup pakai lower(). Upsert manual: cari dulu
+// baris yang cocok tanpa peduli huruf besar/kecil supaya tak muncul duplikat
+// "Makanan" vs "makanan".
 export function setBudget(kategori: string, jumlah: number): void {
-  db.prepare(
-    `INSERT INTO budgets (kategori, jumlah) VALUES (?, ?)
-     ON CONFLICT(kategori) DO UPDATE SET jumlah = excluded.jumlah`
-  ).run(kategori.trim(), jumlah);
+  const nama = kategori.trim();
+  const row = db
+    .prepare(`SELECT kategori FROM budgets WHERE lower(kategori) = lower(?)`)
+    .get(nama) as { kategori: string } | undefined;
+  if (row) {
+    db.prepare(`UPDATE budgets SET jumlah = ? WHERE kategori = ?`).run(jumlah, row.kategori);
+    return;
+  }
+  db.prepare(`INSERT INTO budgets (kategori, jumlah) VALUES (?, ?)`).run(nama, jumlah);
 }
 
 export function deleteBudget(kategori: string): boolean {
@@ -510,8 +554,18 @@ export function deleteBudget(kategori: string): boolean {
     .run(kategori.trim()).changes > 0;
 }
 
+// Key settings yang TIDAK ikut export: kredensial + penanda snapshot internal.
+const SETTING_EXPORT_SKIP = new Set(["ai_key"]);
+const settingExportable = (key: string): boolean =>
+  !SETTING_EXPORT_SKIP.has(key) && !key.startsWith("backup_") && key !== "_backup_keys";
+
 // Export/import seluruh isi DB (backup/restore + migrasi antar device).
+// API key AI sengaja dibuang supaya file backup aman dibagikan.
 export function exportAll(): string {
+  const settings = (db.prepare(`SELECT key, value FROM settings ORDER BY key ASC`).all() as {
+    key: string;
+    value: string | null;
+  }[]).filter((s) => settingExportable(s.key));
   const tables: Record<string, unknown[]> = {
     accounts: listAccounts(),
     transactions: db.prepare(`SELECT * FROM transactions ORDER BY id ASC`).all() as unknown[],
@@ -519,7 +573,7 @@ export function exportAll(): string {
       .prepare(`SELECT id, nama, keywords, tipe, created_at FROM categories ORDER BY id ASC`)
       .all() as unknown[],
     budgets: listBudgets(),
-    settings: db.prepare(`SELECT key, value FROM settings ORDER BY key ASC`).all() as unknown[],
+    settings,
   };
   return JSON.stringify({ version: 2, tables });
 }
@@ -528,6 +582,10 @@ export function importAll(json: string): void {
   const parsed = JSON.parse(json) as { tables: Record<string, unknown[]> };
   const t = parsed.tables;
   if (!t) throw new Error("Format backup tidak dikenali.");
+
+  // API key AI tidak ikut di backup (lihat exportAll). Pertahankan key lokal
+  // yang sudah ada supaya restore tidak mematikan AI pengguna.
+  const localAiKey = getSetting("ai_key");
 
   db.transaction(() => {
     db.exec(`DELETE FROM transactions; DELETE FROM accounts; DELETE FROM categories; DELETE FROM budgets; DELETE FROM settings;`);
@@ -571,5 +629,6 @@ export function importAll(json: string): void {
       const s = r as { key: string; value: string | null };
       insSetting.run(s.key, s.value ?? null);
     }
+    if (localAiKey) insSetting.run("ai_key", localAiKey);
   });
 }
