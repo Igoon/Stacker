@@ -64,7 +64,22 @@ npm run smoke      # uji logika inti via sqlite-wasm build Node (in-memory)
 Vercel, GitHub Pages, dsb.). Manifest + service worker sudah disertakan;
 buka sekali, lalu "Add to Home Screen".
 
+### GitHub Pages (otomatis)
+
+Repo ini sudah dikonfigurasi deploy otomatis ke GitHub Pages. Setiap push ke
+`main` menjalankan `.github/workflows/deploy.yml` (build + deploy). Situs live:
+**<https://igoon.github.io/Stacker/>**.
+
+- Source Pages = **GitHub Actions** (sudah aktif).
+- `base: "./"` di `vite.config.ts` → semua aset relatif, jalan di subpath
+  `/Stacker/` tanpa ubah konfigurasi.
+- Deploy manual: tab **Actions** → **Deploy to GitHub Pages** → **Run workflow**.
+
 Tidak perlu header COOP/COEP karena memakai `opfs-sahpool`.
+
+## Lisensi
+
+[Apache-2.0](LICENSE) — © 2026 Igoon.
 
 ## Versi
 
