@@ -28,7 +28,11 @@ npm run build      # hasil di dist/
 npm run preview    # sajikan hasil build lokal
 npm run verify     # typecheck + smoke (wajib sebelum commit)
 npm run smoke      # uji logika inti via sqlite-wasm build Node (in-memory)
+npm run e2e        # E2E Playwright (Chrome terpasang, OPFS + worker + UI)
 ```
+
+E2E memakai `channel: "chrome"` sehingga tak perlu mengunduh browser
+Playwright. Server dev dijalankan otomatis di `localhost:5199`.
 
 ## Persyaratan runtime
 
@@ -36,8 +40,8 @@ npm run smoke      # uji logika inti via sqlite-wasm build Node (in-memory)
   `http://<ip-lokal>` **tidak jalan**.
 - `opfs-sahpool` = **satu tab** dalam satu waktu. Tab kedua gagal init (pesan
   error). Tutup tab lama dulu.
-- iOS Safari: OPFS tersedia iOS 15.2+. Storage bisa kena *eviction* kalau penuh;
-  rutin pakai tombol **Backup**.
+- iOS Safari: OPFS `FileSystemSyncAccessHandle` butuh **iOS/iPadOS 16.4+**.
+  Storage bisa kena *eviction* kalau penuh; rutin pakai tombol **Backup**.
 
 ## AI (opsional, default mati)
 
@@ -51,9 +55,23 @@ npm run smoke      # uji logika inti via sqlite-wasm build Node (in-memory)
 - Batas 100 panggilan/hari, cache 6 jam. Data keuangan **tidak** dikirim ke
   pihak ketiga kalau pakai Ollama lokal.
 
+## Fitur (ringkas)
+
+- Chat pencatatan transaksi (parser lokal + fallback AI opsional), akun, transfer,
+  anggaran + peringatan, laporan/grafik/CSV, cari.
+- **Utang/piutang** ledger terpisah (tidak mengubah saldo akun).
+- **Transaksi berulang** bulanan (idempotent), **undo** 20 langkah.
+- **PIN + auto-lock** (2 menit idle / app ditinggalkan) — kunci tampilan, hash
+  PBKDF2, bukan enkripsi disk.
+- **Backup terenkripsi** (`backup kunci <sandi>`, AES-GCM 256 + PBKDF2).
+- Share target PWA (Android/desktop) dan wallpaper chat lokal.
+
 ## Backup / migrasi
 
 - **Backup** = unduh JSON (`exportAll`). **Restore** = unggah JSON (`importAll`).
+- `backup kunci <sandi>` menghasilkan file `.enc.json` terenkripsi; restore
+  meminta kata sandi otomatis.
+- PIN, API key AI, dan konfigurasi lokal lain **tidak** ikut file backup.
 - Data dimulai **kosong** di gadget. Tidak ada migrasi otomatis dari desktop
   `data.db`; kalau perlu, ekspor dari desktop lalu impor di sini (format JSON
   `version: 2` — belum tentu sama dengan format desktop; cek `src/db.ts`).
@@ -89,5 +107,5 @@ Tidak perlu header COOP/COEP karena memakai `opfs-sahpool`.
 
 ## Versi
 
-`v2.0.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
+`v2.3.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
 Nilai versi di-hardcode di `src/version.ts` (browser tak bisa baca `package.json`).

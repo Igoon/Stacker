@@ -7,6 +7,7 @@ import {
   initDb,
   saldo,
   rupiah,
+  rupiahSigned,
   countTx,
   accountBalances,
   deleteTxWithIds,
@@ -106,7 +107,7 @@ function state() {
     ok: true,
     version: APP_VERSION,
     saldo: saldo(),
-    saldoRupiah: rupiah(saldo()),
+    saldoRupiah: rupiahSigned(saldo()),
     aiEnabled: aiEnabled(),
     ai: aiStats(),
     accounts: accountBalances().map((a) => ({
