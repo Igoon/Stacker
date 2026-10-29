@@ -1,7 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
 // E2E untuk PWA: uji alur nyata di Chrome (OPFS + worker + service worker).
-// Memakai Chrome yang sudah terpasang (`channel: "chrome"`), tanpa unduh browser.
+// Lokal memakai Chrome terpasang (`channel: "chrome"`); di CI memakai Chromium
+// bawaan Playwright (`npx playwright install chromium`).
+const useLocalChrome = !process.env.CI && !process.env.PLAYWRIGHT_CHROMIUM;
+
 export default defineConfig({
   testDir: "./e2e",
   timeout: 90_000,
@@ -12,7 +15,7 @@ export default defineConfig({
   reporter: [["list"]],
   use: {
     baseURL: "http://localhost:5199",
-    channel: "chrome",
+    ...(useLocalChrome ? { channel: "chrome" } : {}),
     ...devices["Desktop Chrome"],
   },
   webServer: {

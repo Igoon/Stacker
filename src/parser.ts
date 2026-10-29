@@ -18,6 +18,7 @@ export interface LocalParse {
 
 export const MASUK = [
   "gaji", "bonus", "thr", "terima", "dapat", "masuk", "income", "penghasilan", "jual", "profit",
+  "honor", "upah",
   "bunga", "dividen", "deviden", "kupon", "cashback", "refund", "pengembalian", "menang", "komisi",
 ];
 

@@ -15,6 +15,7 @@ initDb(mini);
 const { handleMessage } = await import("./bot");
 const dbmod = await import("./db");
 const { parseLocal } = await import("./parser");
+const { PARSER_CASES } = await import("./parser-cases");
 const { hashPin, safeEqual, encryptJson, decryptJson, isEncrypted } = await import("./crypto");
 
 let pass = 0;
@@ -347,6 +348,29 @@ await check("backup kunci: file terenkripsi & bisa dipulihkan", async () => {
 
   const short = await handleMessage("backup kunci pendek");
   assert(!short.file && short.text.includes("minimal 8"), "tolak sandi pendek");
+});
+
+await check("parser korpus: 20 kalimat nyata", async () => {
+  for (const c of PARSER_CASES) {
+    const p = parseLocal(c.input);
+    assert(p, `tak terparse: ${c.input}`);
+    assert.equal(p!.result.tipe, c.tipe, `${c.input}: tipe`);
+    assert.equal(p!.result.kategori, c.kategori, `${c.input}: kategori`);
+    assert.equal(p!.result.jumlah, c.jumlah, `${c.input}: jumlah`);
+    assert.equal(p!.confidence, c.confidence, `${c.input}: confidence`);
+    if (c.tanggal) assert.equal(p!.result.tanggal, c.tanggal, `${c.input}: tanggal`);
+  }
+});
+
+await check("backup menandai last_backup_at (pengingat)", async () => {
+  dbmod.setSetting("last_backup_at", null);
+  const r = await handleMessage("backup");
+  assert(!!r.file, "harus ada file");
+  assert.equal(
+    dbmod.getSetting("last_backup_at"),
+    new Date().toISOString().slice(0, 10),
+    "tanggal backup tercatat"
+  );
 });
 
 await check("anggaran: set, peringatan 80%/tembus, list, hapus", async () => {

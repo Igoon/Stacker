@@ -69,6 +69,18 @@ test("backup kunci menghasilkan file terenkripsi", async ({ page }) => {
   expect(raw).not.toContain("transactions");
 });
 
+test("modal info menampilkan versi & penyimpanan", async ({ page }) => {
+  await boot(page);
+  await page.locator("#info").click();
+  await expect(page.locator("#infoModal")).toBeVisible();
+  await expect(page.locator("#infoLines")).toContainText("Versi: v");
+  await expect(page.locator("#infoLines")).toContainText("Backup terakhir:");
+  await expect(page.locator("#infoLines")).toContainText("Pemakaian storage:");
+
+  await page.locator("#infoClose").click();
+  await expect(page.locator("#infoModal")).toBeHidden();
+});
+
 test("PIN: kunci otomatis, tolak PIN salah, buka, lalu hapus", async ({ page }) => {
   await boot(page);
 
