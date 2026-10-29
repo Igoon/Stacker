@@ -79,7 +79,7 @@ Tidak perlu header COOP/COEP karena memakai `opfs-sahpool`.
 
 ## Lisensi
 
-[Apache-2.0](LICENSE) — © 2026 Igoon.
+[Apache-2.0](LICENSE) — © 2026 Igoon (I Go On).
 
 ## Versi
 
