@@ -6,6 +6,7 @@ body {
   font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
   background: #111b21;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   justify-content: center;
 }
@@ -13,6 +14,7 @@ body {
   width: 100%;
   max-width: 480px;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   background: #0b141a;
@@ -21,6 +23,7 @@ header {
   background: #1f2c33;
   color: #e9edef;
   padding: 10px 16px;
+  padding-top: calc(10px + env(safe-area-inset-top));
 }
 header .top {
   display: flex;
@@ -131,6 +134,7 @@ footer {
   display: flex;
   gap: 8px;
   padding: 10px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
   background: #1f2c33;
 }
 footer input {

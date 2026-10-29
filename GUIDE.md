@@ -11,7 +11,9 @@ tanpa akun, tanpa kirim data ke luar. Bisa dipasang seperti aplikasi biasa.
 - Buka lewat **HTTPS** atau **localhost**. `http://` biasa tidak jalan (OPFS
   butuh secure context).
 - **Satu tab saja**. Tab kedua akan gagal buka database. Tutup tab lama dulu.
-- iOS minimal 15.2.
+- **iOS/iPadOS 16.4+** (Safari). OPFS `FileSystemSyncAccessHandle` baru ada di
+  versi itu; iOS lebih lama akan gagal buka database.
+- Android: Chrome/Edge/Firefox versi 2023 ke atas.
 
 ---
 
@@ -38,6 +40,14 @@ tanpa akun, tanpa kirim data ke luar. Bisa dipasang seperti aplikasi biasa.
 2. Ketuk tombol **Bagikan (kotak + panah atas)**.
 3. Gulir, pilih **Tambahkan ke Layar Utama (Add to Home Screen)**.
 4. Ketuk **Tambah**. Ikon muncul di home screen.
+
+Catatan iOS:
+- **Pasang ke Home Screen**, jangan cuma dibiarkan di tab Safari. Data situs
+  yang tak pernah dikunjungi 7 hari bisa dibersihkan Safari; app terpasang
+  jauh lebih aman.
+- **Share target tidak tersedia** di iOS (Safari belum mendukung Web Share
+  Target). Salin teks notifikasi lalu tempel ke kolom chat.
+- Unduhan **CSV/JSON** membuka lembar **Bagikan** → pilih **Simpan ke Files**.
 
 ### Desktop — Chrome / Edge
 
@@ -297,6 +307,8 @@ Lakukan backup rutin, terutama di iOS (storage bisa kena *eviction*).
 | Masalah | Solusi |
 |---|---|
 | Tab kedua error buka database | `opfs-sahpool` = satu tab. Tutup tab lain. |
+| iOS < 16.4 gagal buka database | OPFS belum didukung. Update iOS ke 16.4+ atau pakai Android/desktop. |
+| Menu "Bagikan ke Stacker" tak ada | Share target hanya Android/ChromeOS/desktop Chrome. Di iOS salin-tempel teks. |
 | Tidak bisa install (banner tak muncul) | Pastikan HTTPS/localhost. Chrome butuh icon 192 & 512 (sudah ada). |
 | iOS tak muncul "Add to Home Screen" | Pakai Safari, bukan Chrome. |
 | Data hilang setelah lama | Restore dari file backup. |

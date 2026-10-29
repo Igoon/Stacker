@@ -54,7 +54,14 @@ worker.onmessage = (ev: MessageEvent<{ id: number } & Record<string, unknown>>) 
       });
     } else if (m.type === "error") {
       setSub("gagal inisialisasi DB");
-      addBubble("Gagal buka database: " + (m.message ?? "tidak diketahui"), "bot");
+      addBubble(
+        "Gagal buka database: " + (m.message ?? "tidak diketahui") +
+          "\n\nKemungkinan penyebab:\n" +
+          "• iOS/iPadOS < 16.4 — OPFS belum didukung (update iOS).\n" +
+          "• Tab/app lain masih terbuka — tutup dulu (hanya 1 tab).\n" +
+          "• Mode incognito/private — storage dibatasi, pakai tab normal.",
+        "bot"
+      );
     }
     return;
   }
@@ -73,6 +80,39 @@ const busyEl = document.getElementById("busy")!;
 
 function setSub(text: string): void {
   subEl.textContent = text;
+}
+
+// Simpan file ke perangkat. Di iOS/Android, `<a download>` sering cuma membuka
+// preview — pakai Web Share API bila tersedia supaya bisa "Simpan ke Files"
+// atau dibagikan langsung.
+function downloadBlob(blob: Blob, name: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+function saveFile(name: string, content: string): void {
+  const isJson = /\.json$/i.test(name);
+  const type = isJson ? "application/json" : "text/csv";
+  const body = isJson ? content : "\ufeff" + content;
+  const blob = new Blob([body], { type });
+  try {
+    const share = navigator as Navigator & {
+      canShare?: (data?: ShareData) => boolean;
+      share?: (data?: ShareData) => Promise<void>;
+    };
+    const f = new File([blob], name, { type });
+    if (share.canShare && share.canShare({ files: [f] }) && share.share) {
+      void share.share({ files: [f], title: name }).catch(() => downloadBlob(blob, name));
+      return;
+    }
+  } catch {
+    // jatuh ke unduhan biasa
+  }
+  downloadBlob(blob, name);
 }
 
 function addBubble(text: string, side: "me" | "bot", txs?: Tx[], file?: { name: string; content: string }) {
@@ -115,16 +155,15 @@ function addBubble(text: string, side: "me" | "bot", txs?: Tx[], file?: { name: 
     b.appendChild(d);
   }
   if (file) {
-    const isJson = /\.json$/i.test(file.name);
-    const body = isJson ? file.content : "\ufeff" + file.content;
-    const url = URL.createObjectURL(
-      new Blob([body], { type: isJson ? "application/json" : "text/csv" })
-    );
     const a = document.createElement("a");
     a.className = "dl";
-    a.href = url;
+    a.href = "#";
     a.download = file.name;
     a.textContent = "⬇ " + file.name;
+    a.onclick = (ev) => {
+      ev.preventDefault();
+      saveFile(file.name, file.content);
+    };
     b.appendChild(document.createElement("br"));
     b.appendChild(a);
   }
@@ -166,12 +205,7 @@ input.addEventListener("keydown", (e) => {
 // Toolbar: export backup, import backup, set AI key.
 document.getElementById("export")!.onclick = async () => {
   const r = await call({ type: "export" });
-  const url = URL.createObjectURL(new Blob([r.json as string], { type: "application/json" }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `stacker-backup-${new Date().toISOString().slice(0, 10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+  saveFile(`stacker-backup-${new Date().toISOString().slice(0, 10)}.json`, r.json as string);
 };
 
 document.getElementById("import")!.onclick = () => {
