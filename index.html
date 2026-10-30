@@ -29,7 +29,9 @@
     </div>
     <div class="toolbar">
       <button id="export" title="Unduh backup JSON">⬇ Backup</button>
+      <button id="exportEnc" title="Backup terenkripsi">🔐</button>
       <button id="import" title="Muat backup JSON">⬆ Restore</button>
+      <button id="undo" title="Batalkan aksi terakhir">↶</button>
       <button id="wall" title="Atur wallpaper chat">🎨</button>
       <button id="aikey" title="Atur AI (Gemini / OpenAI-compatible)">⚙ AI</button>
       <button id="info" title="Info penyimpanan & auto-backup">ℹ</button>
@@ -114,6 +116,7 @@
       File ini dilindungi kata sandi. Masukkan kata sandi yang dipakai saat
       membuat backup.
     </p>
+    <p id="passMsg" class="hint" hidden></p>
     <label>Kata sandi
       <input id="passInput" type="password" autocomplete="off" />
     </label>
@@ -146,6 +149,14 @@
         CDN, atau pengiriman data ke pihak lain.
       </p>
     </div>
+    <label>Simpan backup terakhir
+      <select id="retain">
+        <option value="10">10 file</option>
+        <option value="30" selected>30 file</option>
+        <option value="60">60 file</option>
+        <option value="100">100 file</option>
+      </select>
+    </label>
     <div class="info-actions">
       <button id="pickDir">Pilih folder auto-backup</button>
       <button id="backupNow">Backup ke folder sekarang</button>

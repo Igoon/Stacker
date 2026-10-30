@@ -37,3 +37,9 @@ jobs:
 
       - name: E2E
         run: npm run e2e
+
+      - name: Build (precache SW)
+        run: npm run build
+
+      - name: Offline check
+        run: npm run test:offline

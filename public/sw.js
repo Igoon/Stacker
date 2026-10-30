@@ -1,6 +1,10 @@
 // Service worker: cache app shell untuk offline (data tetap di OPFS).
-// Naikkan CACHE setiap rilis supaya aset lama (hash lama) terhapus.
+// `scripts/gen-sw-preache.mjs` mengganti dua blok di bawah saat `npm run build`
+// dengan daftar aset ber-hash + nama cache unik per build.
+// CACHE-BEGIN
 const CACHE = "stacker-v9";
+// CACHE-END
+// PRECACHE-BEGIN
 const PRECACHE = [
   "./",
   "./manifest.webmanifest",
@@ -10,6 +14,7 @@ const PRECACHE = [
   "./icon-maskable-512.png",
   "./apple-touch-icon.png",
 ];
+// PRECACHE-END
 
 const ASSET_DEST = new Set(["script", "style", "worker", "image", "font", "manifest"]);
 
@@ -21,9 +26,20 @@ self.addEventListener("install", (e) => {
 
 self.addEventListener("activate", (e) => {
   e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    (async () => {
+      // Simpan cache versi sebelumnya satu siklus supaya tab lama yang masih
+      // terbuka tidak 404 saat meminta aset lama.
+      const META = "stacker-meta";
+      const meta = await caches.open(META);
+      const prevRes = await meta.match("/prev");
+      const prev = prevRes ? await prevRes.text() : "";
+      const keep = new Set([CACHE, prev].filter(Boolean));
+      for (const k of await caches.keys()) {
+        if (k !== META && !keep.has(k)) await caches.delete(k);
+      }
+      await meta.put("/prev", new Response(CACHE));
+      await self.clients.claim();
+    })()
   );
 });
 
@@ -40,9 +56,18 @@ self.addEventListener("fetch", (e) => {
 
   if (isAsset) {
     // Stale-while-revalidate untuk aset ber-hash (script/style/worker/wasm).
+    // ignoreVary: request modul bisa membawa Origin berbeda. Query hanya
+    // diabaikan untuk proxy sqlite (`?vfs=...`), jangan untuk `?url`/`?worker_file`
+    // karena artinya beda.
     e.respondWith(
       caches.open(CACHE).then(async (c) => {
-        const hit = await c.match(req);
+        let hit = await c.match(req, { ignoreVary: true });
+        if (!hit) hit = await caches.match(req, { ignoreVary: true }); // cache versi sebelumnya
+        if (!hit && url.pathname.includes("sqlite3-opfs-async-proxy")) {
+          hit =
+            (await c.match(req, { ignoreVary: true, ignoreSearch: true })) ??
+            (await caches.match(req, { ignoreVary: true, ignoreSearch: true }));
+        }
         const network = fetch(req)
           .then((res) => {
             if (res.ok) c.put(req, res.clone());
@@ -59,6 +84,6 @@ self.addEventListener("fetch", (e) => {
   e.respondWith(
     fetch(req)
       .then((res) => res)
-      .catch(() => caches.match("./"))
+      .catch(() => caches.match("./", { ignoreVary: true, ignoreSearch: true }))
   );
 });

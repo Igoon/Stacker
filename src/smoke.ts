@@ -12,11 +12,13 @@ const mini = createMiniDb(sqlite3, oo1db as never);
 const { initDb } = await import("./db");
 initDb(mini);
 
-const { handleMessage } = await import("./bot");
+const { handleMessage, deleteTxWithUndo, importJsonWithUndo, aiEnabled } = await import("./bot");
 const dbmod = await import("./db");
 const { parseLocal } = await import("./parser");
 const { PARSER_CASES } = await import("./parser-cases");
-const { hashPin, safeEqual, encryptJson, decryptJson, isEncrypted } = await import("./crypto");
+const { hashPin, safeEqual, encryptJson, decryptJson, isEncrypted, PIN_ITER } = await import(
+  "./crypto"
+);
 
 let pass = 0;
 let fail = 0;
@@ -59,6 +61,103 @@ await check("transfer dua sisi, hapus satu hapus pasangan", async () => {
   assert.equal(count(), before);
 });
 
+await check("hapus via tombol UI (deleteTxWithUndo) bisa di-undo dua arah", async () => {
+  const before = count();
+  const r = await handleMessage("transfer 10rb bsi ke gopay");
+  assert.equal(r.txs?.length, 2);
+  const res = deleteTxWithUndo(r.txs![0].id);
+  assert.equal(res.removed, 2, "harus hapus 2 baris");
+  assert.equal(count(), before, "dua baris hilang");
+  const u = await handleMessage("undo");
+  assert(u.text.includes("Dibatalkan"), "pesan undo");
+  assert.equal(count(), before + 2, "dua baris transfer kembali");
+});
+
+await check("transfer dengan biaya admin jadi 3 baris", async () => {
+  const before = dbmod.accountBalance(dbmod.getAccountByName("BSI")!.id);
+  const r = await handleMessage("transfer 10rb bsi ke gopay biaya 2,5rb");
+  assert.equal(r.txs?.length, 3, "dua sisi + biaya");
+  const fee = r.txs!.find((t) => !t.transfer_id)!;
+  assert.equal(fee.jumlah, 2500, "nominal biaya");
+  assert.equal(fee.tipe, "keluar", "biaya keluar");
+  assert.equal(
+    before - dbmod.accountBalance(dbmod.getAccountByName("BSI")!.id),
+    12_500,
+    "saldo asal terpotong transfer + biaya"
+  );
+  const pair = r.txs!.filter((t) => t.transfer_id);
+  await handleMessage(`hapus ${pair[0].id}`);
+  await handleMessage(`hapus ${fee.id}`);
+});
+
+await check("transfer ikut tanggal; hapus dua id sekaligus tak salah lapor", async () => {
+  const r = await handleMessage("transfer 10rb bsi ke gopay 2026-09-03");
+  const [a, b] = r.txs!;
+  assert.equal(dbmod.getTx(a.id)!.tanggal, "2026-09-03", "sisi keluar bertanggal");
+  assert.equal(dbmod.getTx(b.id)!.tanggal, "2026-09-03", "sisi masuk bertanggal");
+  const del = await handleMessage(`hapus ${a.id} ${b.id}`);
+  assert(!del.text.includes("Tidak ada"), "pasangan tak dilaporkan hilang");
+});
+
+await check("ubah nominal transfer mengubah dua sisi; pindah akun ditolak", async () => {
+  const r = await handleMessage("transfer 10rb bsi ke gopay");
+  const [a, b] = r.txs!;
+  const upd = await handleMessage(`ubah #${a.id} jadi 15rb`);
+  assert(upd.text.includes("2 sisi"), "pesan transfer 2 sisi");
+  assert.equal(dbmod.getTx(a.id)!.jumlah, 15_000, "sisi keluar ikut");
+  assert.equal(dbmod.getTx(b.id)!.jumlah, 15_000, "sisi masuk ikut");
+
+  const blocked = await handleMessage(`ubah #${a.id} akun ovo`);
+  assert(blocked.text.includes("tidak bisa dipindah"), "pindah akun transfer ditolak");
+  assert.equal(dbmod.getTx(a.id)!.account_id, dbmod.getAccountByName("bsi")!.id, "akun tak berubah");
+
+  await handleMessage(`hapus #${a.id}`);
+});
+
+await check("multi transaksi lokal tanpa AI", async () => {
+  const before = count();
+  const r = await handleMessage("parkir 5rb sama kopi 18rb");
+  assert.equal(r.txs?.length, 2, "dua transaksi");
+  assert.equal(count(), before + 2, "dua baris masuk");
+  const [parkir, kopi] = r.txs!;
+  assert.equal(parkir.kategori, "Transportasi");
+  assert.equal(kopi.kategori, "Makanan");
+});
+
+await check("ubah nominal mempertahankan tipe & kategori", async () => {
+  const t = last(await handleMessage("gaji 1jt bsi"))!;
+  assert.equal(t.tipe, "masuk");
+  const r = await handleMessage(`ubah #${t.id} jadi 2jt`);
+  assert(r.text.includes("Nominal diperbarui"), "pesan ubah nominal");
+  const after = dbmod.getTx(t.id)!;
+  assert.equal(after.jumlah, 2_000_000, "nominal berubah");
+  assert.equal(after.tipe, "masuk", "tipe tetap masuk");
+  assert.equal(after.kategori, "Gaji", "kategori tetap");
+});
+
+await check("ubah tanggal/catatan/kategori transaksi", async () => {
+  const t = last(await handleMessage("bioskop 20rb"))!;
+  await handleMessage(`ubah #${t.id} tanggal 2026-09-01`);
+  assert.equal(dbmod.getTx(t.id)!.tanggal, "2026-09-01", "tanggal berubah");
+  await handleMessage(`ubah #${t.id} catatan nonton bareng`);
+  assert.equal(dbmod.getTx(t.id)!.catatan, "nonton bareng", "catatan berubah");
+  await handleMessage(`ubah #${t.id} kategori Belanja`);
+  assert.equal(dbmod.getTx(t.id)!.kategori, "Belanja", "kategori berubah");
+  dbmod.deleteTx(t.id);
+});
+
+await check("akun berspasi: saldo awal & sesuaikan", async () => {
+  await handleMessage("akun tambah TempMulti bank");
+  await handleMessage("akun ubah TempMulti jadi Temp Multi");
+  const acc = dbmod.getAccountByName("Temp Multi")!;
+  await handleMessage("saldo awal Temp Multi 500rb");
+  assert.equal(dbmod.accountBalance(acc.id), 500_000, "saldo awal kebaca");
+  await handleMessage("sesuaikan Temp Multi 1jt");
+  assert.equal(dbmod.accountBalance(acc.id), 1_000_000, "sesuaikan kebaca");
+  const r = await handleMessage("akun hapus Temp Multi");
+  assert(r.text.includes("dihapus"), "akun spasi bisa dihapus");
+});
+
 await check("hapus pakai # dan multi-id", async () => {
   const a = last(await handleMessage("kopi 10rb"));
   const b = last(await handleMessage("kopi 5rb"));
@@ -93,6 +192,14 @@ await check("kata perintah tak jadi transaksi", async () => {
   const r = await handleMessage("hapus apa");
   assert(r.text.includes("Format"));
   assert.equal(count(), before);
+});
+
+await check("parser: arah tak salah karena prefix & angka kata kecil", async () => {
+  assert.equal(parseLocal("terimakasih makan 50rb")!.result.tipe, "keluar");
+  assert.equal(parseLocal("terima kasih makan 50rb")!.result.tipe, "keluar");
+  assert.equal(parseLocal("anak menangis beli susu 50rb")!.result.tipe, "keluar");
+  assert.equal(parseLocal("gajian 5jt")!.result.tipe, "masuk");
+  assert.equal(parseLocal("beli dua"), null, "angka kata <1000 ditolak");
 });
 
 await check("parser: angka dalam kata", async () => {
@@ -179,6 +286,29 @@ await check("akun hapus: transaksi dipindah, saldo tetap konsisten", async () =>
   assert.equal(sumAcc, dbmod.saldo(), "total saldo harus = jumlah saldo akun");
 });
 
+await check("akun hapus: transaksi berulang ikut pindah (bukan FK error)", async () => {
+  await handleMessage("akun tambah TempRec bank");
+  const acc = dbmod.getAccountByName("TempRec")!;
+  const rec = dbmod.addRecurring({
+    catatan: "uji berulang",
+    jumlah: 1_000,
+    tipe: "keluar",
+    kategori: "Lainnya",
+    account_id: acc.id,
+    hari: 1,
+  });
+  const r = await handleMessage("akun hapus TempRec");
+  assert(r.text.includes("dihapus"), "hapus akun berhasil");
+  assert(r.text.includes("berulang"), "pesan menyebut transaksi berulang");
+  assert(!dbmod.getAccountByName("TempRec"), "akun hilang");
+  assert.equal(
+    dbmod.listRecurring().find((x) => x.id === rec.id)!.account_id,
+    dbmod.getAccountByName("Cash")!.id,
+    "recurring pindah ke Cash"
+  );
+  dbmod.deleteRecurring(rec.id);
+});
+
 await check("anggaran case-insensitive: tak bikin baris ganda", async () => {
   await handleMessage("anggaran Perabot 100rb");
   await handleMessage("anggaran perabot 300rb");
@@ -197,7 +327,36 @@ await check("export tak memuat api key AI", async () => {
   // Restore tak boleh menghapus key lokal.
   dbmod.importAll(json);
   assert.equal(dbmod.getSetting("ai_key"), "SECRET-KEY-123", "key lokal dipertahankan");
+
+  // Backup format lama yang memuat ai_key/pin tidak boleh menabrak UNIQUE.
+  const legacy = JSON.parse(json) as {
+    tables: { settings: { key: string; value: string | null }[] };
+  };
+  legacy.tables.settings.push({ key: "ai_key", value: "OLD-KEY" });
+  legacy.tables.settings.push({ key: "pin_hash", value: "X" });
+  dbmod.importAll(JSON.stringify(legacy));
+  assert.equal(dbmod.getSetting("ai_key"), "SECRET-KEY-123", "key lokal menang");
+  assert.equal(dbmod.getSetting("pin_hash"), null, "PIN dari backup diabaikan");
+
   dbmod.setSetting("ai_key", null);
+});
+
+await check("AI openai tanpa base URL eksplisit = nonaktif", async () => {
+  dbmod.setSetting("ai_provider", "openai");
+  dbmod.setSetting("ai_base_url", null);
+  assert.equal(aiEnabled(), false, "tanpa base tidak aktif");
+  dbmod.setSetting("ai_base_url", "http://localhost:11434/v1");
+  assert.equal(aiEnabled(), true, "base eksplisit aktif");
+  dbmod.setSetting("ai_provider", null);
+  dbmod.setSetting("ai_base_url", null);
+});
+
+await check("kategori hapus ikut menghapus anggaran", async () => {
+  await handleMessage("kategori tambah keluar UjiHapus | ujihapus");
+  await handleMessage("anggaran UjiHapus 100rb");
+  const r = await handleMessage("kategori hapus UjiHapus");
+  assert(r.text.includes("Anggarannya ikut dihapus"), "pesan anggaran ikut");
+  assert.equal(dbmod.getBudget("UjiHapus"), undefined, "anggaran terhapus");
 });
 
 await check("reset transaksi menyertakan file backup", async () => {
@@ -252,6 +411,16 @@ await check("berulang: catat otomatis, idempotent, hapus", async () => {
   assert.equal(again.created, 0, "tak boleh dobel di bulan yang sama");
   assert.equal(count(), before + 1);
 
+  await handleMessage(`berulang nonaktif ${rec.id}`);
+  assert.equal(dbmod.listRecurring().find((x) => x.id === rec.id)!.aktif, 0, "nonaktif");
+  await handleMessage(`berulang aktif ${rec.id}`);
+  assert.equal(dbmod.listRecurring().find((x) => x.id === rec.id)!.aktif, 1, "aktif lagi");
+  const ed = await handleMessage(`berulang ubah ${rec.id} 500rb tiap 10`);
+  assert(ed.text.includes("Rp500.000") && ed.text.includes("tgl 10"), "edit nominal & tanggal");
+  const edited = dbmod.listRecurring().find((x) => x.id === rec.id)!;
+  assert.equal(edited.jumlah, 500_000);
+  assert.equal(edited.hari, 10);
+
   await handleMessage(`berulang hapus ${rec.id}`);
   assert(!dbmod.listRecurring().some((x) => x.id === rec.id), "harus terhapus");
 });
@@ -275,6 +444,13 @@ await check("utang/piutang: catat, bayar sebagian, lunas", async () => {
   assert(lunas.text.includes("Lunas"), "kelebihan bayar = lunas");
   assert.equal(dbmod.debtTotals().utang, 0);
 
+  const pi = dbmod.listDebts(false).find((d) => d.arah === "piutang")!;
+  const wrong = await handleMessage(`utang hapus ${pi.id}`);
+  assert(wrong.text.includes("itu piutang"), "arah salah ditolak");
+  const delPi = await handleMessage(`piutang hapus ${pi.id}`);
+  assert(delPi.text.includes("Piutang #"), "piutang hapus jalan");
+  assert.equal(dbmod.getDebt(pi.id), undefined);
+
   for (const d of dbmod.listDebts(false)) dbmod.deleteDebt(d.id);
 });
 
@@ -294,6 +470,9 @@ await check("crypto: PIN hash & backup terenkripsi", async () => {
   assert(safeEqual(c.hash, h.hash), "PIN benar harus cocok");
   const d = await hashPin("9999", h.salt, h.iter);
   assert(!safeEqual(d.hash, h.hash), "PIN salah tak boleh cocok");
+
+  const clamp = await hashPin("1234", undefined, 1);
+  assert.equal(clamp.iter, PIN_ITER, "iter ekstrem diklem");
 
   const plain = '{"version":2,"tables":{}}';
   const enc = await encryptJson(plain, "rahasia-panjang");
@@ -362,15 +541,11 @@ await check("parser korpus: 20 kalimat nyata", async () => {
   }
 });
 
-await check("backup menandai last_backup_at (pengingat)", async () => {
+await check("backup hanya ditandai setelah file benar-benar disimpan", async () => {
   dbmod.setSetting("last_backup_at", null);
   const r = await handleMessage("backup");
   assert(!!r.file, "harus ada file");
-  assert.equal(
-    dbmod.getSetting("last_backup_at"),
-    new Date().toISOString().slice(0, 10),
-    "tanggal backup tercatat"
-  );
+  assert.equal(dbmod.getSetting("last_backup_at"), null, "belum ditandai sebelum unduh");
 });
 
 await check("anggaran: set, peringatan 80%/tembus, list, hapus", async () => {
@@ -398,6 +573,11 @@ await check("laporan paket: banding, arus kas, top, akun", async () => {
   const kas = await handleMessage("laporan arus kas 6");
   assert(kas.text.includes("Arus kas 6 bulan"), "arus kas");
   assert(kas.svg?.startsWith("<svg") && kas.svg!.endsWith("</svg>"), "arus kas punya svg valid");
+
+  const kasAkun = await handleMessage("laporan arus kas bsi 6");
+  assert(kasAkun.text.includes("· BSI"), "arus kas filter akun");
+  const trenAkun = await handleMessage("grafik tren gopay 6");
+  assert(trenAkun.text.includes("· GoPay"), "tren filter akun");
 
   const top = await handleMessage("laporan top 5");
   assert(top.text.includes("Top"), "top pengeluaran");
@@ -433,13 +613,23 @@ await check("anggaran mingguan: cap minggu ini", async () => {
   const r100 = await handleMessage("ujiminggu 20rb");
   assert(r100.text.includes("tembus minggu ini"), "tembus mingguan");
 
+  const upd = await handleMessage("anggaran UjiMinggu 200rb");
+  assert(upd.text.includes("/minggu"), "update tanpa periode tetap mingguan");
+
   await handleMessage("anggaran hapus UjiMinggu");
   for (const t of dbmod.listAll()) if (t.kategori === "UjiMinggu") dbmod.deleteTx(t.id);
 });
 
+await check("previousMonthPeriod: bulan kalender, bukan 30 hari", async () => {
+  const { parsePeriod, previousMonthPeriod } = await import("./dates");
+  const q = previousMonthPeriod(parsePeriod("2026-03")!);
+  assert.equal(q.from, "2026-02-01", "mulai tanggal 1");
+  assert.equal(q.to, "2026-02-28", "akhir bulan Februari");
+});
+
 await check("anggaran rollover: carry periode lalu bisa negatif", async () => {
-  const { parsePeriod, previousPeriod } = await import("./dates");
-  const prev = previousPeriod(parsePeriod("")!);
+  const { parsePeriod, previousMonthPeriod } = await import("./dates");
+  const prev = previousMonthPeriod(parsePeriod("")!);
   await handleMessage("anggaran UjiRoll 100rb");
   await handleMessage("anggaran rollover UjiRoll");
   const b = dbmod.getBudget("UjiRoll")!;
@@ -460,6 +650,25 @@ await check("anggaran rollover: carry periode lalu bisa negatif", async () => {
   assert.equal(dbmod.getBudget("UjiRoll")!.rollover, 0, "rollover bisa dimatikan");
   await handleMessage("anggaran hapus UjiRoll");
   dbmod.deleteTx(t.id);
+});
+
+await check("import dari UI bisa di-undo", async () => {
+  const bkp = dbmod.exportAll();
+  const total = count();
+  dbmod.deleteAllTx();
+  assert.equal(count(), 0, "kosong sebelum import");
+  importJsonWithUndo(bkp);
+  assert.equal(count(), total, "import memulihkan jumlah");
+  const u = await handleMessage("undo");
+  assert(u.text.includes("Dibatalkan"), "pesan undo");
+  assert.equal(count(), 0, "undo mengembalikan kondisi sebelum import");
+});
+
+await check("hapus semua kategori tidak memunculkan seed default lagi", async () => {
+  for (const c of dbmod.listCategories()) dbmod.deleteCategory(c.id);
+  assert.equal(dbmod.listCategories().length, 0, "kategori kosong");
+  initDb(mini);
+  assert.equal(dbmod.listCategories().length, 0, "init ulang tidak re-seed");
 });
 
 console.log(`\n${pass} ok, ${fail} fail`);

@@ -13,11 +13,12 @@ import {
   deleteCategory,
   deleteDebt,
   deleteRecurring,
-  deleteTx,
+  deleteTxWithIds,
   dailySeries,
   getAccountByName,
   getBudget,
   getCategoryByName,
+  getDebt,
   getSetting,
   getTx,
   listAccounts,
@@ -33,6 +34,7 @@ import {
   reconcileAccount,
   renameAccount,
   renameCategory,
+  recurringDue,
   rupiah,
   rupiahSigned,
   runRecurring,
@@ -42,18 +44,37 @@ import {
   setBudget,
   setCategoryTipe,
   setSetting,
+  totalChanges,
   transferRange,
   updateCategoryKeywords,
+  updateRecurring,
+  updateTransferAmount,
+  updateTransferDate,
   updateTx,
   type Account,
   type Budget,
   type Debt,
   type Tx,
 } from "./db";
-import { parseLocal, MASUK, type ParseResult } from "./parser";
-import { isoLocal, lastMonths, parsePeriod, previousPeriod, type Period } from "./dates";
+import { parseLocal, parseLocalMulti, MASUK, type ParseResult } from "./parser";
+import {
+  extractDate,
+  isoLocal,
+  lastMonths,
+  parsePeriod,
+  previousMonthPeriod,
+  previousPeriod,
+  type Period,
+} from "./dates";
 import { toCSV } from "./csv";
-import { buildDailyRange, buildDonutSvg, buildGrafik, buildTrendSvg, shortRp } from "./chart";
+import {
+  buildDailyRange,
+  buildDonutSvg,
+  buildGrafik,
+  buildTrendSvg,
+  shortRp,
+  shortRpSigned,
+} from "./chart";
 import { exportJson, importJson } from "./backup";
 import { encryptJson, hashPin, safeEqual } from "./crypto";
 import { aiEnabled, aiResetUsage, aiStats, parseGemini } from "./ai";
@@ -62,6 +83,7 @@ import { APP_VERSION } from "./version";
 export interface Reply {
   text: string;
   txs?: Tx[];
+  removedIds?: number[];
   file?: { name: string; content: string };
   pre?: boolean;
   lock?: boolean;
@@ -85,7 +107,8 @@ const HELP =
   "  terima sedekah 1jt bsi      (arah masuk)\n" +
   "  bsi sedekah 1jt             (arah keluar)\n\n" +
   "Transfer:\n" +
-  "  transfer 100rb bsi ke gopay\n\n" +
+  "  transfer 100rb bsi ke gopay\n" +
+  "  transfer 100rb bsi ke gopay biaya 2,5rb\n\n" +
   "Saldo:\n" +
   "  saldo                       (total + semua akun)\n" +
   "  saldo bsi                   (satu akun)\n\n" +
@@ -129,14 +152,16 @@ const HELP =
   "Kelola:\n" +
   "  riwayat | riwayat 30\n" +
   "  ubah 3 jadi 60rb\n" +
+  "  ubah 3 tanggal kemarin | ubah 3 catatan makan siang | ubah 3 kategori Makanan\n" +
   "  hapus 3\n" +
   "  hapus 24 25                 (beberapa sekaligus, boleh #24)\n" +
   "  undo                        (batalkan aksi terakhir)\n" +
   "  berulang listrik 350rb tiap 5   (auto tiap bulan)\n" +
-  "  berulang | berulang hapus 1\n" +
+  "  berulang | berulang hapus 1 | berulang nonaktif 1 | berulang aktif 1\n" +
+  "  berulang ubah 1 400rb tiap 10\n" +
   "  utang 100rb ke budi         (ledger utang/piutang)\n" +
   "  piutang 50rb dari andi\n" +
-  "  bayar utang budi 50rb | utang hapus 3\n" +
+  "  bayar utang budi 50rb | utang hapus 3 | piutang hapus 4\n" +
   "  pin | pin atur 1234 | pin ubah 1234 5678\n" +
   "  pin hapus 1234              (matikan kunci)\n" +
   "  backup | backup kunci <sandi>   (JSON / terenkripsi)\n" +
@@ -166,6 +191,19 @@ function resolveAccount(text: string): Account | undefined {
   return getAccountByName("Cash") ?? listAccounts()[0];
 }
 
+// Awalan nama akun (boleh berspasi) + sisa teks. Nama terpanjang menang.
+function accountPrefix(text: string): { acc: Account; rest: string } | null {
+  const low = text.toLowerCase();
+  const accounts = [...listAccounts()].sort((a, b) => b.nama.length - a.nama.length);
+  for (const acc of accounts) {
+    const n = acc.nama.toLowerCase();
+    if (low === n || low.startsWith(n + " ")) {
+      return { acc, rest: text.slice(acc.nama.length).trim() };
+    }
+  }
+  return null;
+}
+
 const withRupiah = (t: Tx): Tx => ({ ...t, rupiah: rupiah(t.jumlah) });
 
 function parseAmount(raw: string): number | undefined {
@@ -193,7 +231,8 @@ function budgetCarry(b: Budget): number {
   if (!b.rollover) return 0;
   const cur = budgetWindow(b);
   if (!cur) return 0;
-  return b.jumlah - spentIn(b.kategori, previousPeriod(cur));
+  const prev = b.periode === "mingguan" ? previousPeriod(cur) : previousMonthPeriod(cur);
+  return b.jumlah - spentIn(b.kategori, prev);
 }
 
 function budgetEffective(b: Budget): number {
@@ -269,6 +308,35 @@ const txLine = (r: Tx) =>
 const UNDO_LIMIT = 20;
 const undoStack: string[] = [];
 
+function pushUndo(snap: string): void {
+  undoStack.push(snap);
+  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+}
+
+// Dipakai tombol Hapus di UI: snapshot dulu supaya `undo` bisa membatalkan.
+export function deleteTxWithUndo(id: number): { removed: number; ids: number[] } {
+  const before = exportJson();
+  const res = deleteTxWithIds(id);
+  if (res.removed > 0) pushUndo(before);
+  return res;
+}
+
+// Restore dari UI juga harus bisa di-undo (import mengganti seluruh DB).
+export function importJsonWithUndo(json: string): void {
+  const before = exportJson();
+  importJson(json);
+  if (exportJson() !== before) pushUndo(before);
+}
+
+// Transaksi berulang yang jatuh tempo juga masuk undo stack.
+export function runRecurringWithUndo(): { created: number; entries: string[] } {
+  if (!recurringDue()) return { created: 0, entries: [] };
+  const before = exportJson();
+  const res = runRecurring();
+  if (res.created > 0) pushUndo(before);
+  return res;
+}
+
 export async function handleMessage(input: string): Promise<Reply> {
   const text = input.trim();
 
@@ -282,11 +350,10 @@ export async function handleMessage(input: string): Promise<Reply> {
   }
 
   const before = exportJson();
+  const beforeChanges = totalChanges();
   const r = await handleMessageInner(text);
-  if (exportJson() !== before) {
-    undoStack.push(before);
-    if (undoStack.length > UNDO_LIMIT) undoStack.shift();
-  }
+  // Pre-check murah: perintah baca tak perlu export ulang untuk undo.
+  if (totalChanges() !== beforeChanges && exportJson() !== before) pushUndo(before);
   return r;
 }
 
@@ -369,10 +436,9 @@ async function handleMessageInner(input: string): Promise<Reply> {
 
   if ((m = text.match(/^backup(?:\s+kunci\s+(.+))?$/i))) {
     const pass = (m[1] ?? "").trim();
-    const stamp = new Date().toISOString().slice(0, 10);
+    const stamp = isoLocal();
     const plain = exportJson();
     if (!pass) {
-      setSetting("last_backup_at", isoLocal());
       return {
         text:
           "Backup JSON biasa siap diunduh.\n" +
@@ -384,7 +450,6 @@ async function handleMessageInner(input: string): Promise<Reply> {
       return { text: "Kata sandi minimal 8 karakter. Contoh: `backup kunci rahasia-panjang-2026`" };
     }
     const enc = await encryptJson(plain, pass);
-    setSetting("last_backup_at", isoLocal());
     return {
       text:
         "Backup terenkripsi siap diunduh (AES-GCM 256, PBKDF2).\n" +
@@ -457,11 +522,23 @@ async function handleMessageInner(input: string): Promise<Reply> {
     const acc = getAccountByName(m[1]);
     if (!acc) return { text: `Akun "${m[1]}" tidak ada.` };
     const res = deleteAccount(acc.id);
-    const movedTxt =
-      res.moved > 0 && res.to
-        ? ` ${res.moved} transaksi dipindah ke akun ${res.to}.`
-        : " Tidak ada transaksi terkait.";
-    return { text: `Akun ${acc.nama} dihapus.${movedTxt}` };
+    const parts = [`Akun ${acc.nama} dihapus.`];
+    if (res.moved > 0) {
+      parts.push(
+        res.to
+          ? `${res.moved} transaksi dipindah ke akun ${res.to}.`
+          : `${res.moved} transaksi kini tanpa akun.`
+      );
+    }
+    if (res.movedRecurring > 0) {
+      parts.push(
+        res.to
+          ? `${res.movedRecurring} transaksi berulang dipindah ke akun ${res.to}.`
+          : `${res.movedRecurring} transaksi berulang kini tanpa akun.`
+      );
+    }
+    if (res.moved === 0 && res.movedRecurring === 0) parts.push("Tidak ada transaksi terkait.");
+    return { text: parts.join(" ") };
   }
 
   if (low === "kategori" || low === "kategori list" || low === "kategori daftar") {
@@ -594,41 +671,43 @@ async function handleMessageInner(input: string): Promise<Reply> {
     const cat = getCategoryByName(m[1]);
     if (!cat) return { text: `Kategori "${m[1]}" tidak ada.` };
     deleteCategory(cat.id);
-    return { text: `Kategori ${cat.nama} dihapus. Transaksi lama tetap ada.` };
+    const budgetGone = deleteBudget(cat.nama);
+    return {
+      text:
+        `Kategori ${cat.nama} dihapus. Transaksi lama tetap ada.` +
+        (budgetGone ? " Anggarannya ikut dihapus." : ""),
+    };
   }
 
   if ((m = text.match(/^saldo awal\s+(.+)$/i))) {
-    const parts = m[1].trim().split(/\s+/);
-    const nominalRaw = parts.filter((p) => /\d/.test(p)).join(" ");
-    const nama = parts[0];
-    const acc = getAccountByName(nama);
-    if (!acc) return { text: `Akun "${nama}" tidak ada.` };
-    const nominal = parseAmount(nominalRaw);
+    const found = accountPrefix(m[1].trim());
+    if (!found) return { text: `Akun "${m[1].trim().split(/\s+/)[0]}" tidak ada.` };
+    const nominal = parseAmount(found.rest);
     if (nominal == null) return { text: "Contoh: `saldo awal bca 5jt`" };
-    setAccountSaldoAwal(acc.id, nominal);
-    return { text: `Saldo awal ${acc.nama} = ${rupiahSigned(nominal)}.` };
+    setAccountSaldoAwal(found.acc.id, nominal);
+    return { text: `Saldo awal ${found.acc.nama} = ${rupiahSigned(nominal)}.` };
   }
 
-  if ((m = text.match(/^(?:sesuaikan|betulkan)\s+(?:saldo\s+)?(\S+?)(?:\s+ke)?\s+([\d][\d.,]*(?:\s*(?:jt|juta|rb|ribu|k))?)$/i))) {
-    const acc = getAccountByName(m[1]);
-    if (!acc) return { text: `Akun "${m[1]}" tidak ada. Lihat: \`akun\`` };
-    const target = parseAmount(m[2]);
+  if (/^(?:sesuaikan|betulkan)\b/.test(low)) {
+    const rest = text.replace(/^(?:sesuaikan|betulkan)\s+(?:saldo\s+)?/i, "").trim();
+    const found = accountPrefix(rest);
+    if (!found) {
+      return { text: "Format: `sesuaikan <akun> <nominal>`. Contoh: `sesuaikan bsi 100jt`" };
+    }
+    const target = parseAmount(found.rest.replace(/^(?:ke|jadi|menjadi)\s+/i, ""));
     if (target == null) return { text: "Nominal tidak kebaca. Contoh: `sesuaikan bsi 100jt`" };
-    const awal = reconcileAccount(acc.id, target);
+    const awal = reconcileAccount(found.acc.id, target);
     return {
       text:
-        `Saldo ${acc.nama} kini ${rupiahSigned(target)}\n` +
+        `Saldo ${found.acc.nama} kini ${rupiahSigned(target)}\n` +
         `(saldo awal diset ${rupiahSigned(awal)}, total transaksi ${rupiahSigned(target - awal)})`,
     };
   }
 
-  if (/^(?:sesuaikan|betulkan)\b/.test(low)) {
-    return { text: "Format: `sesuaikan <akun> <nominal>`. Contoh: `sesuaikan bsi 100jt`" };
-  }
-
   if (/^transfer\b/.test(low)) {
     const found = mentionedAccounts(text);
-    const nominal = parseLocal(text)?.result.jumlah;
+    const parsed = parseLocal(text);
+    const nominal = parsed?.result.jumlah;
     if (found.length < 2) {
       return { text: "Sebut dua akun. Contoh: `transfer 100rb bca ke gopay`" };
     }
@@ -637,6 +716,7 @@ async function handleMessageInner(input: string): Promise<Reply> {
     const to = found[1].acc;
     if (from.id === to.id) return { text: "Akun asal dan tujuan sama." };
     const g = crypto.randomUUID();
+    const tanggal = parsed.result.tanggal;
     const keluar = addTx({
       jumlah: nominal,
       tipe: "keluar",
@@ -644,6 +724,7 @@ async function handleMessageInner(input: string): Promise<Reply> {
       catatan: `Transfer ke ${to.nama}`,
       account_id: from.id,
       transfer_id: g,
+      tanggal,
     });
     const masuk = addTx({
       jumlah: nominal,
@@ -652,10 +733,30 @@ async function handleMessageInner(input: string): Promise<Reply> {
       catatan: `Transfer dari ${from.nama}`,
       account_id: to.id,
       transfer_id: g,
+      tanggal,
     });
+    const out = [keluar, masuk];
+    const feeM = text.match(
+      /\b(?:biaya|fee|admin)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k))?)/i
+    );
+    const fee = feeM ? parseAmount(feeM[1]) : undefined;
+    if (fee && fee > 0) {
+      out.push(
+        addTx({
+          jumlah: fee,
+          tipe: "keluar",
+          kategori: "Lainnya",
+          catatan: `Biaya transfer ${from.nama} → ${to.nama}`,
+          account_id: from.id,
+          tanggal,
+        })
+      );
+    }
     return {
-      text: `Transfer ${rupiah(nominal)}: ${from.nama} → ${to.nama}`,
-      txs: [keluar, masuk].map(withRupiah),
+      text:
+        `Transfer ${rupiah(nominal)}: ${from.nama} → ${to.nama}` +
+        (fee && fee > 0 ? ` + biaya ${rupiah(fee)}` : ""),
+      txs: out.map(withRupiah),
     };
   }
 
@@ -714,11 +815,14 @@ async function handleMessageInner(input: string): Promise<Reply> {
 
     if (/^arus\s*kas\b/i.test(arg)) {
       const rest = arg.replace(/^arus\s*kas\s*/i, "").trim();
-      const nm = rest.match(/\b(\d{1,2})\b/);
-      if (rest && !nm) return { text: "Format: `laporan arus kas 6` (jumlah bulan 2–24)." };
+      const { account, per, query } = parseFilter(rest);
+      const nm = query.match(/^(\d{1,2})$/);
+      if (per || (query && !nm)) {
+        return { text: "Format: `laporan arus kas 6` atau `laporan arus kas gopay 6`." };
+      }
       const n = Math.min(24, Math.max(2, nm ? Number(nm[1]) : 6));
       const rows = lastMonths(n).map((p) => {
-        const r = ringkasRange(p.from, p.to);
+        const r = ringkasRange(p.from, p.to, account?.id);
         const masuk = r.filter((x) => x.tipe === "masuk").reduce((a, b) => a + b.total, 0);
         const keluar = r.filter((x) => x.tipe === "keluar").reduce((a, b) => a + b.total, 0);
         return { per: p, masuk, keluar, net: masuk - keluar };
@@ -733,7 +837,7 @@ async function handleMessageInner(input: string): Promise<Reply> {
       );
       return {
         text:
-          `Arus kas ${n} bulan terakhir (tanpa transfer)\n\n${lines.join("\n")}\n\n` +
+          `Arus kas ${n} bulan terakhir${account ? ` · ${account.nama}` : ""} (tanpa transfer)\n\n${lines.join("\n")}\n\n` +
           `Total masuk ${rupiah(tMasuk)} · keluar ${rupiah(tKeluar)} · net ${rupiahSigned(tMasuk - tKeluar)}`,
         svg: buildTrendSvg(
           rows.map((r) => ({ label: r.per.label.slice(0, 3), masuk: r.masuk, keluar: r.keluar }))
@@ -871,12 +975,15 @@ async function handleMessageInner(input: string): Promise<Reply> {
     if (ids.length === 0) return { text: "Format: `hapus 25` atau `hapus 24 25`." };
     const okIds: number[] = [];
     const failIds: number[] = [];
+    const deletedIds = new Set<number>();
     let pairs = 0;
     for (const id of ids) {
-      const n = deleteTx(id);
-      if (n > 0) {
+      if (deletedIds.has(id)) continue; // duplikat / pasangan yang sudah terhapus
+      const res = deleteTxWithIds(id);
+      if (res.removed > 0) {
         okIds.push(id);
-        if (n > 1) pairs += 1;
+        if (res.removed > 1) pairs += 1;
+        for (const x of res.ids) deletedIds.add(x);
       } else {
         failIds.push(id);
       }
@@ -885,11 +992,18 @@ async function handleMessageInner(input: string): Promise<Reply> {
     if (okIds.length) parts.push(`Terhapus: ${okIds.map((i) => `#${i}`).join(", ")}`);
     if (failIds.length) parts.push(`Tidak ada: ${failIds.map((i) => `#${i}`).join(", ")}`);
     if (pairs) parts.push(`(${pairs} transfer ikut terhapus pasangannya)`);
-    return { text: parts.join("\n") };
+    return { text: parts.join("\n"), removedIds: [...deletedIds] };
   }
 
   if ((m = low.match(/^ubah\s+#?(\d+)\s+akun\s+(.+)$/))) {
     const id = Number(m[1]);
+    const cur = getTx(id);
+    if (!cur) return { text: `Id ${id} tidak ada.` };
+    if (cur.transfer_id) {
+      return {
+        text: "Transaksi transfer tidak bisa dipindah satu sisi. Hapus transfer lalu buat ulang.",
+      };
+    }
     const acc = getAccountByName(m[2]);
     if (!acc) return { text: `Akun "${m[2]}" tidak ada. Lihat: \`akun\`` };
     const tx = updateTx(id, { account_id: acc.id });
@@ -898,16 +1012,68 @@ async function handleMessageInner(input: string): Promise<Reply> {
       : { text: `Id ${id} tidak ada.` };
   }
 
+  if ((m = text.match(/^ubah\s+#?(\d+)\s+tanggal\s+(.+)$/i))) {
+    const id = Number(m[1]);
+    const cur = getTx(id);
+    if (!cur) return { text: `Id ${id} tidak ada.` };
+    const { tanggal } = extractDate(m[2]);
+    if (!tanggal) return { text: "Tanggal tidak kebaca. Contoh: `ubah 3 tanggal kemarin`" };
+    if (cur.transfer_id) {
+      const legs = updateTransferDate(id, tanggal);
+      return legs
+        ? { text: `Tanggal transfer → ${tanggal} (2 sisi).`, txs: legs.map(withRupiah) }
+        : { text: `Id ${id} tidak ada.` };
+    }
+    const tx = updateTx(id, { tanggal });
+    return tx
+      ? { text: `Tanggal #${id} → ${tanggal}.`, txs: [withRupiah(tx)] }
+      : { text: `Id ${id} tidak ada.` };
+  }
+
+  if ((m = text.match(/^ubah\s+#?(\d+)\s+catatan\s+(.+)$/i))) {
+    const id = Number(m[1]);
+    const cur = getTx(id);
+    if (!cur) return { text: `Id ${id} tidak ada.` };
+    if (cur.transfer_id) return { text: "Catatan transfer tidak bisa diubah satu sisi." };
+    const tx = updateTx(id, { catatan: m[2].trim() });
+    return tx
+      ? { text: `Catatan #${id} diperbarui.`, txs: [withRupiah(tx)] }
+      : { text: `Id ${id} tidak ada.` };
+  }
+
+  if ((m = text.match(/^ubah\s+#?(\d+)\s+kategori\s+(.+)$/i))) {
+    const id = Number(m[1]);
+    const cur = getTx(id);
+    if (!cur) return { text: `Id ${id} tidak ada.` };
+    if (cur.transfer_id) return { text: "Kategori transfer tidak bisa diubah satu sisi." };
+    const cat = getCategoryByName(m[2]);
+    if (!cat) return { text: `Kategori "${m[2]}" tidak ada. Lihat: \`kategori\`` };
+    const tx = updateTx(id, { kategori: cat.nama });
+    return tx
+      ? { text: `Kategori #${id} → ${cat.nama}.`, txs: [withRupiah(tx)] }
+      : { text: `Id ${id} tidak ada.` };
+  }
+
   if ((m = low.match(/^ubah\s+#?(\d+)\s+jadi\s+(.+)$/))) {
     const id = Number(m[1]);
     const p = parseLocal(m[2]);
     if (!p) return { text: "Nominal baru tidak kebaca. Contoh: `ubah 3 jadi 60rb`" };
-    const tx = updateTx(id, {
-      jumlah: p.result.jumlah,
-      tipe: p.result.tipe,
-      kategori: p.result.kategori,
-    });
-    return tx ? { text: "Diperbarui.", txs: [withRupiah(tx)] } : { text: `Id ${id} tidak ada.` };
+    const cur = getTx(id);
+    if (!cur) return { text: `Id ${id} tidak ada.` };
+    // Hanya nominal yang diubah: tipe & kategori lama dipertahankan.
+    if (cur.transfer_id) {
+      const legs = updateTransferAmount(id, p.result.jumlah);
+      return legs
+        ? {
+            text: `Transfer diperbarui: ${rupiah(p.result.jumlah)} (2 sisi).`,
+            txs: legs.map(withRupiah),
+          }
+        : { text: `Id ${id} tidak ada.` };
+    }
+    const tx = updateTx(id, { jumlah: p.result.jumlah });
+    return tx
+      ? { text: `Nominal diperbarui: ${rupiah(tx.jumlah)}.`, txs: [withRupiah(tx)] }
+      : { text: `Id ${id} tidak ada.` };
   }
 
   if ((m = low.match(/^(riwayat|history|list)(?:\s+(\d{1,3}))?$/))) {
@@ -945,8 +1111,12 @@ async function handleMessageInner(input: string): Promise<Reply> {
     }
     const label = [per?.label ?? "semua", account?.nama].filter(Boolean).join(" · ");
     const name = `transaksi-${per ? `${per.from}_${per.to}` : "semua"}${account ? `-${account.nama}` : ""}.csv`;
+    const capNote =
+      (per || account) && rows.length >= 10000
+        ? " Dibatasi 10.000 baris; persempit periode/akun untuk sisanya."
+        : "";
     return {
-      text: `CSV ${rows.length} transaksi (${label}).`,
+      text: `CSV ${rows.length} transaksi (${label}).${capNote}`,
       file: { name, content: toCSV(rows) },
     };
   }
@@ -984,11 +1154,14 @@ async function handleMessageInner(input: string): Promise<Reply> {
 
     if (/^tren\b/i.test(arg)) {
       const rest = arg.replace(/^tren\s*/i, "").trim();
-      const nm = rest.match(/\b(\d{1,2})\b/);
-      if (rest && !nm) return { text: "Format: `grafik tren 6` (jumlah bulan 2–24)." };
+      const { account, per, query } = parseFilter(rest);
+      const nm = query.match(/^(\d{1,2})$/);
+      if (per || (query && !nm)) {
+        return { text: "Format: `grafik tren 6` atau `grafik tren gopay 6`." };
+      }
       const n = Math.min(24, Math.max(2, nm ? Number(nm[1]) : 6));
       const rows = lastMonths(n).map((p) => {
-        const r = ringkasRange(p.from, p.to);
+        const r = ringkasRange(p.from, p.to, account?.id);
         return {
           per: p,
           masuk: r.filter((x) => x.tipe === "masuk").reduce((a, b) => a + b.total, 0),
@@ -1004,7 +1177,7 @@ async function handleMessageInner(input: string): Promise<Reply> {
       );
       return {
         text:
-          `Tren ${n} bulan terakhir\n${lines.join("\n")}\n\n` +
+          `Tren ${n} bulan terakhir${account ? ` · ${account.nama}` : ""}\n${lines.join("\n")}\n\n` +
           `Total masuk ${rupiah(totalMasuk)} · keluar ${rupiah(totalKeluar)} · ` +
           `net ${rupiahSigned(totalMasuk - totalKeluar)}`,
         svg: buildTrendSvg(
@@ -1037,7 +1210,7 @@ async function handleMessageInner(input: string): Promise<Reply> {
       ? undefined
       : accountBalances()
           .filter((a) => (a.saldo ?? 0) !== 0)
-          .map((a) => `${a.nama} ${shortRp(a.saldo ?? 0)}`);
+          .map((a) => `${a.nama} ${shortRpSigned(a.saldo ?? 0)}`);
 
     const transfer = transferRange(per.from, per.to, account?.id);
 
@@ -1092,8 +1265,9 @@ async function handleMessageInner(input: string): Promise<Reply> {
         return { text: "Nominal anggaran tidak kebaca. Contoh: `anggaran Makanan 2jt`" };
       }
       setBudget(nama, jumlah, { periode });
-      const suffix = periode === "mingguan" ? "/minggu" : periode === "bulanan" ? "/bulan" : "";
-      return { text: `Anggaran ${nama} = ${rupiah(jumlah)}${suffix || "/bulan"}.` };
+      const eff = getBudget(nama)?.periode ?? periode ?? "bulanan";
+      const suffix = eff === "mingguan" ? "/minggu" : "/bulan";
+      return { text: `Anggaran ${nama} = ${rupiah(jumlah)}${suffix}.` };
     }
     return {
       text:
@@ -1118,6 +1292,41 @@ async function handleMessageInner(input: string): Promise<Reply> {
   if ((m = text.match(/^berulang hapus\s+#?(\d+)$/i))) {
     const id = Number(m[1]);
     return { text: deleteRecurring(id) ? `Transaksi berulang #${id} dihapus.` : `Tidak ada #${id}.` };
+  }
+
+  if ((m = text.match(/^berulang\s+(aktif|nonaktif|ubah)\s+#?(\d+)(?:\s+(.+))?$/i))) {
+    const aksi = m[1].toLowerCase();
+    const id = Number(m[2]);
+    const rec = listRecurring().find((r) => r.id === id);
+    if (!rec) return { text: `Tidak ada #${id}.` };
+    if (aksi === "aktif" || aksi === "nonaktif") {
+      updateRecurring(id, { aktif: aksi === "aktif" ? 1 : 0 });
+      const ran = aksi === "aktif" ? runRecurring() : { created: 0, entries: [] as string[] };
+      const tail = ran.created > 0 ? `\nLangsung dicatat: ${ran.entries.join(", ")}` : "";
+      return { text: `Transaksi berulang #${id} ${aksi}.${tail}` };
+    }
+
+    let rest = (m[3] ?? "").trim();
+    let hari = rec.hari;
+    let jumlah = rec.jumlah;
+    const tiap = rest.match(/\btiap\s+(?:tgl\s+|tanggal\s+)?(\d{1,2})\b/i);
+    if (tiap) {
+      hari = Number(tiap[1]);
+      rest = (rest.slice(0, tiap.index) + rest.slice(tiap.index! + tiap[0].length)).trim();
+    }
+    if (rest) {
+      const p = parseLocal(rest);
+      if (!p) return { text: "Nominal tidak kebaca. Contoh: `berulang ubah 3 400rb tiap 10`" };
+      jumlah = p.result.jumlah;
+    }
+    if (!rest && !tiap) {
+      return { text: "Format: `berulang ubah 3 400rb tiap 10` (boleh salah satu)." };
+    }
+    if (hari < 1 || hari > 28) return { text: "Tanggal harus 1-28 (biar aman di semua bulan)." };
+    updateRecurring(id, { jumlah, hari });
+    return {
+      text: `Berulang #${id}: ${rec.catatan} ${rupiah(jumlah)} tiap tgl ${hari}.`,
+    };
   }
 
   if ((m = text.match(/^berulang\s+(.+)$/i))) {
@@ -1166,13 +1375,26 @@ async function handleMessageInner(input: string): Promise<Reply> {
         `Utang saya: ${rupiah(t.utang)} · Piutang saya: ${rupiah(t.piutang)}\n\n` +
         `Utang (harus dibayar):\n${u.map(fmt).join("\n") || "  -"}\n\n` +
         `Piutang (harus diterima):\n${p.map(fmt).join("\n") || "  -"}\n\n` +
-        "Bayar: `bayar utang budi 50rb` · `bayar piutang andi 50rb` · `utang hapus 3`",
+        "Bayar: `bayar utang budi 50rb` · `bayar piutang andi 50rb` · " +
+        "`utang hapus 3` · `piutang hapus 4`",
     };
   }
 
-  if ((m = text.match(/^utang hapus\s+#?(\d+)$/i))) {
-    const id = Number(m[1]);
-    return { text: deleteDebt(id) ? `Utang/piutang #${id} dihapus.` : `Tidak ada #${id}.` };
+  if ((m = text.match(/^(utang|piutang|hutang)\s+hapus\s+#?(\d+)$/i))) {
+    const arah: "utang" | "piutang" = m[1].toLowerCase() === "piutang" ? "piutang" : "utang";
+    const id = Number(m[2]);
+    const d = getDebt(id);
+    if (!d) return { text: `Tidak ada #${id}.` };
+    if (d.arah !== arah) {
+      return {
+        text: `#${id} itu ${d.arah}, bukan ${arah}. Pakai \`${d.arah} hapus ${id}\`.`,
+      };
+    }
+    return {
+      text: deleteDebt(id)
+        ? `${arah === "utang" ? "Utang" : "Piutang"} #${id} dihapus.`
+        : `Tidak ada #${id}.`,
+    };
   }
 
   if ((m = text.match(/^bayar\s+(utang|piutang)\s+(.+?)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k))?)$/i))) {
@@ -1266,6 +1488,9 @@ async function resolveTransactions(
   if (local && local.confidence === "high") {
     return { results: [local.result], usedAI: false };
   }
+
+  const multi = parseLocalMulti(text);
+  if (multi) return { results: multi.map((m) => m.result), usedAI: false };
 
   const ai = await parseGemini(text);
   if (ai && ai.length > 0) {

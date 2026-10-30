@@ -7,6 +7,14 @@ const dec = new TextDecoder();
 export const PIN_ITER = 120_000;
 export const BACKUP_ITER = 150_000;
 
+// Nilai iter dari settings/file bisa rusak/ekstrem. Jangan sampai PIN tak bisa
+// dibuka atau file backup jadi DoS.
+function safeIter(n: unknown, fallback: number): number {
+  const v = Number(n);
+  if (!Number.isFinite(v) || v < 1_000 || v > 1_000_000) return fallback;
+  return Math.round(v);
+}
+
 function toB64(buf: ArrayBuffer | Uint8Array): string {
   const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
   let s = "";
@@ -41,12 +49,13 @@ async function derive(pass: string, salt: Uint8Array, iter: number): Promise<Cry
 
 export async function hashPin(pin: string, saltB64?: string, iter = PIN_ITER): Promise<{ salt: string; hash: string; iter: number }> {
   const salt = saltB64 ? fromB64(saltB64) : randomBytes(16);
+  const it = safeIter(iter, PIN_ITER);
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt: salt as unknown as BufferSource, iterations: iter, hash: "SHA-256" },
+    { name: "PBKDF2", salt: salt as unknown as BufferSource, iterations: it, hash: "SHA-256" },
     await crypto.subtle.importKey("raw", enc.encode(pin), "PBKDF2", false, ["deriveBits"]),
     256
   );
-  return { salt: toB64(salt), hash: toB64(bits), iter };
+  return { salt: toB64(salt), hash: toB64(bits), iter: it };
 }
 
 // Perbandingan waktu-konstan sederhana (hindari short-circuit).
@@ -74,7 +83,8 @@ export function isEncrypted(json: string): boolean {
 export async function encryptJson(plain: string, pass: string, iter = BACKUP_ITER): Promise<string> {
   const salt = randomBytes(16);
   const iv = randomBytes(12);
-  const key = await derive(pass, salt, iter);
+  const it = safeIter(iter, BACKUP_ITER);
+  const key = await derive(pass, salt, it);
   const data = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv: iv as unknown as BufferSource },
     key,
@@ -84,7 +94,7 @@ export async function encryptJson(plain: string, pass: string, iter = BACKUP_ITE
     format: "stacker-enc",
     v: 1,
     kdf: "PBKDF2-SHA256",
-    iter,
+    iter: it,
     salt: toB64(salt),
     iv: toB64(iv),
     data: toB64(data),
@@ -97,7 +107,7 @@ export async function decryptJson(envelope: string, pass: string): Promise<strin
   if (env.format !== "stacker-enc" || !env.salt || !env.iv || !env.data) {
     throw new Error("File bukan backup terenkripsi Stacker.");
   }
-  const key = await derive(pass, fromB64(env.salt), env.iter ?? BACKUP_ITER);
+  const key = await derive(pass, fromB64(env.salt), safeIter(env.iter, BACKUP_ITER));
   try {
     const buf = await crypto.subtle.decrypt(
       { name: "AES-GCM", iv: fromB64(env.iv) as unknown as BufferSource },

@@ -95,7 +95,11 @@ CREATE TABLE IF NOT EXISTS debts (
   if (!hasColumn("budgets", "rollover")) {
     db.exec(`ALTER TABLE budgets ADD COLUMN rollover INTEGER NOT NULL DEFAULT 0`);
   }
-  db.prepare(`UPDATE categories SET tipe='masuk' WHERE lower(nama)='gaji' AND tipe='keluar'`).run();
+  // Migrasi satu kali: jangan paksa Gaji=masuk setiap boot (user boleh ubah).
+  if (!getSetting("_migr_gaji_masuk")) {
+    db.prepare(`UPDATE categories SET tipe='masuk' WHERE lower(nama)='gaji' AND tipe='keluar'`).run();
+    setSetting("_migr_gaji_masuk", "1");
+  }
 
   const DEFAULTS: { nama: string; tipe: string }[] = [
     { nama: "Cash", tipe: "cash" },
@@ -110,17 +114,25 @@ CREATE TABLE IF NOT EXISTS debts (
 
   {
     const count = (db.prepare(`SELECT COUNT(*) AS n FROM accounts`).get() as { n: number }).n;
-    if (count === 0) {
-      const ins = db.prepare(`INSERT INTO accounts (nama, tipe) VALUES (?, ?)`);
-      db.transaction(() => DEFAULTS.forEach((a) => ins.run(a.nama, a.tipe)));
+    // Seed hanya sekali seumur DB. Kalau user sengaja menghapus semua akun,
+    // jangan munculkan default lagi saat reload.
+    if (!getSetting("_seed_accounts")) {
+      if (count === 0) {
+        const ins = db.prepare(`INSERT INTO accounts (nama, tipe) VALUES (?, ?)`);
+        db.transaction(() => DEFAULTS.forEach((a) => ins.run(a.nama, a.tipe)));
+      }
+      setSetting("_seed_accounts", "1");
     }
   }
 
   const cash = db.prepare(`SELECT id FROM accounts WHERE nama = 'Cash'`).get() as
     | { id: number }
     | undefined;
-  if (cash) {
-    db.prepare(`UPDATE transactions SET account_id = ? WHERE account_id IS NULL`).run(cash.id);
+  if (!getSetting("_migr_null_account")) {
+    if (cash) {
+      db.prepare(`UPDATE transactions SET account_id = ? WHERE account_id IS NULL`).run(cash.id);
+    }
+    setSetting("_migr_null_account", "1");
   }
 
   const DEFAULT_CATEGORIES: { nama: string; keywords: string[]; tipe: string }[] = [
@@ -135,11 +147,14 @@ CREATE TABLE IF NOT EXISTS debts (
 
   {
     const count = (db.prepare(`SELECT COUNT(*) AS n FROM categories`).get() as { n: number }).n;
-    if (count === 0) {
-      const ins = db.prepare(`INSERT INTO categories (nama, keywords, tipe) VALUES (?, ?, ?)`);
-      db.transaction(() =>
-        DEFAULT_CATEGORIES.forEach((c) => ins.run(c.nama, JSON.stringify(c.keywords), c.tipe))
-      );
+    if (!getSetting("_seed_categories")) {
+      if (count === 0) {
+        const ins = db.prepare(`INSERT INTO categories (nama, keywords, tipe) VALUES (?, ?, ?)`);
+        db.transaction(() =>
+          DEFAULT_CATEGORIES.forEach((c) => ins.run(c.nama, JSON.stringify(c.keywords), c.tipe))
+        );
+      }
+      setSetting("_seed_categories", "1");
     }
   }
 }
@@ -225,6 +240,10 @@ export function countTx(): number {
   return (db.prepare(`SELECT COUNT(*) AS n FROM transactions`).get() as { n: number }).n;
 }
 
+export function totalChanges(): number {
+  return db.totalChanges();
+}
+
 export function listRange(from: string, to: string): Tx[] {
   return db
     .prepare(`${TX_SELECT} WHERE t.tanggal >= ? AND t.tanggal <= ? ORDER BY t.tanggal ASC, t.id ASC`)
@@ -283,6 +302,36 @@ export function updateTx(
      WHERE id=@id`
   ).run(next);
   return getTx(id);
+}
+
+// Ubah nominal transfer di KEDUA sisi supaya pasangan tetap seimbang.
+export function updateTransferAmount(id: number, jumlah: number): Tx[] | null {
+  const tx = getTx(id);
+  if (!tx?.transfer_id) return null;
+  const rows = db
+    .prepare(`SELECT id FROM transactions WHERE transfer_id = ? ORDER BY id ASC`)
+    .all(tx.transfer_id) as { id: number }[];
+  db.transaction(() => {
+    for (const r of rows) {
+      db.prepare(`UPDATE transactions SET jumlah = ? WHERE id = ?`).run(jumlah, r.id);
+    }
+  });
+  return rows.map((r) => getTx(r.id)!).filter(Boolean);
+}
+
+// Ubah tanggal transfer di KEDUA sisi.
+export function updateTransferDate(id: number, tanggal: string): Tx[] | null {
+  const tx = getTx(id);
+  if (!tx?.transfer_id) return null;
+  const rows = db
+    .prepare(`SELECT id FROM transactions WHERE transfer_id = ? ORDER BY id ASC`)
+    .all(tx.transfer_id) as { id: number }[];
+  db.transaction(() => {
+    for (const r of rows) {
+      db.prepare(`UPDATE transactions SET tanggal = ? WHERE id = ?`).run(tanggal, r.id);
+    }
+  });
+  return rows.map((r) => getTx(r.id)!).filter(Boolean);
 }
 
 export function deleteTxWithIds(id: number): { removed: number; ids: number[] } {
@@ -399,12 +448,17 @@ export function addAccount(nama: string, tipe: string, saldo_awal = 0): Account 
   return db.prepare(`SELECT * FROM accounts WHERE id = ?`).get(Number(info.lastInsertRowid)) as Account;
 }
 
-// Hapus akun. Transaksinya DIPINDAH ke akun fallback (Cash diutamakan) supaya
-// tak ada baris yatim: total saldo tetap sama dengan jumlah saldo akun.
-export function deleteAccount(id: number): { deleted: boolean; moved: number; to: string | null } {
+// Hapus akun. Transaksi & transaksi berulang DIPINDAH ke akun fallback (Cash
+// diutamakan) supaya tak ada baris yatim/FK error.
+export function deleteAccount(id: number): {
+  deleted: boolean;
+  moved: number;
+  movedRecurring: number;
+  to: string | null;
+} {
   return db.transaction(() => {
     const acc = db.prepare(`SELECT * FROM accounts WHERE id = ?`).get(id) as Account | undefined;
-    if (!acc) return { deleted: false, moved: 0, to: null };
+    if (!acc) return { deleted: false, moved: 0, movedRecurring: 0, to: null };
 
     const fallback =
       (db.prepare(`SELECT * FROM accounts WHERE id <> ? AND lower(nama) = 'cash'`).get(id) as
@@ -414,14 +468,26 @@ export function deleteAccount(id: number): { deleted: boolean; moved: number; to
         | undefined);
 
     let moved = 0;
+    let movedRecurring = 0;
     if (fallback) {
       moved = db
         .prepare(`UPDATE transactions SET account_id = ? WHERE account_id = ?`)
         .run(fallback.id, id).changes;
+      movedRecurring = db
+        .prepare(`UPDATE recurring SET account_id = ? WHERE account_id = ?`)
+        .run(fallback.id, id).changes;
+    } else {
+      // Akun terakhir: biarkan baris terkait tanpa akun supaya FK tak menghalangi.
+      moved = db
+        .prepare(`UPDATE transactions SET account_id = NULL WHERE account_id = ?`)
+        .run(id).changes;
+      movedRecurring = db
+        .prepare(`UPDATE recurring SET account_id = NULL WHERE account_id = ?`)
+        .run(id).changes;
     }
 
     const deleted = db.prepare(`DELETE FROM accounts WHERE id = ?`).run(id).changes > 0;
-    return { deleted, moved, to: fallback?.nama ?? null };
+    return { deleted, moved, movedRecurring, to: fallback?.nama ?? null };
   });
 }
 
@@ -678,6 +744,24 @@ export function deleteRecurring(id: number): boolean {
   return db.prepare(`DELETE FROM recurring WHERE id = ?`).run(id).changes > 0;
 }
 
+export function updateRecurring(
+  id: number,
+  fields: Partial<Pick<Recurring, "jumlah" | "hari" | "catatan" | "aktif">>
+): boolean {
+  const cur = listRecurring().find((r) => r.id === id);
+  if (!cur) return false;
+  db.prepare(
+    `UPDATE recurring SET jumlah = ?, hari = ?, catatan = ?, aktif = ? WHERE id = ?`
+  ).run(
+    fields.jumlah ?? cur.jumlah,
+    fields.hari ?? cur.hari,
+    fields.catatan ?? cur.catatan,
+    fields.aktif ?? cur.aktif,
+    id
+  );
+  return true;
+}
+
 function daysInMonth(y: number, m: number): number {
   return new Date(y, m, 0).getDate();
 }
@@ -730,6 +814,32 @@ export function runRecurring(today = isoLocal()): { created: number; entries: st
   }
 
   return { created, entries };
+}
+
+// Cek murah apakah ada transaksi berulang yang jatuh tempo (tanpa menulis).
+export function recurringDue(today = isoLocal()): boolean {
+  const t = today.split("-").map(Number);
+  const ty = t[0];
+  const tm = t[1];
+  for (const rec of listRecurring().filter((r) => r.aktif)) {
+    const anchor = rec.terakhir ?? rec.mulai;
+    const a = anchor.split("-").map(Number);
+    if (a.length < 2 || !a[0] || !a[1]) continue;
+    let y = a[0];
+    let m = a[1] + (rec.terakhir ? 1 : 0);
+    while (m > 12) {
+      m -= 12;
+      y += 1;
+    }
+    let guard = 0;
+    while ((y < ty || (y === ty && m <= tm)) && guard++ < 24) {
+      const day = Math.min(rec.hari, daysInMonth(y, m));
+      const tanggal = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      if (tanggal > today) break;
+      return true;
+    }
+  }
+  return false;
 }
 
 // ---------- Utang / piutang (ledger terpisah, tidak mengubah saldo) ----------
@@ -797,6 +907,10 @@ export function payDebt(
     .prepare(`SELECT COALESCE(SUM(sisa),0) AS s FROM debts WHERE arah = ? AND lower(nama) = lower(?)`)
     .get(arah, nama.trim()) as { s: number };
   return { paid, sisaTotal: rest.s, nama: nama.trim() };
+}
+
+export function getDebt(id: number): Debt | undefined {
+  return db.prepare(`SELECT * FROM debts WHERE id = ?`).get(id) as Debt | undefined;
 }
 
 export function deleteDebt(id: number): boolean {
@@ -937,6 +1051,9 @@ export function importAll(json: string): void {
     const insSetting = db.prepare(`INSERT INTO settings (key, value) VALUES (?, ?)`);
     for (const r of t.settings ?? []) {
       const s = r as { key: string; value: string | null };
+      // Kredensial/PIN selalu lokal; backup lama yang memuatnya tak boleh
+      // menabrak UNIQUE atau menimpa kunci perangkat ini.
+      if (!settingExportable(s.key)) continue;
       insSetting.run(s.key, s.value ?? null);
     }
     if (localAiKey) insSetting.run("ai_key", localAiKey);

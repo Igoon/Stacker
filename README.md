@@ -37,8 +37,10 @@ Playwright. Server dev dijalankan otomatis di `localhost:5199`.
 ## CI
 
 `.github/workflows/ci.yml` menjalankan `npm run verify` + `npm run e2e`
-(Chromium) untuk setiap push/PR ke `main`. Workflow deploy juga menjalankan
-`npm run verify` sebelum build, jadi situs tak ter-deploy kalau logika rusak.
+(Chromium) + `npm run build` + `npm run test:offline` untuk setiap push/PR ke
+`main`. Tes offline membuka build produksi, mematikan jaringan, lalu reload.
+Workflow deploy juga menjalankan `npm run verify` sebelum build, jadi situs tak
+ter-deploy kalau logika rusak.
 
 ## Persyaratan runtime
 
@@ -135,5 +137,5 @@ memverifikasi build (commit SHA + hash bundle di panel **ℹ**,
 
 ## Versi
 
-`v2.6.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
+`v2.7.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
 Nilai versi di-hardcode di `src/version.ts` (browser tak bisa baca `package.json`).

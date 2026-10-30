@@ -48,7 +48,10 @@ export function setAiConfig(cfg: Partial<AiConfig>): void {
 
 export const aiEnabled = (): boolean => {
   const c = getConfig();
-  return c.provider === "gemini" ? c.key.length > 0 : c.baseUrl.length > 0;
+  if (c.provider === "gemini") return c.key.length > 0;
+  // OpenAI-compatible hanya aktif kalau base URL disimpan eksplisit (atau key
+  // diisi). Jangan diam-diam memakai default localhost -> timeout 6 dtk.
+  return !!(getSetting(K_BASE) ?? "").trim() || c.key.length > 0;
 };
 
 const SYSTEM_PROMPT =

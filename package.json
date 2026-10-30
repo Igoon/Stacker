@@ -1,16 +1,17 @@
 {
   "name": "stacker",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/gen-sw-preache.mjs",
     "preview": "vite preview",
     "icons": "node scripts/gen-icon-svg.mjs && node scripts/gen-icons.mjs",
     "typecheck": "tsc --noEmit",
     "smoke": "tsx src/smoke.ts",
     "e2e": "playwright test",
+    "test:offline": "node scripts/check-offline.mjs",
     "verify": "npm run typecheck && npm run smoke"
   },
   "dependencies": {

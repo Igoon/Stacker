@@ -115,6 +115,13 @@ export function previousPeriod(per: Period): Period {
   return { from, to, label: "periode sebelumnya" };
 }
 
+// Bulan kalender tepat sebelum `per` (dipakai carry anggaran bulanan).
+export function previousMonthPeriod(per: Period): Period {
+  const [y, m] = per.from.split("-").map(Number);
+  const d = new Date(y, m - 2, 1);
+  return monthPeriod(d.getFullYear(), d.getMonth() + 1);
+}
+
 // `n` bulan terakhir (termasuk bulan berjalan), urut lama → baru.
 export function lastMonths(n: number, ref = new Date()): Period[] {
   const out: Period[] = [];

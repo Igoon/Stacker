@@ -6,6 +6,7 @@ import {
   forgetFolder,
   getFolder,
   pickFolder,
+  pruneBackups,
   supportsFolderBackup,
   writeBackupFile,
   type FolderHandle,
@@ -16,6 +17,7 @@ interface Reply {
   ok: boolean;
   text?: string;
   txs?: Tx[];
+  removedIds?: number[];
   file?: { name: string; content: string };
   pre?: boolean;
   svg?: string;
@@ -36,6 +38,14 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register(new URL(/* @vite-ignore */ "../sw.js", import.meta.url), { scope: "./" })
+      .then((reg) => {
+        // Cek update walau app lama terbuka (tanpa reload/navigasi).
+        const check = () => void reg.update().catch(() => undefined);
+        window.setInterval(check, 60 * 60 * 1000);
+        document.addEventListener("visibilitychange", () => {
+          if (!document.hidden) check();
+        });
+      })
       .catch((e) => console.warn("[sw] gagal registrasi:", e));
   });
 }
@@ -123,17 +133,36 @@ function saveFile(name: string, content: string): void {
   downloadBlob(blob, name);
 }
 
+function removeTxRows(ids: number[]): void {
+  for (const id of ids) {
+    chat.querySelectorAll(`.tx[data-tx-id="${id}"]`).forEach((el) => {
+      const host = el.closest(".bubble");
+      el.remove();
+      if (host && !host.querySelector(".tx")) host.remove();
+    });
+  }
+}
+
+function clearTxRows(): void {
+  chat.querySelectorAll(".tx").forEach((el) => {
+    const host = el.closest(".bubble");
+    el.remove();
+    if (host && !host.querySelector(".tx")) host.remove();
+  });
+}
+
 function addBubble(
   text: string,
   side: "me" | "bot",
   txs?: Tx[],
   file?: { name: string; content: string },
-  svg?: string
+  svg?: string,
+  pre?: boolean
 ) {
   const row = document.createElement("div");
   row.className = "row " + side;
   const b = document.createElement("div");
-  b.className = "bubble";
+  b.className = "bubble" + (pre ? " pre" : "");
   b.textContent = text;
   if (svg) {
     // SVG dibuat lokal dari angka (tanpa lib, tanpa request keluar).
@@ -142,7 +171,14 @@ function addBubble(
     wrap.innerHTML = svg;
     b.appendChild(wrap);
   }
+  // Transfer = dua baris dengan transfer_id sama. Tampilkan satu baris + satu
+  // tombol; keduanya tetap terhapus bersama.
+  const doneTransfers = new Set<string>();
   for (const tx of txs || []) {
+    if (tx.transfer_id) {
+      if (doneTransfers.has(tx.transfer_id)) continue;
+      doneTransfers.add(tx.transfer_id);
+    }
     const d = document.createElement("div");
     d.className = "tx";
     d.dataset.txId = String(tx.id);
@@ -156,18 +192,21 @@ function addBubble(
       )
     );
     const btn = document.createElement("button");
-    btn.textContent = "Hapus";
+    btn.textContent = tx.transfer_id ? "Hapus (2 baris)" : "Hapus";
     btn.onclick = async () => {
       const res = await call({ type: "delete", txId: tx.id });
       // Transfer = dua baris; hapus semua bubble dengan id yang benar-benar
       // terhapus supaya tampilan tak menyisakan pasangan basi.
       const ids = Array.isArray(res.ids) ? (res.ids as number[]) : [tx.id];
-      for (const id of ids) {
-        chat.querySelectorAll(`.tx[data-tx-id="${id}"]`).forEach((el) => {
-          const host = el.closest(".bubble");
-          el.remove();
-          if (host && !host.querySelector(".tx")) host.remove();
-        });
+      removeTxRows(ids);
+      const removed = Number(res.removed ?? 0);
+      if (removed > 0) {
+        addBubble(
+          removed > 1
+            ? `${removed} baris dihapus. Ketik \`undo\` untuk batalkan.`
+            : "Transaksi dihapus. Ketik `undo` untuk batalkan.",
+          "bot"
+        );
       }
       void refresh();
     };
@@ -184,6 +223,10 @@ function addBubble(
     a.onclick = (ev) => {
       ev.preventDefault();
       saveFile(file.name, file.content);
+      if (/^(stacker-backup-|backup-pre-reset-)/.test(file.name)) {
+        lastBackupAt = todayStr();
+        void call({ type: "markbackup", tanggal: lastBackupAt });
+      }
     };
     b.appendChild(document.createElement("br"));
     b.appendChild(a);
@@ -223,13 +266,27 @@ async function refresh(): Promise<Record<string, unknown>> {
 async function send(): Promise<void> {
   const text = input.value.trim();
   if (!text || !ready) return;
+  if (
+    /^reset\s+(transaksi|laporan|semua)$/i.test(text) &&
+    !window.confirm(
+      "Hapus SEMUA transaksi? Backup JSON akan diunduh otomatis (bisa dibatalkan dengan `undo`)."
+    )
+  ) {
+    return;
+  }
   addBubble(text, "me");
   input.value = "";
   busyEl.hidden = false;
   const r = await call({ type: "chat", text });
   busyEl.hidden = true;
   if (r.ok) {
-    addBubble(r.text ?? "", "bot", r.txs, r.file, r.svg);
+    addBubble(r.text ?? "", "bot", r.txs, r.file, r.svg, r.pre);
+    if (Array.isArray(r.removedIds)) {
+      removeTxRows(r.removedIds as number[]);
+    }
+    if (/^Dibatalkan\b/.test(r.text ?? "") || /^Semua transaksi dihapus/.test(r.text ?? "")) {
+      clearTxRows();
+    }
     if (r.lock) {
       pinSet = true;
       lockNow();
@@ -249,7 +306,18 @@ input.addEventListener("keydown", (e) => {
 // Toolbar: export backup, import backup, set AI key.
 document.getElementById("export")!.onclick = async () => {
   const r = await call({ type: "export" });
-  saveFile(`stacker-backup-${new Date().toISOString().slice(0, 10)}.json`, r.json as string);
+  saveFile(`stacker-backup-${todayStr()}.json`, r.json as string);
+  lastBackupAt = todayStr();
+  void call({ type: "markbackup", tanggal: lastBackupAt });
+};
+
+document.getElementById("exportEnc")!.onclick = () => {
+  askPass("", "Kata sandi minimal 8 karakter untuk mengenkripsi backup.", "encrypt");
+};
+
+document.getElementById("undo")!.onclick = () => {
+  input.value = "undo";
+  void send();
 };
 
 document.getElementById("import")!.onclick = () => {
@@ -260,6 +328,11 @@ document.getElementById("importFile")!.addEventListener("change", async (e) => {
   const inputEl = e.target as HTMLInputElement;
   const file = inputEl.files?.[0];
   if (!file) return;
+  if (file.size > 25 * 1024 * 1024) {
+    addBubble("File backup terlalu besar (maks 25 MB).", "bot");
+    inputEl.value = "";
+    return;
+  }
   const text = await file.text();
   inputEl.value = "";
   await doImport(text);
@@ -508,8 +581,35 @@ syncWallControls(currentWall);
 // PIN hanya mengunci tampilan (bukan enkripsi disk): hash PBKDF2 + salt
 // disimpan di tabel settings dan tak ikut file backup.
 let pinSet = false;
-let lockFails = 0;
-let lockCooldownUntil = 0;
+const LOCK_KEY = "stacker-lock";
+function readLockState(): { fails: number; until: number } {
+  try {
+    const j = JSON.parse(localStorage.getItem(LOCK_KEY) ?? "null") as {
+      fails?: number;
+      until?: number;
+    } | null;
+    if (j && typeof j.until === "number" && j.until > Date.now()) {
+      return { fails: Math.max(0, Number(j.fails) || 0), until: j.until };
+    }
+  } catch {
+    // localStorage diblokir / data rusak -> mulai bersih.
+  }
+  return { fails: 0, until: 0 };
+}
+function saveLockState(): void {
+  try {
+    if (lockFails > 0 || lockCooldownUntil > Date.now()) {
+      localStorage.setItem(LOCK_KEY, JSON.stringify({ fails: lockFails, until: lockCooldownUntil }));
+    } else {
+      localStorage.removeItem(LOCK_KEY);
+    }
+  } catch {
+    // abaikan
+  }
+}
+const savedLock = readLockState();
+let lockFails = savedLock.fails;
+let lockCooldownUntil = savedLock.until;
 let idleTimer: number | undefined;
 const IDLE_MS = 2 * 60 * 1000;
 
@@ -520,6 +620,13 @@ const lockMsg = document.getElementById("lockMsg")!;
 function lockNow(): void {
   if (!pinSet) return;
   if (idleTimer) window.clearTimeout(idleTimer);
+  // Jangan biarkan modal (AI/import/info) tetap terbuka di belakang lock.
+  document.querySelectorAll<HTMLElement>(".modal").forEach((m) => (m.hidden = true));
+  document
+    .querySelectorAll<HTMLInputElement>('.modal input[type="password"]')
+    .forEach((i) => (i.value = ""));
+  pendingImport = null;
+  pendingAction = "import";
   lockEl.hidden = false;
   lockPin.value = "";
   lockMsg.textContent = "";
@@ -554,6 +661,8 @@ async function tryUnlock(): Promise<void> {
   const r = await call({ type: "pincheck", pin });
   if (r.ok) {
     lockFails = 0;
+    lockCooldownUntil = 0;
+    saveLockState();
     unlockUi();
     return;
   }
@@ -566,6 +675,7 @@ async function tryUnlock(): Promise<void> {
   } else {
     lockMsg.textContent = `PIN salah (${lockFails}/5).`;
   }
+  saveLockState();
   lockPin.focus();
 }
 
@@ -578,40 +688,107 @@ for (const ev of ["pointerdown", "keydown", "touchstart"] as const) {
 }
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) lockNow();
+  else if (lockEl.hidden && ready) void refresh();
 });
+// App lama terbuka tetap mengejar transaksi berulang/notice.
+window.setInterval(() => {
+  if (!document.hidden && lockEl.hidden && ready) void refresh();
+}, 5 * 60 * 1000);
 
 // ---------- Backup terenkripsi: minta kata sandi ----------
 const passModal = document.getElementById("passModal")!;
 const passInput = document.getElementById("passInput") as HTMLInputElement;
+const passMsg = document.getElementById("passMsg")!;
 let pendingImport: string | null = null;
+let pendingAction: "import" | "encrypt" = "import";
 
-function askPass(text: string): void {
+function askPass(text: string, message?: string, action: "import" | "encrypt" = "import"): void {
   pendingImport = text;
+  pendingAction = action;
   passInput.value = "";
+  passMsg.textContent = message ?? "";
+  passMsg.hidden = !message;
   passModal.hidden = false;
   passInput.focus();
 }
 
+function describeBackup(text: string): string {
+  const raw = text.trim();
+  if (/^\s*\{\s*"format"\s*:\s*"stacker-enc"/.test(raw)) {
+    return "File terenkripsi — isi baru diketahui setelah kata sandi benar.";
+  }
+  try {
+    const j = JSON.parse(raw) as {
+      tables?: { transactions?: unknown[]; accounts?: unknown[] };
+    };
+    if (!j.tables) return "File tidak berisi tabel backup yang dikenali.";
+    const tx = j.tables.transactions?.length ?? 0;
+    const acc = j.tables.accounts?.length ?? 0;
+    return `File berisi ${tx} transaksi & ${acc} akun. Saat ini: ${txCount} transaksi.`;
+  } catch {
+    return "File bukan JSON backup yang valid.";
+  }
+}
+
+async function doEncryptedExport(pass: string): Promise<void> {
+  if (pass.length < 8) {
+    askPass("", "Kata sandi minimal 8 karakter.", "encrypt");
+    return;
+  }
+  const r = await call({ type: "backupenc", pass });
+  if (!r.ok) {
+    askPass("", r.error ?? "Gagal membuat backup.", "encrypt");
+    return;
+  }
+  addBubble(
+    "Backup terenkripsi siap diunduh. Simpan kata sandinya.",
+    "bot",
+    undefined,
+    r.file as { name: string; content: string }
+  );
+}
+
 async function doImport(text: string, pass?: string): Promise<void> {
+  if (
+    pass === undefined &&
+    !window.confirm(
+      `Restore akan MENGGANTI semua data di perangkat ini.\n\n${describeBackup(text)}\n\nData lama bisa dikembalikan dengan \`undo\`. Lanjut?`
+    )
+  ) {
+    return;
+  }
   const r = await call({ type: "import", json: text, pass });
   if (r.needPass) {
     askPass(text);
     return;
   }
-  addBubble(r.ok ? "Backup dimuat." : "Gagal impor: " + (r.error ?? "format salah"), "bot");
+  if (pass !== undefined && !r.ok && /kata sandi salah|file rusak/i.test(r.error ?? "")) {
+    askPass(text, r.error ?? "Kata sandi salah. Coba lagi.");
+    return;
+  }
+  addBubble(
+    r.ok
+      ? "Backup dimuat. Data sebelum restore bisa dikembalikan dengan ketik `undo`."
+      : "Gagal impor: " + (r.error ?? "format salah"),
+    "bot"
+  );
   void refresh();
 }
 
 document.getElementById("passCancel")!.onclick = () => {
   pendingImport = null;
+  pendingAction = "import";
   passModal.hidden = true;
 };
 
 document.getElementById("passOk")!.onclick = () => {
   const text = pendingImport;
+  const action = pendingAction;
   pendingImport = null;
+  pendingAction = "import";
   passModal.hidden = true;
-  if (text) void doImport(text, passInput.value);
+  if (action === "encrypt") void doEncryptedExport(passInput.value);
+  else if (text) void doImport(text, passInput.value);
 };
 
 passInput.addEventListener("keydown", (e) => {
@@ -624,11 +801,41 @@ let txCount = 0;
 let lastBackupAt: string | null = null;
 let persisted = false;
 let folder: FolderHandle | null = null;
+let folderNeedsPermission = false;
+let backupPermWarned = false;
 let storageText = "";
 let bundleHash = "";
 let aiHosts = "tidak ada (AI mati)";
 
-const todayStr = (): string => new Date().toISOString().slice(0, 10);
+const todayStr = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+};
+const timeStr = (): string => {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(
+    2,
+    "0"
+  )}${String(d.getSeconds()).padStart(2, "0")}`;
+};
+
+const RETAIN_KEY = "stacker-retain";
+function readRetain(): number {
+  const n = Number(localStorage.getItem(RETAIN_KEY));
+  return [10, 30, 60, 100].includes(n) ? n : 30;
+}
+const retainSel = document.getElementById("retain") as HTMLSelectElement;
+retainSel.value = String(readRetain());
+retainSel.onchange = () => {
+  try {
+    localStorage.setItem(RETAIN_KEY, retainSel.value);
+  } catch {
+    // abaikan
+  }
+  addBubble(`Retensi backup: ${retainSel.value} file terbaru.`, "bot");
+};
 
 const infoModal = document.getElementById("infoModal")!;
 const infoLines = document.getElementById("infoLines")!;
@@ -667,13 +874,28 @@ async function initStorage(): Promise<void> {
 async function autoBackup(force = false): Promise<void> {
   if (!folder) return;
   if (!force && lastBackupAt === todayStr()) return;
-  if (!(await folderPermission(folder, false))) return;
+  if (!(await folderPermission(folder, false))) {
+    folderNeedsPermission = true;
+    if (!backupPermWarned) {
+      backupPermWarned = true;
+      addBubble(
+        "Auto-backup butuh izin folder lagi. Buka ℹ → Pilih folder auto-backup sekali lagi.",
+        "bot"
+      );
+    }
+    return;
+  }
+  folderNeedsPermission = false;
   try {
     const dir = folder;
     const r = await call({ type: "export" });
-    const name = `stacker-${force ? "backup" : "auto"}-${todayStr()}.json`;
+    const name = force
+      ? `stacker-backup-${todayStr()}-${timeStr()}.json`
+      : `stacker-auto-${todayStr()}.json`;
     await writeBackupFile(dir, name, r.json as string);
+    void pruneBackups(dir, readRetain()).catch(() => 0); // rotasi sesuai retensi
     lastBackupAt = todayStr();
+    await call({ type: "markbackup", tanggal: lastBackupAt });
     addBubble(
       `${force ? "Backup disimpan" : "Auto-backup disimpan"}: ${name} (folder ${dir.name}).`,
       "bot"
@@ -747,7 +969,12 @@ function renderInfo(): void {
     "",
     `Transaksi: ${txCount}`,
     `Backup terakhir: ${lastBackupAt ?? "belum pernah"}`,
-    `Auto-backup: ${folder ? folder.name : "nonaktif"}`,
+    `Auto-backup: ${
+      folder
+        ? folder.name + (folderNeedsPermission ? " (izin perlu diperbarui)" : "")
+        : "nonaktif"
+    }`,
+    `Retensi backup: ${readRetain()} file terbaru`,
     storageText ? "\n" + storageText : "",
   ]
     .filter((x) => x !== "")
@@ -761,8 +988,10 @@ document.getElementById("info")!.onclick = async () => {
   await Promise.all([refreshStorageText(), refresh(), refreshAiHosts()]);
   infoModal.hidden = false;
   renderInfo();
-  bundleHash = await bundleSha256();
-  renderInfo();
+  if (!bundleHash) {
+    bundleHash = await bundleSha256();
+    renderInfo();
+  }
 };
 
 document.getElementById("infoClose")!.onclick = () => {
@@ -786,6 +1015,8 @@ pickDirBtn.onclick = async () => {
       renderInfo();
       return;
     }
+    folderNeedsPermission = false;
+    backupPermWarned = false;
     await autoBackup(true);
     renderInfo();
   } catch (e) {
@@ -799,14 +1030,19 @@ backupNowBtn.onclick = async () => {
   if (!folder) return;
   const ok = await folderPermission(folder, true);
   if (!ok) {
+    folderNeedsPermission = true;
     addBubble("Izin folder ditolak. Pilih folder lagi lewat ℹ.", "bot");
     return;
   }
+  folderNeedsPermission = false;
+  backupPermWarned = false;
   await autoBackup(true);
 };
 
 clearDirBtn.onclick = async () => {
   folder = null;
+  folderNeedsPermission = false;
+  backupPermWarned = false;
   await forgetFolder();
   addBubble("Auto-backup dimatikan.", "bot");
   renderInfo();
@@ -821,8 +1057,17 @@ function handleSharedText(): void {
   );
   if (parts.length === 0) return;
   history.replaceState({}, "", location.pathname + location.hash);
-  input.value = parts.join(" ").slice(0, 500);
+  const shared = parts.join(" ").slice(0, 500);
+  input.value = shared;
   input.focus();
+  if (
+    /^\s*(hapus|ubah|undo|batalkan|batal|pin|backup|reset|akun|kategori|saldo|transfer|anggaran|berulang|utang|piutang|hutang|bayar|laporan|ringkasan|report|grafik|chart|dashboard|csv|export|cari|lihat|riwayat|history|list|ai|versi|version|help|bantuan)\b/i.test(
+      shared
+    )
+  ) {
+    addBubble("Teks yang dibagikan berisi perintah. Periksa dulu, lalu tekan kirim.", "bot");
+    return;
+  }
   void send();
 }
 

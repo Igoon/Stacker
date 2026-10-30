@@ -13,6 +13,7 @@ export interface MiniDb {
   exec(sql: string): void;
   pragma(_sql: string): void;
   transaction<T>(fn: () => T): T;
+  totalChanges(): number;
 }
 
 type Row = Record<string, unknown>;
@@ -79,6 +80,9 @@ export function createMiniDb(sqlite3: Sqlite3Static, db: Oo1Db): MiniDb {
     },
     transaction<T>(fn: () => T): T {
       return db.transaction(fn);
+    },
+    totalChanges(): number {
+      return Number(db.selectValue("SELECT total_changes()") ?? 0);
     },
   };
 

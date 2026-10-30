@@ -43,6 +43,19 @@ function kwMatch(low: string, kw: string): boolean {
   return re.test(low);
 }
 
+// Arah (masuk/keluar) hanya boleh imbuhan wajar: "gajian" cocok, tapi
+// "terimakasih"/"menangis" tidak boleh dianggap pemasukan.
+function kwMatchDir(low: string, kw: string): boolean {
+  const k = kw.toLowerCase().trim();
+  if (!k) return false;
+  if (k.length <= 3) return kwMatch(low, k);
+  const re = new RegExp(
+    `(?<![a-z0-9])${escapeRe(k)}(?:an|nya|kan|lah|kah|i)?(?![a-z0-9])`,
+    "i"
+  );
+  return re.test(low);
+}
+
 // Toleransi typo 1 huruf (Levenshtein ≤ 1) untuk kata ≥ 5 huruf yang huruf
 // pertamanya sama. Menangkap "gojex" -> "gojek", "gajii" -> "gaji" secara lokal
 // supaya tak perlu memanggil AI.
@@ -149,6 +162,8 @@ function parseNumber(raw: string, suffix: string): number {
 export function parseLocal(text: string): LocalParse | null {
   const { tanggal, cleaned } = extractDate(text);
   const low = cleaned.toLowerCase();
+  // "terima kasih" bukan kata arah pemasukan.
+  const dirLow = low.replace(/\bterima\s+kasih\b/g, " ");
 
   const numRe = /(\d[\d.,]*)\s*(jt|juta|rb|ribu|k)?/gi;
   let found = [...cleaned.matchAll(numRe)]
@@ -157,7 +172,8 @@ export function parseLocal(text: string): LocalParse | null {
 
   if (found.length === 0) {
     const wn = wordsToNumber(cleaned);
-    if (wn.matched && wn.value > 0) found = [{ raw: "", suffix: "", value: wn.value }];
+    // Angka kata tanpa skala ("beli dua") bukan nominal transaksi.
+    if (wn.matched && wn.value >= 1000) found = [{ raw: "", suffix: "", value: wn.value }];
   }
 
   if (found.length === 0) return null;
@@ -167,15 +183,15 @@ export function parseLocal(text: string): LocalParse | null {
 
   let tipe: "masuk" | "keluar";
   let explicitTipe = false;
-  if (KELUAR_WORDS.some((w) => kwMatch(low, w))) {
+  if (KELUAR_WORDS.some((w) => kwMatchDir(dirLow, w))) {
     tipe = "keluar";
     explicitTipe = true;
-  } else if (MASUK_EXTRA.some((w) => kwMatch(low, w))) {
+  } else if (MASUK_EXTRA.some((w) => kwMatchDir(dirLow, w))) {
     tipe = "masuk";
     explicitTipe = true;
   } else {
     const masuk =
-      MASUK.some((k) => kwMatch(low, k)) || MASUK.some((k) => fuzzyKwMatch(low, k));
+      MASUK.some((k) => kwMatchDir(dirLow, k)) || MASUK.some((k) => fuzzyKwMatch(dirLow, k));
     tipe = masuk ? "masuk" : "keluar";
   }
 
@@ -218,4 +234,29 @@ export function parseLocal(text: string): LocalParse | null {
   else if (!kategoriKetemu && !explicitTipe) reason = "kategori tak dikenal";
 
   return { result, confidence: reason ? "low" : "high", reason, explicitTipe };
+}
+
+// Beberapa transaksi dalam satu pesan tanpa AI: "parkir 5rb sama kopi 18rb",
+// "makan 50rb dan kopi 18rb", "makan 50rb, kopi 18rb". Hanya dipakai bila ada
+// ≥2 klausa dengan nominal; kalau tidak, pemanggil lanjut ke parseLocal/AI.
+const MULTI_SPLIT = /\s+(?:sama|dan)\s+|\s*;\s*|\s*\n+\s*|\s*\+\s*|,\s*(?=[a-zA-Z])/i;
+
+export function parseLocalMulti(text: string): LocalParse[] | null {
+  const { tanggal } = extractDate(text);
+  const parts = text
+    .split(MULTI_SPLIT)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length < 2) return null;
+
+  const out: LocalParse[] = [];
+  for (const part of parts) {
+    const r = parseLocal(part);
+    if (!r) continue;
+    // Buang angka nyasar < 1000 tanpa satuan (mis. "2 orang").
+    if (r.confidence !== "high" && r.result.jumlah < 1000) continue;
+    if (!r.result.tanggal && tanggal) r.result.tanggal = tanggal;
+    out.push(r);
+  }
+  return out.length >= 2 ? out : null;
 }

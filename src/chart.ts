@@ -30,6 +30,8 @@ export function shortRp(n: number): string {
   return String(Math.round(a));
 }
 
+export const shortRpSigned = (n: number): string => (n < 0 ? "-" : "") + shortRp(n);
+
 function daysBetween(from: string, to: string): string[] {
   const out: string[] = [];
   const [fy, fm, fd] = from.split("-").map(Number);

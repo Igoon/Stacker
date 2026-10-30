@@ -9,16 +9,20 @@ import {
   rupiahSigned,
   countTx,
   accountBalances,
-  deleteTxWithIds,
   getSetting,
   setSetting,
-  runRecurring,
 } from "./db";
-import { handleMessage } from "./bot";
+import {
+  deleteTxWithUndo,
+  handleMessage,
+  importJsonWithUndo,
+  runRecurringWithUndo,
+} from "./bot";
 import { aiEnabled, aiStats, getAiConfig, setAiConfig } from "./ai";
-import { exportJson, importJson } from "./backup";
-import { decryptJson, hashPin, isEncrypted, safeEqual } from "./crypto";
+import { exportJson } from "./backup";
+import { decryptJson, encryptJson, hashPin, isEncrypted, safeEqual } from "./crypto";
 import { APP_VERSION } from "./version";
+import { isoLocal } from "./dates";
 
 interface ChatMsg {
   type: "chat";
@@ -37,6 +41,11 @@ interface DeleteMsg {
 interface ExportMsg {
   type: "export";
   id: number;
+}
+interface EncExportMsg {
+  type: "backupenc";
+  id: number;
+  pass: string;
 }
 interface ImportMsg {
   type: "import";
@@ -71,6 +80,7 @@ type InMsg =
   | StateMsg
   | DeleteMsg
   | ExportMsg
+  | EncExportMsg
   | ImportMsg
   | GetAiMsg
   | SetAiMsg
@@ -92,17 +102,19 @@ async function boot(): Promise<void> {
   const db = new poolUtil.OpfsSAHPoolDb("/stacker.db");
   mini = createMiniDb(sqlite3, db as never);
   initDb(mini);
-  runRecurring();
+  runRecurringWithUndo();
 }
 
 function reply(id: number, payload: unknown): void {
   (self as unknown as Worker).postMessage({ id, ...(payload as object) });
 }
 
+let backupNoticeShown = false;
+
 function state() {
   // Catat transaksi berulang yang jatuh tempo (idempotent). Bila ada yang
   // tercatat, kirim sebagai notice sekali ke UI.
-  const rec = runRecurring();
+  const rec = runRecurringWithUndo();
   const notices: string[] = [];
   if (rec.created > 0) {
     notices.push(`Transaksi berulang otomatis dicatat (${rec.created}):\n${rec.entries.join("\n")}`);
@@ -112,16 +124,18 @@ function state() {
   // dibersihkan). Cukup sekali per pembukaan app.
   const n = countTx();
   const lastBackup = getSetting("last_backup_at");
-  if (n > 0) {
+  if (n > 0 && !backupNoticeShown) {
     if (!lastBackup) {
       notices.push(
         "Belum pernah backup. Ketuk ⬇ Backup (atau ketik `backup`) supaya data aman."
       );
+      backupNoticeShown = true;
     } else {
       const ts = new Date(lastBackup + "T00:00:00").getTime();
       const days = Math.floor((Date.now() - ts) / 86_400_000);
       if (Number.isFinite(days) && days >= 14) {
         notices.push(`Backup terakhir ${days} hari lalu. Ketuk ⬇ Backup atau ketik \`backup\`.`);
+        backupNoticeShown = true;
       }
     }
   }
@@ -160,16 +174,34 @@ async function onMessage(msg: InMsg): Promise<void> {
       reply(msg.id, state());
       break;
     case "delete": {
-      const res = deleteTxWithIds(msg.txId);
+      const res = deleteTxWithUndo(msg.txId);
       reply(msg.id, { ok: res.removed > 0, removed: res.removed, ids: res.ids });
       break;
     }
     case "export":
-      setSetting("last_backup_at", new Date().toISOString().slice(0, 10));
+      // Jangan tandai backup di sini: penanda baru ditulis setelah file
+      // benar-benar tersimpan (lihat UI: markbackup).
       reply(msg.id, { ok: true, json: exportJson() });
       break;
+    case "backupenc": {
+      try {
+        const pass = msg.pass ?? "";
+        if (pass.length < 8) {
+          reply(msg.id, { ok: false, error: "Kata sandi minimal 8 karakter." });
+          break;
+        }
+        const enc = await encryptJson(exportJson(), pass);
+        reply(msg.id, {
+          ok: true,
+          file: { name: `stacker-backup-${isoLocal()}.enc.json`, content: enc },
+        });
+      } catch (e) {
+        reply(msg.id, { ok: false, error: (e as Error).message });
+      }
+      break;
+    }
     case "markbackup": {
-      setSetting("last_backup_at", msg.tanggal ?? new Date().toISOString().slice(0, 10));
+      setSetting("last_backup_at", msg.tanggal ?? isoLocal());
       reply(msg.id, { ok: true });
       break;
     }
@@ -187,7 +219,7 @@ async function onMessage(msg: InMsg): Promise<void> {
           }
           json = await decryptJson(json, msg.pass);
         }
-        importJson(json);
+        importJsonWithUndo(json);
         reply(msg.id, { ok: true });
       } catch (e) {
         reply(msg.id, { ok: false, error: (e as Error).message });
@@ -229,8 +261,12 @@ async function onMessage(msg: InMsg): Promise<void> {
 boot()
   .then(() => {
     (self as unknown as Worker).postMessage({ id: -1, type: "ready", version: APP_VERSION });
+    // Antre pesan: cegah dua kirim bersamaan mencampur snapshot undo / state.
+    let queue: Promise<void> = Promise.resolve();
     self.onmessage = (ev: MessageEvent<InMsg>) => {
-      onMessage(ev.data).catch((e) => reply(ev.data.id, { ok: false, error: (e as Error).message }));
+      queue = queue.then(() => onMessage(ev.data)).catch((e) => {
+        reply(ev.data.id, { ok: false, error: (e as Error).message });
+      });
     };
   })
   .catch((e) => {

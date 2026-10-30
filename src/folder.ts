@@ -16,6 +16,8 @@ export interface FolderHandle {
   queryPermission?(d: { mode: "readwrite" }): Promise<PermissionState>;
   requestPermission?(d: { mode: "readwrite" }): Promise<PermissionState>;
   getFileHandle(name: string, opts?: { create?: boolean }): Promise<FolderFileHandle>;
+  values?(): AsyncIterableIterator<{ name: string; kind: string }>;
+  removeEntry?(name: string): Promise<void>;
 }
 
 const DB_NAME = "stacker-fs";
@@ -98,4 +100,26 @@ export async function writeBackupFile(
   const w = await fh.createWritable();
   await w.write(content);
   await w.close();
+}
+
+// Sisakan `keep` file backup terbaru buatan Stacker (auto/manual).
+export async function pruneBackups(h: FolderHandle, keep = 30): Promise<number> {
+  if (!h.values || !h.removeEntry) return 0;
+  const names: string[] = [];
+  for await (const e of h.values()) {
+    if (e.kind === "file" && /^stacker-(auto|backup)-\d{4}-\d{2}-\d{2}/.test(e.name)) {
+      names.push(e.name);
+    }
+  }
+  names.sort().reverse();
+  let removed = 0;
+  for (const n of names.slice(keep)) {
+    try {
+      await h.removeEntry(n);
+      removed++;
+    } catch {
+      // file terkunci/dihapus user -> lewati
+    }
+  }
+  return removed;
 }

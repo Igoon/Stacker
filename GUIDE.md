@@ -177,7 +177,11 @@ saldo bsi                     → satu akun
 ### Transfer
 ```
 transfer 100rb bsi ke gopay    → 2 baris (keluar bsi + masuk gopay)
+transfer 100rb bsi ke gopay biaya 2,5rb  → + 1 baris biaya admin
 ```
+Tanggal transfer ikut kebaca (`transfer ... kemarin`). Biaya admin dicatat
+sebagai pengeluaran terpisah (kategori Lainnya) dari akun asal.
+
 
 ### Kategori
 ```
@@ -204,7 +208,8 @@ anggaran hapus Makanan        → hapus anggaran
 ```
 Peringatan otomatis muncul saat pemakaian 80% dan saat tembus.
 
-- **Rollover**: carry = batas − pemakaian periode sebelumnya (bisa negatif).
+- **Rollover**: carry = batas − pemakaian periode sebelumnya (bulan kalender
+  sebelumnya untuk anggaran bulanan, 7 hari sebelumnya untuk mingguan; bisa negatif).
   Limit efektif = `max(0, batas + carry)`, jadi kelebihan bulan lalu
   mengurangi jatah bulan ini.
 - Periode anggaran per kategori: `bulanan` atau `mingguan`. Satu kategori
@@ -215,11 +220,13 @@ Peringatan otomatis muncul saat pemakaian 80% dan saat tembus.
 laporan | laporan september | laporan gopay september
 laporan banding [bulan]       → banding vs periode sebelumnya + top perubahan
 laporan arus kas 6            → masuk/keluar/net 6 bulan terakhir
+laporan arus kas gopay 6      → arus kas satu akun
 laporan top 10 [bulan]        → 10 pengeluaran terbesar
 laporan akun bsi [bulan]      → statement satu akun
 grafik | grafik september | grafik gopay
 grafik komposisi [bulan]      → donut pengeluaran per kategori (SVG)
 grafik tren 6                 → bar masuk/keluar 6 bulan (SVG)
+grafik tren gopay 6           → tren satu akun
 csv | csv september | csv gopay
 ```
 Grafik SVG dibuat lokal dari angka di perangkat — tanpa library, tanpa
@@ -242,7 +249,8 @@ piutang 50rb dari andi         → andi berutang ke saya
 utang | piutang                → daftar + total sisa
 bayar utang budi 50rb          → cicil / lunas otomatis
 bayar piutang andi 50rb
-utang hapus 3                  → hapus catatan #3
+utang hapus 3                  → hapus catatan utang #3
+piutang hapus 4                → hapus catatan piutang #4
 ```
 Ledger utang/piutang **terpisah** dari saldo akun: mencatat utang tidak
 mengubah saldo. Pembayaran mengalokasikan ke catatan tertua lebih dulu.
@@ -251,10 +259,16 @@ mengubah saldo. Pembayaran mengalokasikan ke catatan tertua lebih dulu.
 ```
 riwayat | riwayat 30           → transaksi terakhir
 ubah 3 jadi 60rb               → ubah nominal
+ubah 3 tanggal kemarin         → ubah tanggal
+ubah 3 catatan makan siang     → ubah catatan
+ubah 3 kategori Makanan        → ubah kategori
 hapus 3                        → hapus #3
 hapus 24 25                    → hapus beberapa (boleh #24)
 undo                           → batalkan aksi terakhir (maks 20 langkah)
 berulang listrik 350rb tiap 5  → catat otomatis tiap bulan
+berulang nonaktif 1            → jeda sementara
+berulang aktif 1               → aktifkan lagi (jatuh tempo dikejar)
+berulang ubah 1 400rb tiap 10  → ubah nominal/tanggal
 berulang                       → daftar transaksi berulang
 berulang hapus 1               → hentikan yang #1
 reset transaksi                → hapus semua (file backup JSON terunduh otomatis)
@@ -337,7 +351,11 @@ pin hapus 1234          → matikan kunci (butuh PIN lama)
 ### Backup & restore
 
 - **⬇ Backup** — unduh seluruh data jadi file JSON.
-- **⬆ Restore** — unggah file JSON untuk kembalikan/pindah data.
+- **🔐** — backup terenkripsi; masukkan kata sandi (min. 8 karakter).
+- **⬆ Restore** — unggah file JSON untuk kembalikan/pindah data. App menampilkan
+  ringkasan isi file lalu minta konfirmasi; data sebelum restore bisa
+  dikembalikan dengan `undo`.
+- **↶** — tombol pintas undo (sama dengan mengetik `undo`).
 - `backup kunci <sandi>` di chat — backup **terenkripsi** (AES-GCM 256 +
   PBKDF2, minimal 8 karakter). Simpan kata sandinya; tanpa itu file tak bisa
   dibuka. Saat restore, app meminta kata sandi otomatis.
@@ -363,7 +381,8 @@ Ketuk **ℹ** di toolbar:
   menulis `stacker-auto-YYYY-MM-DD.json` otomatis saat dibuka (sekali per hari)
   dan saat tombol **Backup ke folder sekarang**. Tidak ada data yang dikirim
   ke internet. File ditulis plaintext JSON — kalau perlu terenkripsi, pakai
-  `backup kunci <sandi>` manual.
+  `backup kunci <sandi>` manual. Retensi file backup diatur di modal **ℹ**
+  (10–100 file terbaru).
 - **Pengingat** — chat menampilkan notice bila belum pernah backup atau backup
   terakhir ≥ 14 hari.
 - **Bar "Versi baru tersedia"** — saat service worker memperbarui cache, app
