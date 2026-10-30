@@ -168,9 +168,82 @@ const HELP =
   "  ai | ai reset               (pemakaian AI)\n" +
   "  versi                       (versi aplikasi)\n" +
   "  reset transaksi            (hapus semua, ada backup)\n" +
+  "  alias | alias tf transfer | alias hapus tf | alias reset\n" +
   "  help\n\n" +
   "Nominal: 50rb, 1,5jt, 50000, 45.001.889\n" +
   "Periode: september, 2026-08, minggu ini, minggu lalu, bulan lalu, tahun ini, hari ini, kemarin";
+
+// ---------- Alias perintah ----------
+const ALIAS_TARGETS = [
+  "transfer", "hapus", "ubah", "laporan", "ringkasan", "grafik", "csv", "cari",
+  "lihat", "riwayat", "saldo", "akun", "kategori", "anggaran", "berulang",
+  "utang", "piutang", "bayar", "pin", "backup", "ai", "versi", "help",
+  "undo", "alias",
+];
+const ALIAS_TARGET_SET = new Set(ALIAS_TARGETS);
+// Kata yang sudah dipakai perintah/sinonim/arah; tak boleh dijadikan alias.
+const ALIAS_RESERVED = new Set([
+  ...ALIAS_TARGETS,
+  // reset sengaja tidak boleh jadi alias: perintah ini butuh konfirmasi UI.
+  "reset",
+  "history", "list", "daftar", "bantuan", "report", "chart", "dashboard", "export",
+  "hutang", "batal", "batalkan", "info", "version", "sesuaikan", "betulkan",
+  "masuk", "keluar", "pengeluaran", "pemasukan", "terima", "dapat",
+]);
+
+// Cek bentrok nama/kata kunci baru dengan alias yang sudah ada.
+function aliasConflict(words: string[]): string | null {
+  const map = loadAliases();
+  for (const w of words) {
+    const k = w.toLowerCase().trim();
+    if (k && map[k]) return `"${k}" bentrok dengan alias → ${map[k]}`;
+  }
+  return null;
+}
+
+function loadAliases(): Record<string, string> {
+  try {
+    const raw = getSetting("cmd_aliases");
+    const parsed = JSON.parse(raw ?? "{}") as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      if (typeof v !== "string") continue;
+      const target = v.trim().toLowerCase().replace(/\s+/g, " ");
+      const first = target.split(/\s+/)[0] ?? "";
+      if (first !== "reset" && ALIAS_TARGET_SET.has(first)) out[k] = target;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function saveAliases(map: Record<string, string>): void {
+  setSetting("cmd_aliases", Object.keys(map).length ? JSON.stringify(map) : null);
+}
+
+function expandAlias(text: string): string {
+  const m = text.match(/^(\S+)([\s\S]*)$/);
+  if (!m) return text;
+  const target = loadAliases()[m[1].toLowerCase()];
+  return target ? target + m[2] : text;
+}
+
+function aliasesText(): string {
+  const map = loadAliases();
+  const rows = Object.keys(map)
+    .sort()
+    .map((a) => `  ${a} → ${map[a]}`);
+  const targets = ALIAS_TARGETS.join(", ");
+  if (!rows.length) {
+    return (
+      "Belum ada alias.\nBuat: `alias tf transfer`\n" +
+      `Target: ${targets}`
+    );
+  }
+  return `Alias perintah:\n${rows.join("\n")}\n\nTarget: ${targets}`;
+}
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -338,7 +411,7 @@ export function runRecurringWithUndo(): { created: number; entries: string[] } {
 }
 
 export async function handleMessage(input: string): Promise<Reply> {
-  const text = input.trim();
+  const text = expandAlias(input.trim());
 
   if (/^(undo|batalkan|batal)$/i.test(text)) {
     const snap = undoStack.pop();
@@ -362,9 +435,86 @@ async function handleMessageInner(input: string): Promise<Reply> {
   const low = text.toLowerCase();
 
   if (!text) return { text: "Tulis sesuatu, contoh: makan siang 50rb" };
-  if (["help", "bantuan", "?"].includes(low)) return { text: HELP };
+  if (["help", "bantuan", "?"].includes(low)) {
+    const map = loadAliases();
+    const rows = Object.keys(map)
+      .sort()
+      .map((a) => `  ${a} → ${map[a]}`);
+    return { text: HELP + (rows.length ? `\n\nAlias aktif:\n${rows.join("\n")}` : "") };
+  }
 
   if (["versi", "version", "v"].includes(low)) return { text: `Stacker v${APP_VERSION}` };
+
+  if (low === "alias" || /^alias\s+(?:list|daftar)$/i.test(text)) {
+    return { text: aliasesText() };
+  }
+
+  const aliasReset = text.match(/^alias\s+reset$/i);
+  if (aliasReset) {
+    const n = Object.keys(loadAliases()).length;
+    saveAliases({});
+    return { text: n ? `${n} alias dihapus.` : "Belum ada alias." };
+  }
+
+  const aliasDel = text.match(/^alias\s+hapus\s+(\S+)$/i);
+  if (aliasDel) {
+    const name = aliasDel[1].toLowerCase();
+    const map = loadAliases();
+    if (!map[name]) return { text: `Alias "${name}" tidak ada.` };
+    delete map[name];
+    saveAliases(map);
+    return { text: `Alias ${name} dihapus.` };
+  }
+
+  const aliasSet = text.match(/^alias\s+(\S+)\s+([\s\S]+)$/i);
+  if (aliasSet) {
+    const name = aliasSet[1].toLowerCase();
+    const target = aliasSet[2].trim().toLowerCase().replace(/\s+/g, " ");
+    const targetFirst = target.split(/\s+/)[0] ?? "";
+    if (!/^[a-z][a-z0-9]{1,15}$/.test(name)) {
+      return { text: "Alias harus 2-16 huruf/angka dan diawali huruf. Contoh: `alias tf transfer`" };
+    }
+    if (target === "reset" || targetFirst === "reset") {
+      return { text: "Alias ke `reset` diblokir (perintah berisiko). Pakai `reset` langsung." };
+    }
+    if (!ALIAS_TARGET_SET.has(targetFirst)) {
+      return { text: `Target "${targetFirst}" bukan perintah. Pilihan: ${ALIAS_TARGETS.join(", ")}` };
+    }
+    if (target.length > 80) return { text: "Target alias terlalu panjang (maks 80 karakter)." };
+    if (name === target) return { text: "Alias dan target tidak boleh sama." };
+    if (ALIAS_RESERVED.has(name)) {
+      return { text: `"${name}" sudah dipakai perintah lain. Pilih nama alias lain.` };
+    }
+    if (listAccounts().some((a) => a.nama.toLowerCase() === name)) {
+      return { text: `"${name}" bentrok dengan nama akun.` };
+    }
+    if (
+      listCategories().some(
+        (c) => c.nama.toLowerCase() === name || c.keywords.includes(name)
+      )
+    ) {
+      return { text: `"${name}" bentrok dengan kategori/kata kunci.` };
+    }
+    const map = loadAliases();
+    const old = map[name];
+    if (old === undefined && Object.keys(map).length >= 50) {
+      return { text: "Maksimal 50 alias. Hapus sebagian dulu." };
+    }
+    map[name] = target;
+    saveAliases(map);
+    if (old === undefined) return { text: `Alias ${name} → ${target}.` };
+    return {
+      text: old === target ? `Alias ${name} memang → ${target}.` : `Alias ${name}: ${old} → ${target}.`,
+    };
+  }
+
+  if (/^alias\b/.test(low)) {
+    return {
+      text:
+        "Format: `alias` · `alias tf transfer` · `alias hapus tf` · `alias reset`\n" +
+        `Target: ${ALIAS_TARGETS.join(", ")}`,
+    };
+  }
 
   if (low === "ai reset") {
     aiResetUsage();
@@ -503,6 +653,8 @@ async function handleMessageInner(input: string): Promise<Reply> {
     const tipe = TIPE_AKUN.includes(tipeRaw) ? tipeRaw : "ewallet";
     if (!nama) return { text: "Format: `akun tambah <nama> <bank|ewallet|cash> [saldo 1jt]`" };
     if (getAccountByName(nama)) return { text: `Akun "${nama}" sudah ada.` };
+    const aliasAcc = aliasConflict([nama]);
+    if (aliasAcc) return { text: `Akun tidak dibuat: ${aliasAcc}.` };
     const awal = saldoPart ? parseLocal(saldoPart[1])?.result.jumlah ?? 0 : 0;
     const acc = addAccount(nama, tipe, awal);
     return { text: `Akun ${acc.nama} (${acc.tipe}) ditambah.` };
@@ -514,6 +666,8 @@ async function handleMessageInner(input: string): Promise<Reply> {
     const acc = getAccountByName(lama);
     if (!acc) return { text: `Akun "${lama}" tidak ada.` };
     if (getAccountByName(baru)) return { text: `Akun "${baru}" sudah ada.` };
+    const aliasAcc = aliasConflict([baru]);
+    if (aliasAcc) return { text: `Akun tidak diubah: ${aliasAcc}.` };
     renameAccount(acc.id, baru);
     return { text: `Akun ${lama} → ${baru}.` };
   }
@@ -568,6 +722,8 @@ async function handleMessageInner(input: string): Promise<Reply> {
     if (!cat) return { text: `Kategori "${nama}" tidak ada. Buat: \`kategori tambah ${nama}\`` };
     const add = kwRaw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
     if (!add.length) return { text: "Format: `kategori tambahkata Sedekah | zakat, infak`" };
+    const aliasKw = aliasConflict(add);
+    if (aliasKw) return { text: `Kata kunci tidak ditambah: ${aliasKw}.` };
     const merged = [...new Set([...cat.keywords, ...add])];
     updateCategoryKeywords(cat.id, merged);
     const added = add.filter((k) => !cat.keywords.includes(k));
@@ -616,6 +772,8 @@ async function handleMessageInner(input: string): Promise<Reply> {
     const keywords = kwRaw
       ? kwRaw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
       : [nama.toLowerCase()];
+    const aliasCat = aliasConflict([nama, ...keywords]);
+    if (aliasCat) return { text: `Kategori tidak dibuat: ${aliasCat}.` };
     if (!tipe) tipe = keywords.some((k) => MASUK.includes(k)) ? "masuk" : "keluar";
     const existing = getCategoryByName(nama);
     if (existing) {
@@ -649,6 +807,8 @@ async function handleMessageInner(input: string): Promise<Reply> {
     const cat = getCategoryByName(lama);
     if (!cat) return { text: `Kategori "${lama}" tidak ada.` };
     if (getCategoryByName(baru)) return { text: `Kategori "${baru}" sudah ada.` };
+    const aliasCat = aliasConflict([baru]);
+    if (aliasCat) return { text: `Kategori tidak diubah: ${aliasCat}.` };
     renameCategory(cat.id, baru);
     return { text: `Kategori ${lama} → ${baru}. Riwayat transaksi & anggaran ikut diganti.` };
   }
@@ -663,6 +823,8 @@ async function handleMessageInner(input: string): Promise<Reply> {
     const keywords = kwRaw
       ? kwRaw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
       : [nama.toLowerCase()];
+    const aliasKw = aliasConflict(keywords);
+    if (aliasKw) return { text: `Kata kunci tidak diganti: ${aliasKw}.` };
     updateCategoryKeywords(cat.id, keywords);
     return { text: `Kata kunci ${cat.nama} diganti: ${keywords.join(", ")}` };
   }

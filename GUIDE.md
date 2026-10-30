@@ -265,6 +265,11 @@ ubah 3 kategori Makanan        → ubah kategori
 hapus 3                        → hapus #3
 hapus 24 25                    → hapus beberapa (boleh #24)
 undo                           → batalkan aksi terakhir (maks 20 langkah)
+alias                          → daftar alias
+alias tf transfer              → buat/ubah alias (tf = transfer)
+alias jk laporan top 10        → target boleh lebih dari satu kata
+alias hapus tf                 → hapus alias
+alias reset                    → hapus semua alias
 berulang listrik 350rb tiap 5  → catat otomatis tiap bulan
 berulang nonaktif 1            → jeda sementara
 berulang aktif 1               → aktifkan lagi (jatuh tempo dikejar)

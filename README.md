@@ -81,6 +81,7 @@ ter-deploy kalau logika rusak.
 - **Backup terenkripsi** (`backup kunci <sandi>`, AES-GCM 256 + PBKDF2).
 - **Auto-backup folder** (File System Access API) + pengingat backup 14 hari,
   status storage permanen (`navigator.storage.persist()`) di modal **ℹ**.
+- **Alias perintah** (`alias tf transfer`, target multi-kata, hapus/reset, tampil di `alias`/`help`).
 - **Update prompt** service worker ("Versi baru tersedia → Muat ulang").
 - **CSP ketat** (script self, connect hanya Gemini + localhost) + panel **ℹ**
   berisi commit SHA, hash bundle SHA-256, host AI, dan **Tentang** (pembuat,
@@ -137,5 +138,5 @@ memverifikasi build (commit SHA + hash bundle di panel **ℹ**,
 
 ## Versi
 
-`v2.7.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
+`v2.8.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
 Nilai versi di-hardcode di `src/version.ts` (browser tak bisa baca `package.json`).

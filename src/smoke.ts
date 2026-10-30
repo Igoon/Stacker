@@ -158,6 +158,66 @@ await check("akun berspasi: saldo awal & sesuaikan", async () => {
   assert(r.text.includes("dihapus"), "akun spasi bisa dihapus");
 });
 
+await check("alias: buat, pakai, multi-kata, konflik, undo, backup", async () => {
+  const before = count();
+  const add = await handleMessage("alias tf transfer");
+  assert(add.text.includes("tf → transfer"), "alias dibuat");
+  const list = await handleMessage("alias");
+  assert(list.text.includes("tf → transfer"), "alias tampil di daftar");
+
+  const r = await handleMessage("tf 10rb bsi ke gopay");
+  assert(r.text.startsWith("Transfer"), "alias dipakai sebagai transfer");
+  assert.equal(r.txs?.length, 2, "transfer dua sisi");
+  assert.equal(count(), before + 2);
+  await handleMessage(`hapus #${r.txs![0].id}`);
+
+  const multi = await handleMessage("alias jk laporan top 3");
+  assert(multi.text.includes("jk → laporan top 3"), "target multi-kata");
+  const top = await handleMessage("jk");
+  assert(top.text.includes("Top"), "alias multi-kata dipakai");
+
+  const blocked = await handleMessage("alias rs reset");
+  assert(blocked.text.includes("diblokir"), "alias reset diblokir");
+
+  const reserved = await handleMessage("alias laporan transfer");
+  assert(reserved.text.includes("sudah dipakai"), "nama perintah ditolak");
+  const bentrok = await handleMessage("alias makan transfer");
+  assert(bentrok.text.includes("bentrok"), "bentrok kategori ditolak");
+  const badTarget = await handleMessage("alias xx nope");
+  assert(badTarget.text.includes("bukan perintah"), "target ngawur ditolak");
+
+  assert((await handleMessage("akun tambah tf bank")).text.includes("bentrok"), "akun bentrok");
+  assert(
+    (await handleMessage("kategori tambah keluar tf")).text.includes("bentrok"),
+    "kategori bentrok"
+  );
+  assert(
+    (await handleMessage("kategori tambahkata Makanan | tf")).text.includes("bentrok"),
+    "kata kunci bentrok"
+  );
+  assert(
+    (await handleMessage("akun ubah bsi jadi tf")).text.includes("bentrok"),
+    "rename akun bentrok"
+  );
+  assert(dbmod.getAccountByName("BSI"), "BSI tetap ada");
+
+  const changed = await handleMessage("alias tf hapus");
+  assert(changed.text.includes("transfer → hapus"), "alias bisa diubah");
+  await handleMessage("undo");
+  assert((await handleMessage("alias")).text.includes("tf → transfer"), "ubah alias bisa di-undo");
+
+  const bkp = dbmod.exportAll();
+  await handleMessage("alias reset");
+  assert(!(await handleMessage("alias")).text.includes("tf →"), "reset menghapus semua");
+  dbmod.importAll(bkp);
+  assert((await handleMessage("alias")).text.includes("tf → transfer"), "alias ikut restore");
+
+  await handleMessage("alias hapus tf");
+  assert(!(await handleMessage("alias")).text.includes("tf →"), "hapus alias");
+  const reset = await handleMessage("alias reset");
+  assert(reset.text.includes("1 alias"), "sisa alias dihapus");
+});
+
 await check("hapus pakai # dan multi-id", async () => {
   const a = last(await handleMessage("kopi 10rb"));
   const b = last(await handleMessage("kopi 5rb"));

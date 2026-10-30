@@ -100,6 +100,24 @@ test("dua pesan cepat diproses berurutan", async ({ page }) => {
   await expect(page.locator("#saldo")).toHaveText(/-Rp15\.000/);
 });
 
+test("alias tf dipakai untuk transfer", async ({ page }) => {
+  await boot(page);
+  await chat(page, "alias tf transfer");
+  await expect(page.locator("#chat .bubble").filter({ hasText: "tf → transfer" }).last()).toBeVisible();
+  await chat(page, "tf 10rb bsi ke gopay");
+  await expect(page.locator("#chat .bubble").filter({ hasText: "Transfer Rp10.000" })).toBeVisible();
+  await expect(page.locator("#saldo")).toHaveText(/Rp0/);
+  await chat(page, "alias");
+  await expect(page.locator("#chat .bubble").filter({ hasText: "tf → transfer" }).last()).toBeVisible();
+
+  // Alias juga berlaku untuk teks yang dibagikan dari app lain.
+  await page.goto("/?text=" + encodeURIComponent("tf 5rb bsi ke gopay"));
+  await expect(page.locator("#sub")).toHaveText(/^v\d/, { timeout: 60_000 });
+  await expect(
+    page.locator("#chat .bubble").filter({ hasText: "Transfer Rp5.000" })
+  ).toBeVisible();
+});
+
 test("reset transaksi minta konfirmasi dulu", async ({ page }) => {
   await boot(page);
   await chat(page, "kopi 15rb");
