@@ -625,6 +625,8 @@ let lastBackupAt: string | null = null;
 let persisted = false;
 let folder: FolderHandle | null = null;
 let storageText = "";
+let bundleHash = "";
+let aiHosts = "tidak ada (AI mati)";
 
 const todayStr = (): string => new Date().toISOString().slice(0, 10);
 
@@ -694,9 +696,55 @@ async function refreshStorageText(): Promise<void> {
   }
 }
 
+// SHA-256 dari bundle utama. Pengguna bisa mencocokkan nilainya dengan release
+// notes sehingga kode yang berjalan bisa diverifikasi.
+async function bundleSha256(): Promise<string> {
+  try {
+    const res = await fetch(import.meta.url, { cache: "no-store" });
+    if (!res.ok) return "";
+    const buf = await res.arrayBuffer();
+    const digest = await crypto.subtle.digest("SHA-256", buf);
+    return Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  } catch {
+    return "";
+  }
+}
+
+async function refreshAiHosts(): Promise<void> {
+  try {
+    const r = await call({ type: "getai" });
+    const c = (r.config ?? {}) as { provider?: string; baseUrl?: string; key?: string };
+    if (c.provider === "openai") {
+      const base = (c.baseUrl ?? "").trim();
+      if (!base) {
+        aiHosts = "belum diatur";
+      } else {
+        try {
+          aiHosts = new URL(base).host;
+        } catch {
+          aiHosts = base;
+        }
+      }
+    } else {
+      aiHosts = (c.key ?? "").trim()
+        ? "generativelanguage.googleapis.com"
+        : "tidak ada (AI mati)";
+    }
+  } catch {
+    aiHosts = "?";
+  }
+}
+
 function renderInfo(): void {
   infoLines.textContent = [
     `Versi: v${appVersion || "-"}`,
+    `Build: ${__BUILD_SHA__ || "lokal"} (${__BUILD_TIME__.slice(0, 10)})`,
+    `Hash bundle SHA-256: ${bundleHash || "menghitung…"}`,
+    `Host AI: ${aiHosts}`,
+    `Data: lokal di perangkat (OPFS), tanpa server`,
+    "",
     `Transaksi: ${txCount}`,
     `Backup terakhir: ${lastBackupAt ?? "belum pernah"}`,
     `Auto-backup: ${folder ? folder.name : "nonaktif"}`,
@@ -710,10 +758,11 @@ function renderInfo(): void {
 }
 
 document.getElementById("info")!.onclick = async () => {
-  await refreshStorageText();
-  await refresh();
-  renderInfo();
+  await Promise.all([refreshStorageText(), refresh(), refreshAiHosts()]);
   infoModal.hidden = false;
+  renderInfo();
+  bundleHash = await bundleSha256();
+  renderInfo();
 };
 
 document.getElementById("infoClose")!.onclick = () => {

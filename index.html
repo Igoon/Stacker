@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<!-- CSP: blokir script/objek/frame asing. Koneksi keluar dibatasi ke Gemini
+     dan localhost (AI custom harus lokal). Lihat SECURITY.md. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' ws://localhost:* ws://127.0.0.1:* https://generativelanguage.googleapis.com http://localhost:* http://127.0.0.1:*; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
 <meta name="theme-color" content="#0b141a" />
 <meta name="description" content="Catat keuangan lewat chat, data tersimpan lokal di perangkat." />
 <meta name="mobile-web-app-capable" content="yes" />
@@ -80,7 +83,7 @@
     <label>Provider
       <select id="aiProvider">
         <option value="gemini">Gemini</option>
-        <option value="openai">OpenAI-compatible (Ollama / Groq / dll)</option>
+        <option value="openai">OpenAI-compatible (Ollama / LM Studio lokal)</option>
       </select>
     </label>
     <label>Base URL (hanya OpenAI-compatible)
@@ -92,6 +95,11 @@
     <label>API key (kosong = nonaktif / Ollama tanpa key)
       <input id="aiKey" type="password" placeholder="..." />
     </label>
+    <p class="hint">
+      Demi keamanan, app hanya boleh menghubungi Gemini dan alamat
+      <code>localhost</code>/<code>127.0.0.1</code> (Ollama/LM Studio). Base URL
+      remote lain diblokir CSP. AI default mati.
+    </p>
     <div class="modal-actions">
       <button id="aiCancel">Batal</button>
       <button id="aiSave">Simpan</button>
@@ -102,7 +110,7 @@
 <div id="passModal" class="modal" hidden>
   <div class="modal-box">
     <h3>Backup terenkripsi</h3>
-    <p style="font-size:13px;color:#8696a0;margin:0 0 10px">
+    <p class="hint">
       File ini dilindungi kata sandi. Masukkan kata sandi yang dipakai saat
       membuat backup.
     </p>
@@ -120,6 +128,24 @@
   <div class="modal-box">
     <h3>Info & penyimpanan</h3>
     <div id="infoLines" class="info-lines"></div>
+    <div class="about">
+      <div class="about-title">Tentang Stacker</div>
+      <p>
+        Pencatat keuangan lewat chat. Data tersimpan lokal di perangkat — tanpa
+        server, tanpa akun.
+      </p>
+      <p>
+        Dibuat oleh <strong>Igoon (I Go On)</strong> ·
+        Lisensi
+        <a href="https://github.com/Igoon/Stacker/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">Apache-2.0</a>
+        ·
+        <a href="https://github.com/Igoon/Stacker" target="_blank" rel="noopener noreferrer">Kode sumber</a>
+      </p>
+      <p class="about-note">
+        AI opsional: hanya Gemini atau server lokal milikmu. Tanpa analytics,
+        CDN, atau pengiriman data ke pihak lain.
+      </p>
+    </div>
     <div class="info-actions">
       <button id="pickDir">Pilih folder auto-backup</button>
       <button id="backupNow">Backup ke folder sekarang</button>

@@ -281,11 +281,15 @@ Parser lokal sudah menangani mayoritas. AI hanya dipakai saat pesan ambigu.
 1. Ketuk tombol **⚙ AI** di toolbar.
 2. Pilih provider:
    - **Gemini** (default) — gratis pakai free tier. Isi API key.
-   - **OpenAI-compatible** — Ollama lokal / Groq / OpenRouter. Isi base URL +
+   - **OpenAI-compatible** — Ollama / LM Studio **lokal**. Isi base URL +
      model + key (Ollama lokal tanpa key).
 3. Ketuk **Simpan**.
 
 Contoh base URL Ollama lokal: `http://localhost:11434/v1`, model `llama3.2`.
+
+> CSP app hanya mengizinkan koneksi ke Gemini dan `localhost`/`127.0.0.1`.
+> Base URL remote (Groq, OpenRouter, dsb.) akan diblokir browser. Pakai
+> Ollama/LM Studio lokal supaya data tidak keluar perangkat.
 
 > AI key tersimpan di perangkat kamu (tabel settings), tidak dibundel.
 > Pakai Ollama lokal = data keuangan tidak keluar dari perangkat.
@@ -364,6 +368,23 @@ Ketuk **ℹ** di toolbar:
   terakhir ≥ 14 hari.
 - **Bar "Versi baru tersedia"** — saat service worker memperbarui cache, app
   menampilkan tombol **Muat ulang** (tidak auto-reload supaya ketikan tak hilang).
+- **Panel keamanan** — modal **ℹ** juga menampilkan commit SHA build, hash
+  bundle SHA-256, host AI yang boleh dihubungi, dan status "data lokal".
+- **Tentang** — bagian bawah modal **ℹ** memuat nama app, pembuat
+  (Igoon / I Go On), lisensi Apache-2.0, dan tautan kode sumber.
+
+### Verifikasi keamanan (30 detik)
+
+1. DevTools → **Network** → muat ulang: semua request harus same-origin
+   (kecuali Gemini kalau AI dinyalakan).
+2. Matikan internet → app tetap jalan dan data tetap ada.
+3. DevTools → **Application → Storage**: hanya OPFS/IndexedDB/localStorage
+   origin ini.
+4. Bandingkan **Hash bundle SHA-256** di **ℹ** dengan release notes.
+
+Batas jujur: PIN hanya mengunci tampilan (bukan enkripsi database), dan
+service worker bisa memperbarui kode saat rilis baru. Detail model ancaman di
+[`SECURITY.md`](SECURITY.md).
 
 ### Transaksi berulang
 
@@ -396,6 +417,7 @@ Lakukan backup rutin, terutama di iOS (storage bisa kena *eviction*).
 | Tombol auto-backup folder tak ada | File System Access API hanya Chrome/Edge/Android. Di iOS/Safari pakai **⬇ Backup**. |
 | Auto-backup tidak jalan otomatis | Buka **ℹ** → **Pilih folder auto-backup** sekali (izin folder bisa dicabut browser). Tombol **Backup ke folder sekarang** memaksa tulis. |
 | AI tidak aktif | Provider Gemini butuh key. Provider OpenAI butuh base URL. |
+| AI OpenAI remote (Groq/OpenRouter) gagal | CSP hanya mengizinkan Gemini + `localhost`/`127.0.0.1`. Pakai Ollama/LM Studio lokal. |
 
 ---
 

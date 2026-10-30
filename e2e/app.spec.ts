@@ -91,9 +91,29 @@ test("modal info menampilkan versi & penyimpanan", async ({ page }) => {
   await expect(page.locator("#infoLines")).toContainText("Versi: v");
   await expect(page.locator("#infoLines")).toContainText("Backup terakhir:");
   await expect(page.locator("#infoLines")).toContainText("Pemakaian storage:");
+  await expect(page.locator("#infoModal .about")).toContainText("Tentang Stacker");
+  await expect(page.locator("#infoModal .about")).toContainText("Apache-2.0");
+  await expect(page.locator("#infoModal .about")).toContainText("Igoon");
 
   await page.locator("#infoClose").click();
   await expect(page.locator("#infoModal")).toBeHidden();
+});
+
+test("CSP aktif & panel keamanan menampilkan build + hash", async ({ page }) => {
+  await boot(page);
+
+  const csp = await page
+    .locator('meta[http-equiv="Content-Security-Policy"]')
+    .getAttribute("content");
+  expect(csp).toContain("script-src 'self'");
+  expect(csp).toContain("object-src 'none'");
+
+  await page.locator("#info").click();
+  await expect(page.locator("#infoLines")).toContainText("Build:");
+  await expect(page.locator("#infoLines")).toContainText(/Hash bundle SHA-256: [0-9a-f]{64}/, {
+    timeout: 15_000,
+  });
+  await expect(page.locator("#infoLines")).toContainText("Host AI:");
 });
 
 test("PIN: kunci otomatis, tolak PIN salah, buka, lalu hapus", async ({ page }) => {

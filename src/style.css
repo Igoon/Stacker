@@ -374,6 +374,40 @@ footer button {
   line-height: 1.5;
   color: #8696a0;
 }
+.hint {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #8696a0;
+}
+.hint code {
+  color: #e9edef;
+}
+
+/* ---------- Tentang app di modal info ---------- */
+.about {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #2a3942;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #8696a0;
+}
+.about-title {
+  margin-bottom: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #e9edef;
+}
+.about p {
+  margin: 0 0 5px;
+}
+.about a {
+  color: #53bdeb;
+}
+.about-note {
+  margin-bottom: 0 !important;
+}
 
 /* ---------- Grafik SVG di bubble ---------- */
 .chart {

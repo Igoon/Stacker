@@ -53,8 +53,9 @@ Playwright. Server dev dijalankan otomatis di `localhost:5199`.
 
 - Tombol **AI** di toolbar → modal pengaturan. Dua provider:
   - **Gemini** (default) — gratis pakai free tier (`gemini-2.0-flash`). Isi API key.
-  - **OpenAI-compatible** — `{base}/chat/completions` (Ollama lokal, Groq,
-    OpenRouter, dsb). Isi base URL + model + key (Ollama lokal tanpa key).
+  - **OpenAI-compatible** — `{base}/chat/completions` (Ollama / LM Studio
+    lokal). Isi base URL + model + key (Ollama lokal tanpa key). CSP membatasi
+    koneksi ke Gemini + `localhost`/`127.0.0.1`; base URL remote diblokir.
 - Konfigurasi disimpan di DB lokal (tabel `settings`), bukan dibundel.
 - Key kosong + provider Gemini = AI nonaktif. Provider OpenAI + base URL = aktif
   (walau tanpa key, mis. Ollama).
@@ -79,6 +80,10 @@ Playwright. Server dev dijalankan otomatis di `localhost:5199`.
 - **Auto-backup folder** (File System Access API) + pengingat backup 14 hari,
   status storage permanen (`navigator.storage.persist()`) di modal **ℹ**.
 - **Update prompt** service worker ("Versi baru tersedia → Muat ulang").
+- **CSP ketat** (script self, connect hanya Gemini + localhost) + panel **ℹ**
+  berisi commit SHA, hash bundle SHA-256, host AI, dan **Tentang** (pembuat,
+  lisensi Apache-2.0, kode sumber). Threat model di
+  [`SECURITY.md`](SECURITY.md); build CI diberi provenance attestation.
 - Share target PWA (Android/desktop) dan wallpaper chat lokal.
 - Parser diuji dengan korpus 20 kalimat (`src/parser-cases.ts`).
 
@@ -117,11 +122,18 @@ Repo ini sudah dikonfigurasi deploy otomatis ke GitHub Pages. Setiap push ke
 
 Tidak perlu header COOP/COEP karena memakai `opfs-sahpool`.
 
+## Keamanan
+
+Lihat [`SECURITY.md`](SECURITY.md) untuk model ancaman, kontrol CSP, batas
+jujur (PIN bukan enkripsi disk, service worker bisa update kode), dan cara
+memverifikasi build (commit SHA + hash bundle di panel **ℹ**,
+`gh attestation verify`).
+
 ## Lisensi
 
 [Apache-2.0](LICENSE) — © 2026 Igoon (I Go On).
 
 ## Versi
 
-`v2.5.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
+`v2.6.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
 Nilai versi di-hardcode di `src/version.ts` (browser tak bisa baca `package.json`).

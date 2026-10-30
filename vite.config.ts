@@ -1,7 +1,16 @@
 import { defineConfig } from "vite";
 
+// Commit SHA dari CI (GitHub) supaya pengguna bisa mencocokkan build dengan
+// source. Kosong saat build lokal.
+const buildSha = (process.env.GITHUB_SHA ?? "").slice(0, 12);
+const buildTime = new Date().toISOString();
+
 export default defineConfig({
   base: "./",
+  define: {
+    __BUILD_SHA__: JSON.stringify(buildSha),
+    __BUILD_TIME__: JSON.stringify(buildTime),
+  },
   // sqlite-wasm memuat proxy worker secara dinamis (`?vfs=opfs`), yang tak
   // dikenali pre-bundler Vite. Kecualikan supaya dev tak memunculkan warning
   // "file does not exist ... optimize deps".
