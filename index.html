@@ -28,13 +28,10 @@
       <div class="saldo" id="saldo">Saldo: -</div>
     </div>
     <div class="toolbar">
-      <button id="export" title="Unduh backup JSON">⬇ Backup</button>
-      <button id="exportEnc" title="Backup terenkripsi">🔐</button>
-      <button id="import" title="Muat backup JSON">⬆ Restore</button>
-      <button id="undo" title="Batalkan aksi terakhir">↶</button>
-      <button id="wall" title="Atur wallpaper chat">🎨</button>
-      <button id="aikey" title="Atur AI (Gemini / OpenAI-compatible)">⚙ AI</button>
-      <button id="info" title="Info penyimpanan & auto-backup">ℹ</button>
+      <button id="export" aria-label="Unduh backup JSON" title="Unduh backup JSON">⬇ Backup</button>
+      <button id="import" aria-label="Muat backup JSON" title="Muat backup JSON">⬆ Restore</button>
+      <button id="undo" aria-label="Batalkan aksi terakhir" title="Batalkan aksi terakhir">↶ Undo</button>
+      <button id="info" aria-label="Info & pengaturan" title="Info & pengaturan">ℹ Info</button>
       <span id="busy" hidden>…</span>
     </div>
   </header>
@@ -142,10 +139,74 @@
 
 <div id="infoModal" class="modal" hidden>
   <div class="modal-box">
-    <h3>Info & penyimpanan</h3>
-    <div id="infoLines" class="info-lines"></div>
+    <h3>Info</h3>
+    <p id="infoSummary" class="info-summary"></p>
+    <div class="menu-list">
+      <button id="openSecurity" class="menu-row"><span>Keamanan &amp; PIN</span><span class="chev">›</span></button>
+      <button id="openStorage" class="menu-row"><span>Backup &amp; penyimpanan</span><span class="chev">›</span></button>
+      <button id="openWall" class="menu-row"><span>Tampilan (wallpaper)</span><span class="chev">›</span></button>
+      <button id="openAI" class="menu-row"><span>AI (opsional)</span><span class="chev">›</span></button>
+      <button id="openAbout" class="menu-row"><span>Tentang</span><span class="chev">›</span></button>
+    </div>
+    <div class="modal-actions">
+      <button id="infoClose">Tutup</button>
+    </div>
+  </div>
+</div>
+
+<div id="secModal" class="modal" hidden>
+  <div class="modal-box">
+    <h3>Keamanan &amp; PIN</h3>
+    <div id="secLines" class="info-lines"></div>
+    <div class="info-actions">
+      <button id="pinSetBtn">Atur PIN</button>
+      <button id="pinChangeBtn">Ubah PIN</button>
+      <button id="pinDeleteBtn">Hapus PIN</button>
+    </div>
+    <p class="info-note">
+      PIN hanya mengunci tampilan (bukan enkripsi). App mengunci otomatis setelah
+      2 menit idle atau saat pindah app.
+    </p>
+    <div class="modal-actions">
+      <button id="wipeData" class="danger">Hapus semua data…</button>
+      <button id="secBack">Kembali</button>
+    </div>
+  </div>
+</div>
+
+<div id="storeModal" class="modal" hidden>
+  <div class="modal-box">
+    <h3>Backup &amp; penyimpanan</h3>
+    <div id="storeLines" class="info-lines"></div>
+    <label>Simpan backup terakhir
+      <select id="retain">
+        <option value="10">10 file</option>
+        <option value="30" selected>30 file</option>
+        <option value="60">60 file</option>
+        <option value="100">100 file</option>
+      </select>
+    </label>
+    <div class="info-actions">
+      <button id="exportEnc">🔐 Backup terenkripsi (kata sandi)</button>
+      <button id="pickDir">Pilih folder auto-backup</button>
+      <button id="backupNow">Backup ke folder sekarang</button>
+      <button id="clearDir">Matikan auto-backup</button>
+    </div>
+    <p class="info-note">
+      Auto-backup hanya menulis ke folder yang kamu pilih (Chrome/Edge/Android).
+      Data tidak dikirim ke mana pun. Di iPhone/iPad, pakai tombol ⬇ Backup.
+    </p>
+    <div class="modal-actions">
+      <button id="storeBack">Kembali</button>
+    </div>
+  </div>
+</div>
+
+<div id="aboutModal" class="modal" hidden>
+  <div class="modal-box">
+    <h3>Tentang Stacker</h3>
+    <div id="aboutLines" class="info-lines"></div>
     <div class="about">
-      <div class="about-title">Tentang Stacker</div>
       <p>
         Pencatat keuangan lewat chat. Data tersimpan lokal di perangkat — tanpa
         server, tanpa akun.
@@ -162,29 +223,8 @@
         CDN, atau pengiriman data ke pihak lain.
       </p>
     </div>
-    <label>Simpan backup terakhir
-      <select id="retain">
-        <option value="10">10 file</option>
-        <option value="30" selected>30 file</option>
-        <option value="60">60 file</option>
-        <option value="100">100 file</option>
-      </select>
-    </label>
-    <div class="info-actions">
-      <button id="pinSetBtn">Atur PIN</button>
-      <button id="pinChangeBtn">Ubah PIN</button>
-      <button id="pinDeleteBtn">Hapus PIN</button>
-      <button id="pickDir">Pilih folder auto-backup</button>
-      <button id="backupNow">Backup ke folder sekarang</button>
-      <button id="clearDir">Matikan auto-backup</button>
-      <button id="wipeData" class="danger">Hapus semua data…</button>
-    </div>
-    <p class="info-note">
-      Auto-backup hanya menulis ke folder yang kamu pilih (Chrome/Edge/Android).
-      Data tidak dikirim ke mana pun. Di iPhone/iPad, pakai tombol Backup.
-    </p>
     <div class="modal-actions">
-      <button id="infoClose">Tutup</button>
+      <button id="aboutBack">Kembali</button>
     </div>
   </div>
 </div>

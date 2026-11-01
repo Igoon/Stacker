@@ -46,16 +46,19 @@ header .saldo {
 }
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
   margin-top: 8px;
 }
 .toolbar button {
-  font-size: 12px;
+  font-size: 12.5px;
   color: #d1f4cc;
   background: #2a3942;
   border: 0;
   border-radius: 12px;
-  padding: 5px 10px;
+  padding: 7px 12px;
+  min-height: 34px;
   cursor: pointer;
 }
 .toolbar button:hover {
@@ -391,6 +394,45 @@ footer button {
   font-size: 11.5px;
   line-height: 1.5;
   color: #8696a0;
+}
+.info-summary {
+  margin: 0;
+  font-size: 13px;
+  color: #8696a0;
+}
+.menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.menu-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 0;
+  border-radius: 10px;
+  padding: 13px 14px;
+  background: #202c33;
+  color: #e9edef;
+  font-size: 14.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.menu-row:hover {
+  background: #2a3942;
+}
+.menu-row .chev {
+  color: #8696a0;
+  font-size: 18px;
+  line-height: 1;
+}
+.modal-actions button.danger {
+  background: #6e2020;
+  color: #ffd7d7;
+}
+.modal-actions button.danger:hover {
+  background: #8a2626;
 }
 .hint {
   margin: 0 0 10px;

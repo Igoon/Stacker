@@ -63,7 +63,7 @@ Efek:
 
 ## Verifikasi build
 
-Di modal **ℹ**:
+Di **ℹ → Tentang**:
 - `Build`: commit SHA (dari CI) + tanggal build.
 - `Hash bundle SHA-256`: hash modul utama yang sedang berjalan.
 - `Host AI`: host yang boleh dihubungi menurut konfigurasi saat ini.
@@ -96,7 +96,7 @@ gh attestation verify <artifact> --repo Igoon/Stacker
 ## Menghapus data
 
 Uninstall OS tidak menjamin semua jejak terhapus (cache, OPFS, IndexedDB, dan
-localStorage bisa tertinggal). Gunakan **ℹ → Hapus semua data…** di dalam app:
+localStorage bisa tertinggal). Gunakan **ℹ → Keamanan → Hapus semua data…** di dalam app:
 perintah ini menutup DB, mengosongkan OPFS/IndexedDB/localStorage, menghapus
 cache + registrasi Service Worker, lalu memuat ulang dalam keadaan bersih.
 Setelah itu barulah hapus ikon PWA.

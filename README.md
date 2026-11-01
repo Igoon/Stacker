@@ -53,7 +53,7 @@ ter-deploy kalau logika rusak.
 
 ## AI (opsional, default mati)
 
-- Tombol **AI** di toolbar → modal pengaturan. Dua provider:
+- **ℹ → AI (opsional)** → modal pengaturan. Dua provider:
   - **Gemini** (default) — gratis pakai free tier (`gemini-2.0-flash`). Isi API key.
   - **OpenAI-compatible** — `{base}/chat/completions` (Ollama / LM Studio
     lokal). Isi base URL + model + key (Ollama lokal tanpa key). CSP membatasi
@@ -77,7 +77,7 @@ ter-deploy kalau logika rusak.
 - **Utang/piutang** ledger terpisah (tidak mengubah saldo akun).
 - **Transaksi berulang** bulanan (idempotent), **undo** 20 langkah.
 - **PIN + auto-lock** (2 menit idle / app ditinggalkan) — keypad visual tanpa
-  keyboard OS, atur/ubah/hapus lewat modal ℹ; hash PBKDF2, bukan enkripsi disk.
+  keyboard OS, atur/ubah/hapus lewat **ℹ › Keamanan**; hash PBKDF2, bukan enkripsi disk.
 - **Backup terenkripsi** (`backup kunci <sandi>`, AES-GCM 256 + PBKDF2).
 - **Auto-backup folder** (File System Access API) + pengingat backup 14 hari,
   status storage permanen (`navigator.storage.persist()`) di modal **ℹ**.
@@ -104,7 +104,7 @@ ter-deploy kalau logika rusak.
 
 ## Tampilan (wallpaper)
 
-Tombol **🎨** di toolbar: pilih preset warna/gradien atau foto sendiri. Gambar
+**ℹ → Tampilan**: pilih preset warna/gradien atau foto sendiri. Gambar
 dikecilkan ke maks 1280 px lalu disimpan **lokal** (localStorage) — tak dikirim
 ke mana pun, tak ikut file backup.
 
@@ -140,5 +140,5 @@ memverifikasi build (commit SHA + hash bundle di panel **ℹ**,
 
 ## Versi
 
-`v2.9.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
+`v2.9.1` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
 Nilai versi di-hardcode di `src/version.ts` (browser tak bisa baca `package.json`).

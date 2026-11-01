@@ -163,7 +163,7 @@ const HELP =
   "  utang 100rb ke budi         (ledger utang/piutang)\n" +
   "  piutang 50rb dari andi\n" +
   "  bayar utang budi 50rb | utang hapus 3 | piutang hapus 4\n" +
-  "  pin                         (status kunci; atur lewat tombol ℹ)\n" +
+  "  pin                         (status kunci; atur lewat ℹ → Keamanan)\n" +
   "  backup | backup kunci <sandi>   (JSON / terenkripsi)\n" +
   "  ai | ai reset               (pemakaian AI)\n" +
   "  versi                       (versi aplikasi)\n" +
@@ -539,8 +539,8 @@ async function handleMessageInner(input: string): Promise<Reply> {
     const set = !!getSetting("pin_hash");
     return {
       text: set
-        ? "PIN: aktif.\nApp mengunci otomatis setelah 2 menit idle atau saat pindah app.\nUbah/hapus lewat tombol PIN di modal ℹ (keypad visual)."
-        : "PIN: nonaktif.\nAtur lewat tombol PIN di modal ℹ (keypad visual).\nPIN hanya mengunci tampilan — data tetap tersimpan di perangkat.",
+        ? "PIN: aktif.\nApp mengunci otomatis setelah 2 menit idle atau saat pindah app.\nUbah/hapus lewat ℹ → Keamanan (keypad visual)."
+        : "PIN: nonaktif.\nAtur lewat ℹ → Keamanan (keypad visual).\nPIN hanya mengunci tampilan — data tetap tersimpan di perangkat.",
     };
   }
 

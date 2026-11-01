@@ -78,7 +78,7 @@ beda per platform:
   browser/HP, pakai mode privat, atau hapus data situs = data kosong. Tidak ada
   sinkronisasi antar-perangkat; pakai Backup untuk pindah.
 - Uninstall OS tidak selalu menghapus seluruh storage. Untuk bersih total,
-  pakai **ℹ → Hapus semua data…** (lihat bagian 3).
+  pakai **ℹ → Keamanan → Hapus semua data…** (lihat bagian 3).
 
 > Pakai URL yang benar (case-sensitive, dengan akhiran `/`):
 > `https://igoon.github.io/Stacker/`.
@@ -96,7 +96,7 @@ baru hapus ikonnya.
 
 1. **⬇ Backup** dulu kalau data masih mau disimpan (wajib bila berencana
    pindah perangkat).
-2. Buka **ℹ** → tombol **Hapus semua data…**.
+2. Buka **ℹ → Keamanan**, lalu tombol **Hapus semua data…**.
 3. Konfirmasi. Bila PIN aktif, masukkan PIN lewat keypad.
 4. App menghapus transaksi + pengaturan, mengosongkan OPFS/IndexedDB/localStorage,
    membersihkan cache, lalu memuat ulang dalam keadaan bersih.
@@ -164,7 +164,7 @@ Setelah itu barulah hapus aplikasinya:
    csv
    ```
 8. Backup rutin: tombol **⬇ Backup** → file JSON.
-9. Atur tampilan (opsional): tombol **🎨** → wallpaper preset atau foto sendiri.
+9. Atur tampilan (opsional): **ℹ → Tampilan** → wallpaper preset atau foto sendiri.
 10. Keluar: tidak ada logout. Tutup app/tab. Data aman di perangkat (OPFS).
 
 ### Contoh transaksi
@@ -339,7 +339,7 @@ help                          → daftar perintah
 
 Parser lokal sudah menangani mayoritas. AI hanya dipakai saat pesan ambigu.
 
-1. Ketuk tombol **⚙ AI** di toolbar.
+1. Ketuk **ℹ → AI (opsional)**.
 2. Pilih provider:
    - **Gemini** (default) — gratis pakai free tier. Isi API key.
    - **OpenAI-compatible** — Ollama / LM Studio **lokal**. Isi base URL +
@@ -359,7 +359,7 @@ Contoh base URL Ollama lokal: `http://localhost:11434/v1`, model `llama3.2`.
 
 ## 7. Wallpaper Chat
 
-Ketuk **🎨** di toolbar.
+Ketuk **ℹ → Tampilan (wallpaper)**.
 
 - **Preset** — pilih salah satu kotak warna (Default, Teal, Hutan, Laut, Plum,
   Pasir, Malam, Rose). Langsung diterapkan.
@@ -382,8 +382,8 @@ tidak ikut file backup, dan tidak mempengaruhi data transaksi.
 pin                     → status kunci
 ```
 
-- Atur/ubah/hapus PIN lewat tombol **PIN** di modal **ℹ**. Tidak ada PIN yang
-  diketik di chat.
+- Atur/ubah/hapus PIN lewat **ℹ → Keamanan & PIN**. Tidak ada PIN yang diketik
+  di chat.
 - Keypad visual (1–9, 0, ⌫, ✓) dipakai untuk set/ubah/unlock. Tidak ada input
   password yang memunculkan keyboard OS.
 - App mengunci otomatis setelah **2 menit tanpa aktivitas**, atau begitu app
@@ -403,7 +403,7 @@ pin                     → status kunci
 - **⬆ Restore** — unggah file JSON untuk kembalikan/pindah data. App menampilkan
   ringkasan isi file lalu minta konfirmasi; data sebelum restore bisa
   dikembalikan dengan `undo`.
-- **↶** — tombol pintas undo (sama dengan mengetik `undo`).
+- **↶ Undo** — tombol pintas undo (sama dengan mengetik `undo`).
 - `backup kunci <sandi>` di chat — backup **terenkripsi** (AES-GCM 256 +
   PBKDF2, minimal 8 karakter). Simpan kata sandinya; tanpa itu file tak bisa
   dibuka. Saat restore, app meminta kata sandi otomatis.
@@ -421,26 +421,27 @@ Catatan:
 
 ### Penyimpanan permanen & auto-backup
 
-Ketuk **ℹ** di toolbar:
+Modal **ℹ** kini ringkas: ringkasan di atas, lalu sub-menu **Keamanan & PIN**,
+**Backup & penyimpanan**, dan **Tentang**. Detail penyimpanan ada di
+**ℹ → Backup & penyimpanan**; info teknis build ada di **ℹ → Tentang**.
 
 - **Penyimpanan permanen** — app meminta `navigator.storage.persist()` saat
   dibuka supaya browser tidak membersihkan data saat storage menipis. Status
-  "ya/belum" tampil di modal; kalau "belum", tetap backup rutin.
+  "ya/belum" tampil di **ℹ → Backup & penyimpanan**; kalau "belum", tetap backup rutin.
 - **Pemakaian storage** — perkiraan ruang terpakai vs kuota.
 - **Auto-backup folder** (Chrome/Edge/Android) — pilih folder sekali; app
   menulis `stacker-auto-YYYY-MM-DD.json` otomatis saat dibuka (sekali per hari)
   dan saat tombol **Backup ke folder sekarang**. Tidak ada data yang dikirim
   ke internet. File ditulis plaintext JSON — kalau perlu terenkripsi, pakai
-  `backup kunci <sandi>` manual. Retensi file backup diatur di modal **ℹ**
-  (10–100 file terbaru).
+  `backup kunci <sandi>` manual. Retensi file backup diatur di
+  **ℹ → Backup & penyimpanan** (10–100 file terbaru).
 - **Pengingat** — chat menampilkan notice bila belum pernah backup atau backup
   terakhir ≥ 14 hari.
 - **Bar "Versi baru tersedia"** — saat service worker memperbarui cache, app
   menampilkan tombol **Muat ulang** (tidak auto-reload supaya ketikan tak hilang).
-- **Panel keamanan** — modal **ℹ** juga menampilkan commit SHA build, hash
-  bundle SHA-256, host AI yang boleh dihubungi, dan status "data lokal".
-- **Tentang** — bagian bawah modal **ℹ** memuat nama app, pembuat
-  (Igoon / I Go On), lisensi Apache-2.0, dan tautan kode sumber.
+- **Info teknis** — **ℹ → Tentang** menampilkan commit SHA build, hash
+  bundle SHA-256, host AI yang boleh dihubungi, dan status "data lokal", plus
+  nama app, pembuat (Igoon / I Go On), lisensi Apache-2.0, dan tautan kode sumber.
 
 ### Verifikasi keamanan (30 detik)
 
@@ -484,7 +485,7 @@ Lakukan backup rutin, terutama di iOS (storage bisa kena *eviction*).
 | Data hilang setelah lama | Restore dari file backup. |
 | Muncul bar "Versi baru tersedia" | Ketuk **Muat ulang** untuk memakai versi terbaru (data tidak hilang). |
 | Tombol auto-backup folder tak ada | File System Access API hanya Chrome/Edge/Android. Di iOS/Safari pakai **⬇ Backup**. |
-| Auto-backup tidak jalan otomatis | Buka **ℹ** → **Pilih folder auto-backup** sekali (izin folder bisa dicabut browser). Tombol **Backup ke folder sekarang** memaksa tulis. |
+| Auto-backup tidak jalan otomatis | Buka **ℹ → Backup & penyimpanan** → **Pilih folder auto-backup** sekali (izin folder bisa dicabut browser). Tombol **Backup ke folder sekarang** memaksa tulis. |
 | AI tidak aktif | Provider Gemini butuh key. Provider OpenAI butuh base URL. |
 | AI OpenAI remote (Groq/OpenRouter) gagal | CSP hanya mengizinkan Gemini + `localhost`/`127.0.0.1`. Pakai Ollama/LM Studio lokal. |
 

@@ -304,7 +304,7 @@ input.addEventListener("keydown", (e) => {
   if (e.key === "Enter") send();
 });
 
-// Toolbar: export backup, import backup, set AI key.
+// Toolbar: backup, restore, undo. (AI/wallpaper/backup terenkripsi via ℹ.)
 document.getElementById("export")!.onclick = async () => {
   const r = await call({ type: "export" });
   saveFile(`stacker-backup-${todayStr()}.json`, r.json as string);
@@ -354,7 +354,8 @@ function toggleBaseRow(): void {
 
 aiProvider.addEventListener("change", toggleBaseRow);
 
-document.getElementById("aikey")!.onclick = async () => {
+document.getElementById("openAI")!.onclick = async () => {
+  for (const m of [infoModal, secModal, storeModal, aboutModal]) m.hidden = true;
   const r = await call({ type: "getai" });
   const c = (r.config ?? {}) as {
     provider?: string;
@@ -494,7 +495,8 @@ for (const p of WALL_PRESETS) {
   wallSwatches.appendChild(btn);
 }
 
-document.getElementById("wall")!.onclick = () => {
+document.getElementById("openWall")!.onclick = () => {
+  for (const m of [infoModal, secModal, storeModal, aboutModal]) m.hidden = true;
   currentWall = readWall();
   syncWallControls(currentWall);
   wallModal.hidden = false;
@@ -716,12 +718,12 @@ function openPinModal(mode: PinMode): void {
   pinFlow = { mode, step: 0 };
   pinModalBuffer = "";
   pinMsg.textContent = "";
-  infoModal.hidden = true;
+  for (const m of [infoModal, secModal, storeModal, aboutModal]) m.hidden = true;
   pinModal.hidden = false;
   renderPinStep();
 }
 
-function closePinModal(backToInfo: boolean): void {
+function closePinModal(backToSec: boolean): void {
   pinFlow = null;
   pinModalBuffer = "";
   pinModal.hidden = true;
@@ -731,8 +733,8 @@ function closePinModal(backToInfo: boolean): void {
     pinVerifyResolve = null;
     resolve(false);
   }
-  if (backToInfo) {
-    infoModal.hidden = false;
+  if (backToSec) {
+    secModal.hidden = false;
     renderInfo();
   }
 }
@@ -975,6 +977,7 @@ function askPass(text: string, message?: string, action: "import" | "encrypt" = 
   passInput.value = "";
   passMsg.textContent = message ?? "";
   passMsg.hidden = !message;
+  for (const m of [infoModal, secModal, storeModal, aboutModal]) m.hidden = true;
   passModal.hidden = false;
   passInput.focus();
 }
@@ -1105,7 +1108,13 @@ retainSel.onchange = () => {
 };
 
 const infoModal = document.getElementById("infoModal")!;
-const infoLines = document.getElementById("infoLines")!;
+const infoSummary = document.getElementById("infoSummary")!;
+const secModal = document.getElementById("secModal")!;
+const secLines = document.getElementById("secLines")!;
+const storeModal = document.getElementById("storeModal")!;
+const storeLines = document.getElementById("storeLines")!;
+const aboutModal = document.getElementById("aboutModal")!;
+const aboutLines = document.getElementById("aboutLines")!;
 const pickDirBtn = document.getElementById("pickDir") as HTMLButtonElement;
 const backupNowBtn = document.getElementById("backupNow") as HTMLButtonElement;
 const clearDirBtn = document.getElementById("clearDir") as HTMLButtonElement;
@@ -1132,7 +1141,7 @@ function verifyPinForWipe(): Promise<boolean> {
 
 async function wipeAllData(): Promise<void> {
   try {
-    infoModal.hidden = true;
+    for (const m of [infoModal, secModal, storeModal, aboutModal]) m.hidden = true;
     const r = await call({ type: "wipe" });
     if (!r.ok) throw new Error(String(r.error ?? "gagal menghapus database"));
     if (window.caches) {
@@ -1218,7 +1227,7 @@ async function autoBackup(force = false): Promise<void> {
     if (!backupPermWarned) {
       backupPermWarned = true;
       addBubble(
-        "Auto-backup butuh izin folder lagi. Buka ℹ → Pilih folder auto-backup sekali lagi.",
+        "Auto-backup butuh izin folder lagi. Buka ℹ → Backup & penyimpanan → Pilih folder sekali lagi.",
         "bot"
       );
     }
@@ -1299,14 +1308,12 @@ async function refreshAiHosts(): Promise<void> {
 }
 
 function renderInfo(): void {
-  infoLines.textContent = [
-    `Versi: v${appVersion || "-"}`,
-    `Build: ${__BUILD_SHA__ || "lokal"} (${__BUILD_TIME__.slice(0, 10)})`,
-    `Hash bundle SHA-256: ${bundleHash || "menghitung…"}`,
-    `Host AI: ${aiHosts}`,
-    `Data: lokal di perangkat (OPFS), tanpa server`,
-    "",
-    `Transaksi: ${txCount}`,
+  infoSummary.textContent =
+    `v${appVersion || "-"} · ${txCount} transaksi · backup: ${lastBackupAt ?? "belum"}`;
+  secLines.textContent = pinSet
+    ? "PIN: aktif."
+    : "PIN: nonaktif. PIN hanya mengunci tampilan — data tetap tersimpan di perangkat.";
+  storeLines.textContent = [
     `Backup terakhir: ${lastBackupAt ?? "belum pernah"}`,
     `Auto-backup: ${
       folder
@@ -1318,16 +1325,28 @@ function renderInfo(): void {
   ]
     .filter((x) => x !== "")
     .join("\n");
+  aboutLines.textContent = [
+    `Versi: v${appVersion || "-"}`,
+    `Build: ${__BUILD_SHA__ || "lokal"} (${__BUILD_TIME__.slice(0, 10)})`,
+    `Hash bundle SHA-256: ${bundleHash || "menghitung…"}`,
+    `Host AI: ${aiHosts}`,
+    `Data: lokal di perangkat (OPFS), tanpa server`,
+  ].join("\n");
   pickDirBtn.disabled = !supportsFolderBackup();
   backupNowBtn.disabled = !folder;
   clearDirBtn.disabled = !folder;
   renderPinButtons();
 }
 
+function showInfoPane(pane: HTMLElement): void {
+  for (const m of [infoModal, secModal, storeModal, aboutModal]) m.hidden = true;
+  pane.hidden = false;
+  renderInfo();
+}
+
 document.getElementById("info")!.onclick = async () => {
   await Promise.all([refreshStorageText(), refresh(), refreshAiHosts()]);
-  infoModal.hidden = false;
-  renderInfo();
+  showInfoPane(infoModal);
   if (!bundleHash) {
     bundleHash = await bundleSha256();
     renderInfo();
@@ -1337,6 +1356,12 @@ document.getElementById("info")!.onclick = async () => {
 document.getElementById("infoClose")!.onclick = () => {
   infoModal.hidden = true;
 };
+document.getElementById("openSecurity")!.onclick = () => showInfoPane(secModal);
+document.getElementById("openStorage")!.onclick = () => showInfoPane(storeModal);
+document.getElementById("openAbout")!.onclick = () => showInfoPane(aboutModal);
+document.getElementById("secBack")!.onclick = () => showInfoPane(infoModal);
+document.getElementById("storeBack")!.onclick = () => showInfoPane(infoModal);
+document.getElementById("aboutBack")!.onclick = () => showInfoPane(infoModal);
 
 document.getElementById("updateReload")!.onclick = () => location.reload();
 
@@ -1371,7 +1396,7 @@ backupNowBtn.onclick = async () => {
   const ok = await folderPermission(folder, true);
   if (!ok) {
     folderNeedsPermission = true;
-    addBubble("Izin folder ditolak. Pilih folder lagi lewat ℹ.", "bot");
+    addBubble("Izin folder ditolak. Pilih folder lagi lewat ℹ → Backup & penyimpanan.", "bot");
     return;
   }
   folderNeedsPermission = false;

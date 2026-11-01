@@ -30,6 +30,7 @@ async function submitPad(page: Page, pad: "#lockPad" | "#pinPad"): Promise<void>
 
 async function setPinUi(page: Page, pin: string): Promise<void> {
   await page.locator("#info").click();
+  await page.locator("#openSecurity").click();
   await page.locator("#pinSetBtn").click();
   await tapPad(page, "#pinPad", pin);
   await submitPad(page, "#pinPad");
@@ -127,6 +128,8 @@ test("tombol undo membatalkan aksi terakhir", async ({ page }) => {
 test("tombol backup terenkripsi", async ({ page }) => {
   await boot(page);
   await chat(page, "kopi 15rb");
+  await page.locator("#info").click();
+  await page.locator("#openStorage").click();
   await page.locator("#exportEnc").click();
   await expect(page.locator("#passModal")).toBeVisible();
   await page.locator("#passInput").fill("sandi-panjang-2026");
@@ -252,18 +255,42 @@ test("backup kunci menghasilkan file terenkripsi", async ({ page }) => {
   await expect(page.locator("#chat .bubble").filter({ hasText: "Backup dimuat" })).toBeVisible();
 });
 
-test("modal info menampilkan versi & penyimpanan", async ({ page }) => {
+test("modal info ringkas + sub-modal (storage & tentang)", async ({ page }) => {
   await boot(page);
   await page.locator("#info").click();
   await expect(page.locator("#infoModal")).toBeVisible();
-  await expect(page.locator("#infoLines")).toContainText("Versi: v");
-  await expect(page.locator("#infoLines")).toContainText("Backup terakhir:");
-  await expect(page.locator("#infoLines")).toContainText("Pemakaian storage:");
-  await expect(page.locator("#retain")).toHaveValue("30");
-  await expect(page.locator("#infoModal .about")).toContainText("Tentang Stacker");
-  await expect(page.locator("#infoModal .about")).toContainText("Apache-2.0");
-  await expect(page.locator("#infoModal .about")).toContainText("Igoon");
+  await expect(page.locator("#infoSummary")).toContainText(/v\d/);
+  await expect(page.locator("#infoSummary")).toContainText("transaksi");
 
+  await page.locator("#openStorage").click();
+  await expect(page.locator("#storeModal")).toBeVisible();
+  await expect(page.locator("#storeLines")).toContainText("Backup terakhir:");
+  await expect(page.locator("#storeLines")).toContainText("Pemakaian storage:");
+  await expect(page.locator("#retain")).toHaveValue("30");
+
+  await page.locator("#storeBack").click();
+  await expect(page.locator("#infoModal")).toBeVisible();
+  await page.locator("#openAbout").click();
+  await expect(page.locator("#aboutModal")).toBeVisible();
+  await expect(page.locator("#aboutLines")).toContainText("Versi: v");
+  await expect(page.locator("#aboutLines")).toContainText("Host AI:");
+  await expect(page.locator("#aboutModal h3")).toContainText("Tentang Stacker");
+  await expect(page.locator("#aboutModal .about")).toContainText("Apache-2.0");
+  await expect(page.locator("#aboutModal .about")).toContainText("Igoon");
+
+  await page.locator("#aboutBack").click();
+  await expect(page.locator("#infoModal")).toBeVisible();
+
+  await page.locator("#openWall").click();
+  await expect(page.locator("#wallModal")).toBeVisible();
+  await page.locator("#wallClose").click();
+
+  await page.locator("#info").click();
+  await page.locator("#openAI").click();
+  await expect(page.locator("#aiModal")).toBeVisible();
+  await page.locator("#aiCancel").click();
+
+  await page.locator("#info").click();
   await page.locator("#infoClose").click();
   await expect(page.locator("#infoModal")).toBeHidden();
 });
@@ -278,11 +305,12 @@ test("CSP aktif & panel keamanan menampilkan build + hash", async ({ page }) => 
   expect(csp).toContain("object-src 'none'");
 
   await page.locator("#info").click();
-  await expect(page.locator("#infoLines")).toContainText("Build:");
-  await expect(page.locator("#infoLines")).toContainText(/Hash bundle SHA-256: [0-9a-f]{64}/, {
+  await page.locator("#openAbout").click();
+  await expect(page.locator("#aboutLines")).toContainText("Build:");
+  await expect(page.locator("#aboutLines")).toContainText(/Hash bundle SHA-256: [0-9a-f]{64}/, {
     timeout: 15_000,
   });
-  await expect(page.locator("#infoLines")).toContainText("Host AI:");
+  await expect(page.locator("#aboutLines")).toContainText("Host AI:");
 });
 
 test("cooldown PIN bertahan setelah reload (keypad visual)", async ({ page }) => {
@@ -319,8 +347,9 @@ test("PIN: set via keypad, ubah, unlock, hapus", async ({ page }) => {
   await unlockUi(page, "1234");
   await expect(page.locator("#lock")).toBeHidden();
 
-  // Ubah PIN lewat modal ℹ.
+  // Ubah PIN lewat sub-modal Keamanan di ℹ.
   await page.locator("#info").click();
+  await page.locator("#openSecurity").click();
   await page.locator("#pinChangeBtn").click();
   await tapPad(page, "#pinPad", "1234");
   await submitPad(page, "#pinPad");
@@ -337,9 +366,12 @@ test("PIN: set via keypad, ubah, unlock, hapus", async ({ page }) => {
 
   // Hapus PIN.
   await page.locator("#info").click();
+  await page.locator("#openSecurity").click();
   await page.locator("#pinDeleteBtn").click();
   await tapPad(page, "#pinPad", "5678");
   await submitPad(page, "#pinPad");
+  await expect(page.locator("#secModal")).toBeVisible();
+  await page.locator("#secBack").click();
   await page.locator("#infoClose").click();
   await expect(page.locator("#chat .bubble").filter({ hasText: "PIN dihapus" })).toBeVisible();
 
@@ -359,6 +391,7 @@ test("hapus semua data membersihkan storage dan mereset app", async ({ page }) =
 
   page.on("dialog", (d) => void d.accept());
   await page.locator("#info").click();
+  await page.locator("#openSecurity").click();
   await page.locator("#wipeData").click();
 
   // Reload otomatis: app kembali bersih dan localStorage dibersihkan.
@@ -376,6 +409,7 @@ test("hapus semua data wajib PIN bila PIN aktif", async ({ page }) => {
 
   page.on("dialog", (d) => void d.accept());
   await page.locator("#info").click();
+  await page.locator("#openSecurity").click();
   await page.locator("#wipeData").click();
   await expect(page.locator("#pinModal")).toBeVisible();
 
