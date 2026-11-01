@@ -35,6 +35,9 @@ import {
   reconcileAccount,
   renameAccount,
   renameCategory,
+  resetAccounts,
+  resetAll,
+  resetCategories,
   recurringDue,
   rupiah,
   rupiahSigned,
@@ -57,7 +60,7 @@ import {
   type Debt,
   type Tx,
 } from "./db";
-import { parseLocal, parseLocalMulti, MASUK, type ParseResult } from "./parser";
+import { parseLocal, parseLocalMulti, type ParseResult } from "./parser";
 import {
   extractDate,
   isoLocal,
@@ -124,14 +127,15 @@ const HELP =
   "Kategori:\n" +
   "  (arah: terima/masuk/dapat/gaji/bunga = masuk; lain = keluar)\n" +
   "  kategori\n" +
+  "  kategori tambah Sosial | sosial, jimpitan, donasi   (default keduanya)\n" +
+  "  kategori tambah Sosial sosial jimpitan   (tanpa |, kata pertama = nama)\n" +
   "  kategori tambah masuk Bunga | bunga, dividen\n" +
   "  kategori tambah keluar Sedekah | sedekah, donasi\n" +
-  "  kategori tambah keduanya Sedekah | sedekah\n" +
   "  kategori sisi Sedekah keduanya\n" +
   "  kategori tambahkata Sedekah | infak\n" +
   "  kategori hapuskata Sedekah | zakat\n" +
   "  kategori ubah Sedekah | sedekah, donasi, zakat\n" +
-  "  kategori hapus Sedekah\n\n" +
+  "  kategori hapus Sedekah      (atau: hapus kategori Sedekah)\n\n" +
   "Laporan & export:\n" +
   "  laporan | laporan september | laporan gopay september\n" +
   "  laporan banding [bulan]      (vs periode sebelumnya)\n" +
@@ -167,7 +171,7 @@ const HELP =
   "  backup | backup kunci <sandi>   (JSON / terenkripsi)\n" +
   "  ai | ai reset               (pemakaian AI)\n" +
   "  versi                       (versi aplikasi)\n" +
-  "  reset transaksi            (hapus semua, ada backup)\n" +
+  "  reset transaksi            (hapus semua transaksi, ada backup)\n" +
   "  alias | alias tf transfer | alias hapus tf | alias reset\n" +
   "  help\n\n" +
   "Nominal: 50rb, 1,5jt, 50000, 45.001.889\n" +
@@ -199,6 +203,35 @@ function aliasConflict(words: string[]): string | null {
     if (k && map[k]) return `"${k}" bentrok dengan alias → ${map[k]}`;
   }
   return null;
+}
+
+// Cek bentrok satu kata kunci: perintah, alias, atau kategori lain.
+// exceptId: kategori yang sedang diedit (boleh punya kata kunci itu sendiri).
+function keywordConflict(kw: string, exceptId?: number): string | null {
+  const k = kw.toLowerCase().trim();
+  if (!k) return null;
+  if (COMMAND_WORD_SET.has(k)) return "bentrok perintah";
+  const aliases = loadAliases();
+  if (aliases[k]) return `bentrok alias → ${aliases[k]}`;
+  for (const c of listCategories()) {
+    if (exceptId != null && c.id === exceptId) continue;
+    if (c.nama.toLowerCase() === k) return `bentrok nama kategori ${c.nama}`;
+    if (c.keywords.some((x) => x.toLowerCase() === k)) return `sudah dipakai kategori ${c.nama}`;
+  }
+  return null;
+}
+
+// Pisahkan "<nama> <pemisah> <kata kunci>" dengan pemisah | : = (opsional).
+function splitNameKw(rest: string): { name: string; kwRaw: string } {
+  const i = rest.search(/[|:=]/);
+  return i === -1
+    ? { name: rest.trim(), kwRaw: "" }
+    : { name: rest.slice(0, i).trim(), kwRaw: rest.slice(i + 1).trim() };
+}
+
+// Kata kunci dipisah koma dan/atau spasi.
+function splitKw(raw: string): string[] {
+  return raw.split(/[,\s]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
 }
 
 function loadAliases(): Record<string, string> {
@@ -568,17 +601,44 @@ async function handleMessageInner(input: string): Promise<Reply> {
     };
   }
 
-  if (/^reset\s+(transaksi|laporan|semua)$/i.test(text)) {
-    const bkp = exportJson();
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const name = `backup-pre-reset-${stamp}.json`;
-    const n = deleteAllTx();
-    return {
-      text:
-        `Semua transaksi dihapus (${n}). Saldo kini = saldo awal tiap akun.\n` +
-        `Backup sebelum reset: ${name} (file terunduh otomatis).`,
-      file: { name, content: bkp },
-    };
+  {
+    const rm = text.match(/^reset\s+(transaksi|laporan|semua|kategori|akun)$/i);
+    if (rm) {
+      const kind = rm[1].toLowerCase();
+      const back = {
+        name: `backup-pre-reset-${new Date().toISOString().replace(/[:.]/g, "-")}.json`,
+        content: exportJson(),
+      };
+      const tail = `\nBackup sebelum reset: ${back.name} (unduh otomatis).`;
+      if (kind === "kategori") {
+        const n = resetCategories();
+        return {
+          text: `Semua kategori dihapus (${n}) + anggarannya. Transaksi lama tetap ada.${tail}`,
+          file: back,
+        };
+      }
+      if (kind === "akun") {
+        const r = resetAccounts();
+        return {
+          text:
+            `Semua akun dihapus (${r.accounts}) + ${r.tx} transaksi & ${r.recurring} berulang. ` +
+            `Akun default dibuat ulang.${tail}`,
+          file: back,
+        };
+      }
+      if (kind === "semua") {
+        resetAll();
+        return {
+          text: `Reset total: semua data kembali ke kondisi awal (akun & kategori default).${tail}`,
+          file: back,
+        };
+      }
+      const n = deleteAllTx();
+      return {
+        text: `Semua transaksi dihapus (${n}). Saldo kini = saldo awal tiap akun.${tail}`,
+        file: back,
+      };
+    }
   }
 
   if ((low === "saldo" || low.startsWith("saldo ")) && !/^saldo\s+awal\b/.test(low)) {
@@ -666,42 +726,46 @@ async function handleMessageInner(input: string): Promise<Reply> {
         fmt(grp("masuk")) +
         "\n\nKeluar:\n" +
         fmt(grp("keluar")) +
-        "\n\nTambah: `kategori tambah masuk Bunga | bunga, dividen` · `kategori tambah keluar Sedekah | sedekah`\n" +
-        "Dua arah: `kategori tambah keduanya Sedekah | sedekah`\n" +
+        "\n\nTambah: `kategori tambah Sosial | sosial, jimpitan` (pemisah `|`, `:`, atau `=`)\n" +
+        "Tanpa pemisah: `kategori tambah Sosial sosial jimpitan` (kata pertama = nama)\n" +
+        "Tipe opsional: `masuk`/`keluar`/`keduanya` (default `keduanya`)\n" +
         "Pindah sisi: `kategori sisi Sedekah keduanya`\n" +
         "Kata kunci: `kategori tambahkata Sedekah | infak` · `kategori hapuskata Sedekah | zakat`",
     };
   }
 
   if ((m = text.match(/^kategori tambahkata\s+(.+)$/i))) {
-    const rest = m[1].trim();
-    const pipe = rest.indexOf("|");
-    const nama = (pipe === -1 ? rest : rest.slice(0, pipe)).trim();
-    const kwRaw = pipe === -1 ? "" : rest.slice(pipe + 1).trim();
-    const cat = getCategoryByName(nama);
-    if (!cat) return { text: `Kategori "${nama}" tidak ada. Buat: \`kategori tambah ${nama}\`` };
-    const add = kwRaw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+    const { name, kwRaw } = splitNameKw(m[1].trim());
+    const cat = getCategoryByName(name);
+    if (!cat) return { text: `Kategori "${name}" tidak ada. Buat: \`kategori tambah ${name}\`` };
+    const add = splitKw(kwRaw);
     if (!add.length) return { text: "Format: `kategori tambahkata Sedekah | zakat, infak`" };
-    const aliasKw = aliasConflict(add);
-    if (aliasKw) return { text: `Kata kunci tidak ditambah: ${aliasKw}.` };
-    const merged = [...new Set([...cat.keywords, ...add])];
+    const kept: string[] = [];
+    const skipped: string[] = [];
+    for (const k of add) {
+      const conf = keywordConflict(k, cat.id);
+      if (conf) skipped.push(`${k} (${conf})`);
+      else kept.push(k);
+    }
+    const merged = [...new Set([...cat.keywords, ...kept])];
     updateCategoryKeywords(cat.id, merged);
-    const added = add.filter((k) => !cat.keywords.includes(k));
+    const added = kept.filter((k) => !cat.keywords.includes(k));
+    const note = skipped.length ? `\nDilewati: ${skipped.join("; ")}` : "";
+    if (!kept.length) {
+      return { text: `Kata kunci tidak ditambah: ${skipped.join("; ")}.` };
+    }
     return {
       text:
         `${cat.nama}: +${added.length} kata kunci${added.length ? ` (${added.join(", ")})` : " (tidak ada baru)"}\n` +
-        `Kata kunci: ${merged.join(", ")}`,
+        `Kata kunci: ${merged.join(", ")}${note}`,
     };
   }
 
   if ((m = text.match(/^kategori hapuskata\s+(.+)$/i))) {
-    const rest = m[1].trim();
-    const pipe = rest.indexOf("|");
-    const nama = (pipe === -1 ? rest : rest.slice(0, pipe)).trim();
-    const kwRaw = pipe === -1 ? "" : rest.slice(pipe + 1).trim();
-    const cat = getCategoryByName(nama);
-    if (!cat) return { text: `Kategori "${nama}" tidak ada.` };
-    const del = kwRaw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+    const { name, kwRaw } = splitNameKw(m[1].trim());
+    const cat = getCategoryByName(name);
+    if (!cat) return { text: `Kategori "${name}" tidak ada.` };
+    const del = splitKw(kwRaw);
     if (!del.length) return { text: "Format: `kategori hapuskata Sedekah | zakat`" };
     const remaining = cat.keywords.filter((k) => !del.includes(k));
     updateCategoryKeywords(cat.id, remaining);
@@ -713,11 +777,18 @@ async function handleMessageInner(input: string): Promise<Reply> {
     };
   }
 
-  if ((m = text.match(/^kategori tambah\s+(.+)$/i))) {
-    const rest = m[1].trim();
-    const pipe = rest.indexOf("|");
-    let head = (pipe === -1 ? rest : rest.slice(0, pipe)).trim();
-    const kwRaw = pipe === -1 ? "" : rest.slice(pipe + 1).trim();
+  // Sinonim: "tambah/buat kategori X", "kategori baru X", "hapus kategori X".
+  let katText = text;
+  const revAdd = text.match(/^(?:tambah|buat)\s+kategori\s+([\s\S]+)$/i);
+  const newAdd = text.match(/^kategori\s+baru\s+([\s\S]+)$/i);
+  const delKat = text.match(/^hapus\s+kategori\s+([\s\S]+)$/i);
+  if (revAdd) katText = `kategori tambah ${revAdd[1]}`;
+  else if (newAdd) katText = `kategori tambah ${newAdd[1]}`;
+  else if (delKat) katText = `kategori hapus ${delKat[1]}`;
+
+  if ((m = katText.match(/^kategori tambah\s+(.+)$/i))) {
+    const { name: rawName, kwRaw } = splitNameKw(m[1].trim());
+    let head = rawName;
     let tipe: string | undefined;
     const words = head.split(/\s+/).filter(Boolean);
     for (const t of ["masuk", "keluar", "keduanya"]) {
@@ -727,25 +798,49 @@ async function handleMessageInner(input: string): Promise<Reply> {
         break;
       }
     }
-    const nama = head;
-    if (!nama) return { text: "Format: `kategori tambah [masuk|keluar|keduanya] <nama> | kata kunci`" };
-    const keywords = kwRaw
-      ? kwRaw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
-      : [nama.toLowerCase()];
-    const aliasCat = aliasConflict([nama, ...keywords]);
+    let nama = head;
+    let keywords: string[];
+    if (kwRaw) {
+      keywords = splitKw(kwRaw);
+    } else if (nama.split(/\s+/).filter(Boolean).length > 1) {
+      // Tanpa pemisah: kata pertama = nama, sisanya = kata kunci.
+      const ws = nama.split(/\s+/).filter(Boolean);
+      nama = ws[0];
+      keywords = splitKw(ws.slice(1).join(" "));
+    } else {
+      keywords = [nama.toLowerCase()];
+    }
+    if (!nama) return { text: "Format: `kategori tambah [masuk|keluar|keduanya] <nama> | <kata kunci>`" };
+
+    const aliasCat = aliasConflict([nama]);
     if (aliasCat) return { text: `Kategori tidak dibuat: ${aliasCat}.` };
-    if (!tipe) tipe = keywords.some((k) => MASUK.includes(k)) ? "masuk" : "keluar";
+
     const existing = getCategoryByName(nama);
-    if (existing) {
-      const merged = [...new Set([...existing.keywords, ...keywords])];
-      updateCategoryKeywords(existing.id, merged);
-      if (tipe) setCategoryTipe(existing.id, tipe);
+    const kept: string[] = [];
+    const skipped: string[] = [];
+    for (const k of keywords) {
+      const conf = keywordConflict(k, existing?.id);
+      if (conf) skipped.push(`${k} (${conf})`);
+      else kept.push(k);
+    }
+    if (!kept.length) {
       return {
-        text: `Kategori ${existing.nama} (${tipe}) diperbarui. Kata kunci: ${merged.join(", ")}`,
+        text: `Kata kunci bentrok semua: ${skipped.join("; ")}. Pilih kata lain atau lihat \`kategori\`.`,
       };
     }
-    addCategory(nama, keywords, tipe);
-    return { text: `Kategori ${nama} [${tipe}] ditambah. Kata kunci: ${keywords.join(", ")}` };
+    // Tiada tipe ditentukan → keduanya (bisa masuk & keluar).
+    if (!tipe) tipe = "keduanya";
+    const note = skipped.length ? ` Dilewati: ${skipped.join("; ")}.` : "";
+    if (existing) {
+      const merged = [...new Set([...existing.keywords, ...kept])];
+      updateCategoryKeywords(existing.id, merged);
+      setCategoryTipe(existing.id, tipe);
+      return {
+        text: `Kategori ${existing.nama} (${tipe}) diperbarui. Kata kunci: ${merged.join(", ")}.${note}`,
+      };
+    }
+    addCategory(nama, kept, tipe);
+    return { text: `Kategori ${nama} [${tipe}] ditambah. Kata kunci: ${kept.join(", ")}.${note}` };
   }
 
   if ((m = text.match(/^kategori sisi\s+(.+)$/i))) {
@@ -767,29 +862,33 @@ async function handleMessageInner(input: string): Promise<Reply> {
     const cat = getCategoryByName(lama);
     if (!cat) return { text: `Kategori "${lama}" tidak ada.` };
     if (getCategoryByName(baru)) return { text: `Kategori "${baru}" sudah ada.` };
-    const aliasCat = aliasConflict([baru]);
-    if (aliasCat) return { text: `Kategori tidak diubah: ${aliasCat}.` };
+    const nameConflict = keywordConflict(baru, cat.id);
+    if (nameConflict) return { text: `Nama kategori ditolak: "${baru}" ${nameConflict}.` };
     renameCategory(cat.id, baru);
     return { text: `Kategori ${lama} → ${baru}. Riwayat transaksi & anggaran ikut diganti.` };
   }
 
   if ((m = text.match(/^kategori ubah\s+(.+)$/i))) {
-    const rest = m[1].trim();
-    const pipe = rest.indexOf("|");
-    const nama = (pipe === -1 ? rest : rest.slice(0, pipe)).trim();
-    const kwRaw = pipe === -1 ? "" : rest.slice(pipe + 1).trim();
-    const cat = getCategoryByName(nama);
-    if (!cat) return { text: `Kategori "${nama}" tidak ada. Buat: \`kategori tambah ${nama} | kws\`` };
-    const keywords = kwRaw
-      ? kwRaw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
-      : [nama.toLowerCase()];
-    const aliasKw = aliasConflict(keywords);
-    if (aliasKw) return { text: `Kata kunci tidak diganti: ${aliasKw}.` };
-    updateCategoryKeywords(cat.id, keywords);
-    return { text: `Kata kunci ${cat.nama} diganti: ${keywords.join(", ")}` };
+    const { name, kwRaw } = splitNameKw(m[1].trim());
+    const cat = getCategoryByName(name);
+    if (!cat) return { text: `Kategori "${name}" tidak ada. Buat: \`kategori tambah ${name} | kws\`` };
+    const list = kwRaw ? splitKw(kwRaw) : [name.toLowerCase()];
+    const kept: string[] = [];
+    const skipped: string[] = [];
+    for (const k of list) {
+      const conf = keywordConflict(k, cat.id);
+      if (conf) skipped.push(`${k} (${conf})`);
+      else kept.push(k);
+    }
+    if (!kept.length) {
+      return { text: `Kata kunci tidak diganti: semua bentrok — ${skipped.join("; ")}.` };
+    }
+    updateCategoryKeywords(cat.id, kept);
+    const note = skipped.length ? ` Dilewati: ${skipped.join("; ")}.` : "";
+    return { text: `Kata kunci ${cat.nama} diganti: ${kept.join(", ")}.${note}` };
   }
 
-  if ((m = text.match(/^kategori hapus\s+(.+)$/i))) {
+  if ((m = katText.match(/^kategori hapus\s+(.+)$/i))) {
     const cat = getCategoryByName(m[1]);
     if (!cat) return { text: `Kategori "${m[1]}" tidak ada.` };
     deleteCategory(cat.id);

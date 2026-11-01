@@ -5,6 +5,28 @@ import type { MiniDb } from "./mini-sqlite";
 
 let db: MiniDb;
 
+// Default saat instal/reset pabrik.
+const DEFAULT_ACCOUNTS: { nama: string; tipe: string }[] = [
+  { nama: "Cash", tipe: "cash" },
+  { nama: "BSI", tipe: "bank" },
+  { nama: "Jago", tipe: "bank" },
+  { nama: "GoPay", tipe: "ewallet" },
+  { nama: "OVO", tipe: "ewallet" },
+  { nama: "DANA", tipe: "ewallet" },
+  { nama: "ShopeePay", tipe: "ewallet" },
+  { nama: "Flip", tipe: "ewallet" },
+];
+
+const DEFAULT_CATEGORIES: { nama: string; keywords: string[]; tipe: string }[] = [
+  { nama: "Makanan", keywords: ["makan", "minum", "sarapan", "kopi", "jajan", "camilan", "resto", "warteg", "nasi", "ayam", "bakso", "indomaret", "alfamart"], tipe: "keluar" },
+  { nama: "Transportasi", keywords: ["transport", "ojek", "bensin", "gojek", "grab", "taksi", "parkir", "tol", "kereta", "bus", "angkot", "tiket"], tipe: "keluar" },
+  { nama: "Belanja", keywords: ["belanja", "beli", "shopping", "baju", "sepatu", "tokopedia", "shopee"], tipe: "keluar" },
+  { nama: "Tagihan", keywords: ["listrik", "air", "internet", "pulsa", "kuota", "tagihan", "token", "wifi", "bpjs", "cicilan", "sewa", "kos"], tipe: "keluar" },
+  { nama: "Kesehatan", keywords: ["obat", "dokter", "klinik", "rumah sakit", "vitamin", "apotek"], tipe: "keluar" },
+  { nama: "Hiburan", keywords: ["nonton", "bioskop", "game", "topup", "spotify", "netflix", "liburan", "jalan"], tipe: "keluar" },
+  { nama: "Gaji", keywords: ["gaji", "upah", "honor", "thr", "bonus"], tipe: "masuk" },
+];
+
 export function initDb(mini: MiniDb): void {
   db = mini;
   db.pragma("journal_mode = WAL"); // no-op di OPFS sahpool
@@ -101,17 +123,6 @@ CREATE TABLE IF NOT EXISTS debts (
     setSetting("_migr_gaji_masuk", "1");
   }
 
-  const DEFAULTS: { nama: string; tipe: string }[] = [
-    { nama: "Cash", tipe: "cash" },
-    { nama: "BSI", tipe: "bank" },
-    { nama: "Jago", tipe: "bank" },
-    { nama: "GoPay", tipe: "ewallet" },
-    { nama: "OVO", tipe: "ewallet" },
-    { nama: "DANA", tipe: "ewallet" },
-    { nama: "ShopeePay", tipe: "ewallet" },
-    { nama: "Flip", tipe: "ewallet" },
-  ];
-
   {
     const count = (db.prepare(`SELECT COUNT(*) AS n FROM accounts`).get() as { n: number }).n;
     // Seed hanya sekali seumur DB. Kalau user sengaja menghapus semua akun,
@@ -119,7 +130,7 @@ CREATE TABLE IF NOT EXISTS debts (
     if (!getSetting("_seed_accounts")) {
       if (count === 0) {
         const ins = db.prepare(`INSERT INTO accounts (nama, tipe) VALUES (?, ?)`);
-        db.transaction(() => DEFAULTS.forEach((a) => ins.run(a.nama, a.tipe)));
+        db.transaction(() => DEFAULT_ACCOUNTS.forEach((a) => ins.run(a.nama, a.tipe)));
       }
       setSetting("_seed_accounts", "1");
     }
@@ -134,16 +145,6 @@ CREATE TABLE IF NOT EXISTS debts (
     }
     setSetting("_migr_null_account", "1");
   }
-
-  const DEFAULT_CATEGORIES: { nama: string; keywords: string[]; tipe: string }[] = [
-    { nama: "Makanan", keywords: ["makan", "minum", "sarapan", "kopi", "jajan", "camilan", "resto", "warteg", "nasi", "ayam", "bakso", "indomaret", "alfamart"], tipe: "keluar" },
-    { nama: "Transportasi", keywords: ["transport", "ojek", "bensin", "gojek", "grab", "taksi", "parkir", "tol", "kereta", "bus", "angkot", "tiket"], tipe: "keluar" },
-    { nama: "Belanja", keywords: ["belanja", "beli", "shopping", "baju", "sepatu", "tokopedia", "shopee"], tipe: "keluar" },
-    { nama: "Tagihan", keywords: ["listrik", "air", "internet", "pulsa", "kuota", "tagihan", "token", "wifi", "bpjs", "cicilan", "sewa", "kos"], tipe: "keluar" },
-    { nama: "Kesehatan", keywords: ["obat", "dokter", "klinik", "rumah sakit", "vitamin", "apotek"], tipe: "keluar" },
-    { nama: "Hiburan", keywords: ["nonton", "bioskop", "game", "topup", "spotify", "netflix", "liburan", "jalan"], tipe: "keluar" },
-    { nama: "Gaji", keywords: ["gaji", "upah", "honor", "thr", "bonus"], tipe: "masuk" },
-  ];
 
   {
     const count = (db.prepare(`SELECT COUNT(*) AS n FROM categories`).get() as { n: number }).n;
@@ -354,6 +355,54 @@ export function deleteTx(id: number): number {
 
 export function deleteAllTx(): number {
   return db.prepare(`DELETE FROM transactions`).run().changes;
+}
+
+// Hapus semua kategori + anggarannya (tanpa seed ulang).
+export function resetCategories(): number {
+  return db.transaction(() => {
+    const n = (db.prepare(`SELECT COUNT(*) AS n FROM categories`).get() as { n: number }).n;
+    db.prepare(`DELETE FROM budgets`).run();
+    db.prepare(`DELETE FROM categories`).run();
+    return n;
+  });
+}
+
+// Hapus semua akun + transaksi/berulang, lalu buat ulang akun default.
+export function resetAccounts(): { accounts: number; tx: number; recurring: number } {
+  return db.transaction(() => {
+    const a = (db.prepare(`SELECT COUNT(*) AS n FROM accounts`).get() as { n: number }).n;
+    const t = (db.prepare(`SELECT COUNT(*) AS n FROM transactions`).get() as { n: number }).n;
+    const rc = (db.prepare(`SELECT COUNT(*) AS n FROM recurring`).get() as { n: number }).n;
+    db.prepare(`DELETE FROM transactions`).run();
+    db.prepare(`DELETE FROM recurring`).run();
+    db.prepare(`DELETE FROM accounts`).run();
+    const ins = db.prepare(`INSERT INTO accounts (nama, tipe) VALUES (?, ?)`);
+    DEFAULT_ACCOUNTS.forEach((acc) => ins.run(acc.nama, acc.tipe));
+    return { accounts: a, tx: t, recurring: rc };
+  });
+}
+
+// Reset pabrik: kosongkan semua data + kembalikan default (akun + kategori).
+export function resetAll(): void {
+  db.transaction(() => {
+    for (const t of [
+      "transactions",
+      "recurring",
+      "debts",
+      "budgets",
+      "categories",
+      "accounts",
+      "settings",
+    ]) {
+      db.prepare(`DELETE FROM ${t}`).run();
+    }
+    const insA = db.prepare(`INSERT INTO accounts (nama, tipe) VALUES (?, ?)`);
+    DEFAULT_ACCOUNTS.forEach((a) => insA.run(a.nama, a.tipe));
+    const insC = db.prepare(`INSERT INTO categories (nama, keywords, tipe) VALUES (?, ?, ?)`);
+    DEFAULT_CATEGORIES.forEach((c) => insC.run(c.nama, JSON.stringify(c.keywords), c.tipe));
+    setSetting("_seed_accounts", "1");
+    setSetting("_seed_categories", "1");
+  });
 }
 
 export function listAccounts(): Account[] {

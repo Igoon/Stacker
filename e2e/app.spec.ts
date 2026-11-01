@@ -178,6 +178,33 @@ test("reset transaksi minta konfirmasi dulu", async ({ page }) => {
   await expect(page.locator("#chat .tx")).toHaveCount(0);
 });
 
+test("menu Reset data menjalankan reset transaksi", async ({ page }) => {
+  await boot(page);
+  await chat(page, "kopi 15rb");
+  await expect(page.locator("#chat .tx")).toHaveCount(1);
+
+  page.once("dialog", (d) => d.accept());
+  await page.locator("#info").click();
+  await page.locator("#openReset").click();
+  await page.locator("#resetTxBtn").click();
+  await expect(
+    page.locator("#chat .bubble").filter({ hasText: "Semua transaksi dihapus" })
+  ).toBeVisible();
+  await expect(page.locator("#chat .tx")).toHaveCount(0);
+});
+
+test("reset semua minta konfirmasi & mengosongkan data", async ({ page }) => {
+  await boot(page);
+  await chat(page, "kopi 15rb");
+  await expect(page.locator("#saldo")).toHaveText(/-Rp15\.000/);
+
+  page.once("dialog", (d) => d.accept());
+  await chat(page, "reset semua");
+  await expect(page.locator("#chat .bubble").filter({ hasText: "Reset total" })).toBeVisible();
+  await expect(page.locator("#saldo")).toHaveText(/Rp0/);
+  await expect(page.locator("#chat .tx")).toHaveCount(0);
+});
+
 test("hapus via perintah menyinkronkan bubble", async ({ page }) => {
   await boot(page);
   await chat(page, "makan 50rb");

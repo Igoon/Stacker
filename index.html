@@ -146,6 +146,7 @@
       <button id="openStorage" class="menu-row"><span>Backup &amp; penyimpanan</span><span class="chev">›</span></button>
       <button id="openWall" class="menu-row"><span>Tampilan (wallpaper)</span><span class="chev">›</span></button>
       <button id="openAI" class="menu-row"><span>AI (opsional)</span><span class="chev">›</span></button>
+      <button id="openReset" class="menu-row"><span>Reset data</span><span class="chev">›</span></button>
       <button id="openAbout" class="menu-row"><span>Tentang</span><span class="chev">›</span></button>
     </div>
     <div class="modal-actions">
@@ -225,6 +226,28 @@
     </div>
     <div class="modal-actions">
       <button id="aboutBack">Kembali</button>
+    </div>
+  </div>
+</div>
+<div id="resetModal" class="modal" hidden>
+  <div class="modal-box">
+    <h3>Reset data</h3>
+    <p class="info-note">
+      Reset mengembalikan data ke kondisi awal; app tetap terinstall. Backup
+      otomatis diunduh sebelum reset.
+    </p>
+    <div class="info-actions">
+      <button id="resetTxBtn">Reset transaksi (saldo balik ke saldo awal)</button>
+      <button id="resetCatBtn">Reset kategori + anggaran</button>
+      <button id="resetAccBtn">Reset akun + transaksinya</button>
+      <button id="resetAllBtn" class="danger">Reset semua (pabrik)</button>
+    </div>
+    <p class="info-note">
+      Untuk uninstall bersih (hapus cache/PIN/izin folder), pakai
+      <strong>ℹ → Keamanan → Hapus semua data…</strong>.
+    </p>
+    <div class="modal-actions">
+      <button id="resetBack">Kembali</button>
     </div>
   </div>
 </div>

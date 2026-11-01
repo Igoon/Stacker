@@ -83,6 +83,8 @@ ter-deploy kalau logika rusak.
   status storage permanen (`navigator.storage.persist()`) di modal **ℹ**.
 - **Hapus semua data (uninstall bersih)** — hapus DB OPFS, IndexedDB, cache,
   Service Worker, dan kunci localStorage; PIN wajib bila aktif.
+- **Reset data lewat menu** (ℹ → Reset data): transaksi/kategori/akun/semua —
+  konfirmasi + auto-backup; `semua` reset pabrik (butuh PIN / ketik `RESET`).
 - **Alias perintah** (`alias tf transfer`, target multi-kata, hapus/reset, tampil di `alias`/`help`).
 - **Update prompt** service worker ("Versi baru tersedia → Muat ulang").
 - **CSP ketat** (script self, connect hanya Gemini + localhost) + panel **ℹ**
@@ -140,5 +142,5 @@ memverifikasi build (commit SHA + hash bundle di panel **ℹ**,
 
 ## Versi
 
-`v2.9.1` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
+`v2.10.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
 Nilai versi di-hardcode di `src/version.ts` (browser tak bisa baca `package.json`).

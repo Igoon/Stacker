@@ -267,13 +267,22 @@ async function refresh(): Promise<Record<string, unknown>> {
 async function send(): Promise<void> {
   const text = input.value.trim();
   if (!text || !ready) return;
-  if (
-    /^reset\s+(transaksi|laporan|semua)$/i.test(text) &&
-    !window.confirm(
-      "Hapus SEMUA transaksi? Backup JSON akan diunduh otomatis (bisa dibatalkan dengan `undo`)."
+  const isReset = /^reset\s+(transaksi|laporan|semua|kategori|akun)$/i.test(text);
+  if (/^reset\s+semua$/i.test(text)) {
+    if (
+      !window.confirm(
+        "Reset TOTAL: hapus semua data (transaksi, akun, kategori, anggaran, utang, " +
+          "berulang, pengaturan). Backup JSON diunduh otomatis. Lanjut?"
+      )
     )
-  ) {
-    return;
+      return;
+  } else if (isReset) {
+    if (
+      !window.confirm(
+        "Lanjut hapus? Backup JSON diunduh otomatis (bisa dibatalkan dengan `undo`)."
+      )
+    )
+      return;
   }
   addBubble(text, "me");
   input.value = "";
@@ -282,11 +291,14 @@ async function send(): Promise<void> {
   busyEl.hidden = true;
   if (r.ok) {
     addBubble(r.text ?? "", "bot", r.txs, r.file, r.svg, r.pre);
-    if (Array.isArray(r.removedIds)) {
-      removeTxRows(r.removedIds as number[]);
+    if (isReset && r.file) {
+      const f = r.file as { name: string; content: string };
+      saveFile(f.name, f.content);
     }
-    if (/^Dibatalkan\b/.test(r.text ?? "") || /^Semua transaksi dihapus/.test(r.text ?? "")) {
+    if (/^reset\s+(transaksi|laporan|semua|akun)$/i.test(text) || /^Dibatalkan\b/.test(r.text ?? "")) {
       clearTxRows();
+    } else if (Array.isArray(r.removedIds)) {
+      removeTxRows(r.removedIds as number[]);
     }
     if (r.lock) {
       pinSet = true;
@@ -355,7 +367,7 @@ function toggleBaseRow(): void {
 aiProvider.addEventListener("change", toggleBaseRow);
 
 document.getElementById("openAI")!.onclick = async () => {
-  for (const m of [infoModal, secModal, storeModal, aboutModal]) m.hidden = true;
+  for (const m of [infoModal, secModal, storeModal, aboutModal, resetModal]) m.hidden = true;
   const r = await call({ type: "getai" });
   const c = (r.config ?? {}) as {
     provider?: string;
@@ -496,7 +508,7 @@ for (const p of WALL_PRESETS) {
 }
 
 document.getElementById("openWall")!.onclick = () => {
-  for (const m of [infoModal, secModal, storeModal, aboutModal]) m.hidden = true;
+  for (const m of [infoModal, secModal, storeModal, aboutModal, resetModal]) m.hidden = true;
   currentWall = readWall();
   syncWallControls(currentWall);
   wallModal.hidden = false;
@@ -718,7 +730,7 @@ function openPinModal(mode: PinMode): void {
   pinFlow = { mode, step: 0 };
   pinModalBuffer = "";
   pinMsg.textContent = "";
-  for (const m of [infoModal, secModal, storeModal, aboutModal]) m.hidden = true;
+  for (const m of [infoModal, secModal, storeModal, aboutModal, resetModal]) m.hidden = true;
   pinModal.hidden = false;
   renderPinStep();
 }
@@ -977,7 +989,7 @@ function askPass(text: string, message?: string, action: "import" | "encrypt" = 
   passInput.value = "";
   passMsg.textContent = message ?? "";
   passMsg.hidden = !message;
-  for (const m of [infoModal, secModal, storeModal, aboutModal]) m.hidden = true;
+  for (const m of [infoModal, secModal, storeModal, aboutModal, resetModal]) m.hidden = true;
   passModal.hidden = false;
   passInput.focus();
 }
@@ -1115,6 +1127,7 @@ const storeModal = document.getElementById("storeModal")!;
 const storeLines = document.getElementById("storeLines")!;
 const aboutModal = document.getElementById("aboutModal")!;
 const aboutLines = document.getElementById("aboutLines")!;
+const resetModal = document.getElementById("resetModal")!;
 const pickDirBtn = document.getElementById("pickDir") as HTMLButtonElement;
 const backupNowBtn = document.getElementById("backupNow") as HTMLButtonElement;
 const clearDirBtn = document.getElementById("clearDir") as HTMLButtonElement;
@@ -1141,7 +1154,7 @@ function verifyPinForWipe(): Promise<boolean> {
 
 async function wipeAllData(): Promise<void> {
   try {
-    for (const m of [infoModal, secModal, storeModal, aboutModal]) m.hidden = true;
+    for (const m of [infoModal, secModal, storeModal, aboutModal, resetModal]) m.hidden = true;
     const r = await call({ type: "wipe" });
     if (!r.ok) throw new Error(String(r.error ?? "gagal menghapus database"));
     if (window.caches) {
@@ -1339,7 +1352,7 @@ function renderInfo(): void {
 }
 
 function showInfoPane(pane: HTMLElement): void {
-  for (const m of [infoModal, secModal, storeModal, aboutModal]) m.hidden = true;
+  for (const m of [infoModal, secModal, storeModal, aboutModal, resetModal]) m.hidden = true;
   pane.hidden = false;
   renderInfo();
 }
@@ -1359,9 +1372,52 @@ document.getElementById("infoClose")!.onclick = () => {
 document.getElementById("openSecurity")!.onclick = () => showInfoPane(secModal);
 document.getElementById("openStorage")!.onclick = () => showInfoPane(storeModal);
 document.getElementById("openAbout")!.onclick = () => showInfoPane(aboutModal);
+document.getElementById("openReset")!.onclick = () => showInfoPane(resetModal);
 document.getElementById("secBack")!.onclick = () => showInfoPane(infoModal);
 document.getElementById("storeBack")!.onclick = () => showInfoPane(infoModal);
 document.getElementById("aboutBack")!.onclick = () => showInfoPane(infoModal);
+document.getElementById("resetBack")!.onclick = () => showInfoPane(infoModal);
+
+// Reset data (jalur utama lewat menu; chat `reset ...` tetap ada sebagai pintasan).
+async function runReset(kind: "transaksi" | "kategori" | "akun" | "semua"): Promise<void> {
+  if (!ready) return;
+  if (kind === "semua") {
+    if (pinSet) {
+      if (!(await verifyPinForWipe())) return;
+    } else {
+      const typed = window.prompt("Ketik RESET untuk konfirmasi reset total:");
+      if ((typed ?? "").trim().toUpperCase() !== "RESET") return;
+    }
+  } else if (
+    !window.confirm(
+      `Reset ${kind}? Backup JSON diunduh otomatis.` +
+        (kind === "kategori" ? " Transaksi lama tetap tersimpan." : "")
+    )
+  ) {
+    return;
+  }
+  for (const m of [infoModal, secModal, storeModal, aboutModal, resetModal]) m.hidden = true;
+  addBubble(`reset ${kind}`, "me");
+  busyEl.hidden = false;
+  const r = await call({ type: "chat", text: `reset ${kind}` });
+  busyEl.hidden = true;
+  if (!r.ok) {
+    addBubble("Error: " + (r.error ?? "tidak diketahui"), "bot");
+    return;
+  }
+  addBubble(r.text ?? "", "bot");
+  if (r.file) {
+    const f = r.file as { name: string; content: string };
+    saveFile(f.name, f.content);
+  }
+  if (kind !== "kategori") clearTxRows();
+  void refresh();
+}
+
+document.getElementById("resetTxBtn")!.onclick = () => void runReset("transaksi");
+document.getElementById("resetCatBtn")!.onclick = () => void runReset("kategori");
+document.getElementById("resetAccBtn")!.onclick = () => void runReset("akun");
+document.getElementById("resetAllBtn")!.onclick = () => void runReset("semua");
 
 document.getElementById("updateReload")!.onclick = () => location.reload();
 

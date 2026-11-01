@@ -248,6 +248,44 @@ await check("kategori keduanya: dua arah", async () => {
   assert.equal(inn!.kategori, "Sedekah");
 });
 
+await check("kategori: sintaks toleran, default keduanya, bentrok kata kunci", async () => {
+  // A. sinonim "tambah kategori" + pemisah ':'.
+  const a = await handleMessage("tambah kategori Sosial: sosial, jimpitan");
+  assert(a.text.includes("Sosial") && a.text.includes("keduanya"), "sinonim + pemisah ':'");
+  // D. default keduanya → dua arah.
+  assert.equal(last(await handleMessage("jimpitan 10rb"))!.kategori, "Sosial");
+  assert.equal(last(await handleMessage("terima jimpitan 10rb"))!.kategori, "Sosial");
+  // C. tanpa pemisah → kata pertama = nama, sisanya kata kunci.
+  const c = await handleMessage("kategori tambah Kegiatan kegiatan, olahraga");
+  assert(c.text.includes("Kegiatan"), "tanpa pemisah: kata pertama jadi nama");
+  assert.equal(last(await handleMessage("olahraga 5rb"))!.kategori, "Kegiatan");
+  // B. kata kunci bentrok kategori lain → dilewati, sisanya tetap masuk.
+  const b = await handleMessage("kategori tambah Sosial2 | renang, donasi");
+  assert(b.text.includes("Dilewati") && b.text.includes("donasi"), "bentrok dilaporkan");
+  assert.equal(last(await handleMessage("renang 5rb"))!.kategori, "Sosial2");
+  // B. kata kunci = perintah → ditolak.
+  const cmd = await handleMessage("kategori tambah Sosial3 | saldo");
+  assert(cmd.text.includes("bentrok"), "kata kunci = perintah ditolak");
+  assert(!dbmod.getCategoryByName("Sosial3"), "kategori tanpa kata kunci valid tak dibuat");
+});
+
+await check("kategori ubah/hapus: aman & sinonim", async () => {
+  await handleMessage("kategori tambah TempUnik | unikku");
+  assert(dbmod.getCategoryByName("TempUnik"), "kategori dibuat");
+  // ubah dengan semua kata bentrok → jangan mengosongkan.
+  const u = await handleMessage("kategori ubah TempUnik | kopi");
+  assert(u.text.includes("tidak diganti"), "ubah bentrok ditolak");
+  assert(dbmod.getCategoryByName("TempUnik")!.keywords.includes("unikku"), "kata kunci lama tetap");
+  // rename ke kata perintah → ditolak.
+  const rn = await handleMessage("kategori ubah TempUnik jadi saldo");
+  assert(rn.text.includes("ditolak"), "rename ke kata perintah ditolak");
+  assert(dbmod.getCategoryByName("TempUnik"), "nama tetap");
+  // sinonim "hapus kategori".
+  const del = await handleMessage("hapus kategori TempUnik");
+  assert(del.text.includes("dihapus"), "sinonim hapus kategori");
+  assert(!dbmod.getCategoryByName("TempUnik"), "kategori terhapus");
+});
+
 await check("kata perintah tak jadi transaksi", async () => {
   const before = count();
   const r = await handleMessage("hapus apa");
@@ -727,6 +765,33 @@ await check("hapus semua kategori tidak memunculkan seed default lagi", async ()
   assert.equal(dbmod.listCategories().length, 0, "kategori kosong");
   initDb(mini);
   assert.equal(dbmod.listCategories().length, 0, "init ulang tidak re-seed");
+});
+
+await check("reset akun/kategori/semua + backup", async () => {
+  // reset akun: transaksi + akun dihapus, default dibuat ulang.
+  await handleMessage("makan siang 10rb");
+  const ra = await handleMessage("reset akun");
+  assert(ra.file, "reset akun menyertakan backup");
+  assert.equal(dbmod.listAccounts().length, 8, "akun default dibuat ulang");
+  assert.equal(count(), 0, "transaksi ikut terhapus");
+  assert(dbmod.getAccountByName("BSI"), "BSI default ada lagi");
+
+  // reset kategori: semua kategori + anggaran dihapus.
+  await handleMessage("kategori tambah UjiReset | ujireset");
+  await handleMessage("anggaran UjiReset 100rb");
+  const rk = await handleMessage("reset kategori");
+  assert(rk.file, "reset kategori menyertakan backup");
+  assert.equal(dbmod.listCategories().length, 0, "kategori kosong");
+  assert.equal(dbmod.getBudget("UjiReset"), undefined, "anggaran ikut terhapus");
+
+  // reset semua: pabrik (akun + kategori default), settings direset.
+  await handleMessage("makan 5rb");
+  const rs = await handleMessage("reset semua");
+  assert(rs.file, "reset semua menyertakan backup");
+  assert.equal(dbmod.listCategories().length, 7, "kategori default kembali");
+  assert.equal(dbmod.listAccounts().length, 8, "akun default kembali");
+  assert.equal(count(), 0, "transaksi kosong");
+  assert.equal(dbmod.getSetting("cmd_aliases"), null, "settings direset");
 });
 
 console.log(`\n${pass} ok, ${fail} fail`);

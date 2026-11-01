@@ -229,16 +229,30 @@ sebagai pengeluaran terpisah (kategori Lainnya) dari akun asal.
 ### Kategori
 ```
 kategori                      → daftar kategori + kata kunci
+kategori tambah Sosial | sosial, jimpitan, donasi   (default keduanya)
+kategori tambah Sosial sosial jimpitan   (tanpa |, kata pertama = nama)
 kategori tambah masuk Bunga | bunga, dividen
 kategori tambah keluar Sedekah | sedekah, donasi
-kategori tambah keduanya Sedekah | sedekah
 kategori sisi Sedekah keduanya
 kategori tambahkata Sedekah | infak
 kategori hapuskata Sedekah | zakat
 kategori ubah Sedekah | sedekah, donasi, zakat
 kategori ubah Hiburan jadi HiburanX  → ganti nama (riwayat + anggaran ikut)
-kategori hapus Sedekah
+kategori hapus Sedekah         → hapus kategori (transaksi lama tetap, anggaran ikut hapus)
+hapus kategori Sedekah         → sama dengan di atas
 ```
+- Bentuk lain yang diterima: `tambah kategori ...`, `buat kategori ...`,
+  `kategori baru ...`; pemisah boleh `|`, `:`, atau `=`.
+- Tipe opsional: `masuk` / `keluar` / `keduanya`. Kalau tak ditulis, default
+  **keduanya** (kata kunci berlaku untuk pemasukan & pengeluaran).
+- Nama kategori **multi-kata** harus memakai pemisah, mis.
+  `kategori tambah Rumah Tangga | rumah`.
+- Kata kunci yang **bentrok** (sudah dipakai kategori lain, sama dengan perintah,
+  atau alias) otomatis dilewati dan dilaporkan — sisanya tetap ditambahkan.
+  `kategori ubah` juga menolak kalau **semua** kata kunci baru bentrok (agar
+  daftar kata kunci tidak jadi kosong).
+- Rename kategori ke kata perintah (mis. `saldo`) atau ke kata kunci/ nama
+  kategori lain akan **ditolak**.
 
 ### Anggaran
 ```
@@ -319,8 +333,10 @@ berulang aktif 1               → aktifkan lagi (jatuh tempo dikejar)
 berulang ubah 1 400rb tiap 10  → ubah nominal/tanggal
 berulang                       → daftar transaksi berulang
 berulang hapus 1               → hentikan yang #1
-reset transaksi                → hapus semua (file backup JSON terunduh otomatis)
+reset transaksi                → hapus semua transaksi (saldo balik ke saldo awal)
 ```
+> Reset lain (kategori / akun / semua) ada di menu **ℹ → Reset data**.
+> `reset transaksi` juga bisa dibatalkan dengan `undo`.
 
 ### AI & lain
 ```
@@ -419,11 +435,28 @@ Catatan:
   supaya total saldo tetap sama dengan jumlah saldo akun.
 - Transaksi berulang (`berulang ...`) ikut tersimpan di file backup.
 
+### Reset data
+
+Aksi reset dilakukan lewat menu (bukan chat), supaya aman & gampang ditemukan:
+**ℹ → Reset data**.
+
+- **Reset transaksi** — hapus semua transaksi; saldo balik ke saldo awal.
+- **Reset kategori** — hapus semua kategori + anggaran (transaksi lama tetap).
+- **Reset akun** — hapus semua akun + transaksinya; akun default dibuat ulang.
+- **Reset semua** (pabrik) — transaksi+akun+kategori+anggaran+utang+berulang+
+  pengaturan kembali ke kondisi awal.
+
+Sebelum reset, app otomatis mengunduh `backup-pre-reset-*.json`. `Reset
+transaksi/kategori/akun` bisa dibatalkan dengan `undo`; `Reset semua` tidak.
+`Reset semua` minta konfirmasi kuat: masukkan **PIN** bila aktif, atau ketik
+`RESET`. Perintah chat `reset transaksi` tetap tersedia sebagai pintasan.
+
 ### Penyimpanan permanen & auto-backup
 
 Modal **ℹ** kini ringkas: ringkasan di atas, lalu sub-menu **Keamanan & PIN**,
-**Backup & penyimpanan**, dan **Tentang**. Detail penyimpanan ada di
-**ℹ → Backup & penyimpanan**; info teknis build ada di **ℹ → Tentang**.
+**Backup & penyimpanan**, **Tampilan**, **AI**, **Reset data**, dan **Tentang**.
+Detail penyimpanan ada di **ℹ → Backup & penyimpanan**; info teknis build ada di
+**ℹ → Tentang**.
 
 - **Penyimpanan permanen** — app meminta `navigator.storage.persist()` saat
   dibuka supaya browser tidak membersihkan data saat storage menipis. Status
