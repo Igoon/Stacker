@@ -76,11 +76,13 @@ ter-deploy kalau logika rusak.
   periode `bulanan`/`mingguan` per kategori.
 - **Utang/piutang** ledger terpisah (tidak mengubah saldo akun).
 - **Transaksi berulang** bulanan (idempotent), **undo** 20 langkah.
-- **PIN + auto-lock** (2 menit idle / app ditinggalkan) — kunci tampilan, hash
-  PBKDF2, bukan enkripsi disk.
+- **PIN + auto-lock** (2 menit idle / app ditinggalkan) — keypad visual tanpa
+  keyboard OS, atur/ubah/hapus lewat modal ℹ; hash PBKDF2, bukan enkripsi disk.
 - **Backup terenkripsi** (`backup kunci <sandi>`, AES-GCM 256 + PBKDF2).
 - **Auto-backup folder** (File System Access API) + pengingat backup 14 hari,
   status storage permanen (`navigator.storage.persist()`) di modal **ℹ**.
+- **Hapus semua data (uninstall bersih)** — hapus DB OPFS, IndexedDB, cache,
+  Service Worker, dan kunci localStorage; PIN wajib bila aktif.
 - **Alias perintah** (`alias tf transfer`, target multi-kata, hapus/reset, tampil di `alias`/`help`).
 - **Update prompt** service worker ("Versi baru tersedia → Muat ulang").
 - **CSP ketat** (script self, connect hanya Gemini + localhost) + panel **ℹ**
@@ -138,5 +140,5 @@ memverifikasi build (commit SHA + hash bundle di panel **ℹ**,
 
 ## Versi
 
-`v2.8.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
+`v2.9.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
 Nilai versi di-hardcode di `src/version.ts` (browser tak bisa baca `package.json`).

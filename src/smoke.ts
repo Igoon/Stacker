@@ -15,6 +15,7 @@ initDb(mini);
 const { handleMessage, deleteTxWithUndo, importJsonWithUndo, aiEnabled } = await import("./bot");
 const dbmod = await import("./db");
 const { parseLocal } = await import("./parser");
+const { setPin, checkPin, changePin, removePin, hasPin } = await import("./pin");
 const { PARSER_CASES } = await import("./parser-cases");
 const { hashPin, safeEqual, encryptJson, decryptJson, isEncrypted, PIN_ITER } = await import(
   "./crypto"
@@ -547,30 +548,27 @@ await check("crypto: PIN hash & backup terenkripsi", async () => {
   assert(failed, "kata sandi salah harus gagal");
 });
 
-await check("PIN: atur, tolak format salah, ubah, hapus, tak ikut export", async () => {
-  const a = await handleMessage("pin atur 1234");
-  assert(a.lock === true, "UI harus langsung mengunci");
-  assert(dbmod.getSetting("pin_hash"), "hash tersimpan");
+await check("PIN: set/cek/ubah/hapus (UI), chat tak bisa set PIN", async () => {
+  assert.equal(hasPin(), false, "awal tanpa PIN");
+  assert.equal((await setPin("12")).ok, false, "format pendek ditolak");
+  assert.equal((await setPin("1234")).ok, true, "PIN dipasang");
+  assert(hasPin(), "PIN aktif");
+  assert((await checkPin("1234")).ok, "PIN benar");
+  assert(!(await checkPin("0000")).ok, "PIN salah");
 
-  const bad = await handleMessage("pin atur 12");
-  assert(bad.text.includes("4-8"));
-
-  const wrong = await handleMessage("pin hapus 0000");
-  assert(wrong.text.includes("salah"));
-  assert(dbmod.getSetting("pin_hash"), "PIN tetap ada setelah salah");
-
-  const ch = await handleMessage("pin ubah 1234 5678");
-  assert(ch.text.includes("diganti"));
-  const h = dbmod.getSetting("pin_hash")!;
-  const s = dbmod.getSetting("pin_salt")!;
-  const it = Number(dbmod.getSetting("pin_iter"));
-  assert(safeEqual((await hashPin("5678", s, it)).hash, h), "PIN baru berlaku");
-
+  assert.equal((await changePin("0000", "5678")).ok, false, "PIN lama salah ditolak");
+  assert.equal((await changePin("1234", "5678")).ok, true, "PIN diganti");
+  assert((await checkPin("5678")).ok, "PIN baru berlaku");
   assert(!dbmod.exportAll().includes("pin_hash"), "PIN tak boleh ikut backup");
 
-  const del = await handleMessage("pin hapus 5678");
-  assert(del.text.includes("dihapus"));
-  assert.equal(dbmod.getSetting("pin_hash"), null);
+  assert.equal((await removePin("0000")).ok, false, "hapus dengan PIN salah ditolak");
+  assert(hasPin(), "PIN tetap ada");
+  assert.equal((await removePin("5678")).ok, true, "hapus PIN");
+  assert.equal(hasPin(), false, "PIN mati");
+
+  const chat = await handleMessage("pin atur 1234");
+  assert(chat.text.includes("tidak dikenali"), "perintah PIN chat ditolak");
+  assert.equal(dbmod.getSetting("pin_hash"), null, "chat tak bisa set PIN");
 });
 
 await check("backup kunci: file terenkripsi & bisa dipulihkan", async () => {

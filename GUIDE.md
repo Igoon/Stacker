@@ -55,15 +55,58 @@ Catatan iOS:
 2. Klik ikon **Install (⊞ dengan panah bawah)** di pojok kanan address bar.
 3. Konfirmasi **Install**. Aplikasi terbuka di jendela sendiri.
 
+### Aplikasi asli, bukan demo
+
+Situs ini **aplikasi penuh**, bukan halaman demo. Semua perhitungan dan
+penyimpanan dilakukan di perangkatmu — tidak ada server yang menyimpan data.
+Transaksi yang kamu entri **nyata** dan langsung tersimpan.
+
+### Tab browser vs aplikasi terinstall
+
+Data disimpan **per origin** (untuk situs ini: `https://igoon.github.io`), bukan
+per "instalasi". Jadi install PWA tidak menyalin/mengosongkan data. Perilakunya
+beda per platform:
+
+- **Android (Chrome) & Desktop (Chrome/Edge):** tab dan aplikasi terinstall
+  memakai storage yang **sama**. Data yang kamu entri sebelum install tetap ada
+  setelah dipasang, dan sebaliknya.
+- **iPhone/iPad (Safari):** aplikasi Home Screen bisa punya storage **terpisah**
+  dari tab Safari. Data di tab Safari belum tentu muncul di ikon terinstall.
+  Sebaiknya **install dulu, baru masukkan data**, atau pindahkan lewat
+  **⬇ Backup** lalu **⬆ Restore**.
+- Data terikat pada **browser + profil + perangkat** yang sama. Ganti
+  browser/HP, pakai mode privat, atau hapus data situs = data kosong. Tidak ada
+  sinkronisasi antar-perangkat; pakai Backup untuk pindah.
+- Uninstall OS tidak selalu menghapus seluruh storage. Untuk bersih total,
+  pakai **ℹ → Hapus semua data…** (lihat bagian 3).
+
+> Pakai URL yang benar (case-sensitive, dengan akhiran `/`):
+> `https://igoon.github.io/Stacker/`.
+
 ---
 
 ## 3. Cara Uninstall
+
+Uninstall OS **tidak selalu** membersihkan semua jejak: cache Service Worker,
+database OPFS, izin folder auto-backup (IndexedDB), dan kunci di localStorage
+bisa tertinggal. Karena itu lakukan **Hapus semua data** dulu dari dalam app,
+baru hapus ikonnya.
+
+### Hapus semua data (disarankan)
+
+1. **⬇ Backup** dulu kalau data masih mau disimpan (wajib bila berencana
+   pindah perangkat).
+2. Buka **ℹ** → tombol **Hapus semua data…**.
+3. Konfirmasi. Bila PIN aktif, masukkan PIN lewat keypad.
+4. App menghapus transaksi + pengaturan, mengosongkan OPFS/IndexedDB/localStorage,
+   membersihkan cache, lalu memuat ulang dalam keadaan bersih.
+
+Setelah itu barulah hapus aplikasinya:
 
 ### Android
 
 1. Tekan lama ikon aplikasi di home screen.
 2. Pilih **Hapus / Uninstall** (atau seret ke **Hapus**).
-3. Konfirmasi. Data lokal ikut terhapus (pastikan sudah **Backup** kalau mau).
 
 ### iPhone / iPad
 
@@ -75,8 +118,8 @@ Catatan iOS:
 1. Di jendela aplikasi, klik menu **⋮** (atau **⋯** di Edge).
 2. Pilih **Uninstall Stacker** / **Hapus**.
 
-> **Penting:** Uninstall = data lokal hilang. Ekspor dulu lewat tombol
-> **⬇ Backup** kalau data mau dipindah/disimpan.
+> **Penting:** Tindakan ini permanen. Pastikan sudah **⬇ Backup** kalau data
+> mau dipindah/disimpan.
 
 ---
 
@@ -283,8 +326,7 @@ reset transaksi                → hapus semua (file backup JSON terunduh otomat
 ```
 ai                            → statistik pemakaian AI
 ai reset                      → reset hitungan harian AI
-pin | pin atur 1234           → kunci layar (4-8 digit)
-pin ubah 1234 5678 | pin hapus 1234
+pin                           → status kunci (atur/ubah/hapus lewat ℹ)
 backup                        → unduh backup JSON
 backup kunci <kata sandi>     → backup terenkripsi (min 8 karakter)
 versi                         → versi aplikasi
@@ -338,11 +380,12 @@ tidak ikut file backup, dan tidak mempengaruhi data transaksi.
 
 ```
 pin                     → status kunci
-pin atur 1234           → pasang PIN (4-8 digit)
-pin ubah 1234 5678      → ganti PIN
-pin hapus 1234          → matikan kunci (butuh PIN lama)
 ```
 
+- Atur/ubah/hapus PIN lewat tombol **PIN** di modal **ℹ**. Tidak ada PIN yang
+  diketik di chat.
+- Keypad visual (1–9, 0, ⌫, ✓) dipakai untuk set/ubah/unlock. Tidak ada input
+  password yang memunculkan keyboard OS.
 - App mengunci otomatis setelah **2 menit tanpa aktivitas**, atau begitu app
   ditinggalkan (pindah app / tab disembunyikan).
 - Salah PIN 5× → tunggu 30 detik sebelum bisa coba lagi.
@@ -366,6 +409,8 @@ pin hapus 1234          → matikan kunci (butuh PIN lama)
   dibuka. Saat restore, app meminta kata sandi otomatis.
 
 Catatan:
+- **Hapus semua data** (ℹ) menghapus seluruh data lokal + cache + PIN + izin
+  folder auto-backup. Lakukan ini sebelum uninstall OS (lihat bagian 3).
 - File backup **tidak memuat API key AI** (aman dibagikan). Key AI yang
   tersimpan di perangkat tetap dipakai setelah restore.
 - `reset transaksi` otomatis mengunduh file `backup-pre-reset-*.json` sebelum

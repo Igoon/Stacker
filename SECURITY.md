@@ -18,6 +18,8 @@ Yang **tidak** dilindungi (batas jujur):
   auto-reload; build punya attestation.
 - **PIN hanya mengunci tampilan**, bukan mengenkripsi database. Perangkat yang
   tidak terkunci dan dikuasai orang lain bisa membaca OPFS lewat devtools.
+- Keypad visual menghindari keyboard OS/autocomplete, tapi tidak melindungi dari
+  rekaman layar, shoulder surfing, atau malware tingkat OS.
 - XSS lewat input pengguna belum menjadi fokus (tidak ada konten HTML dari luar).
 - Serangan fisik/OS-level, malware perangkat, atau browser yang sudah
   dikompromikan berada di luar cakupan.
@@ -90,6 +92,14 @@ gh attestation verify <artifact> --repo Igoon/Stacker
 3. DevTools → **Application → Storage**: hanya OPFS/IndexedDB/localStorage
    origin ini.
 4. Bandingkan **Hash bundle** di ℹ dengan release notes.
+
+## Menghapus data
+
+Uninstall OS tidak menjamin semua jejak terhapus (cache, OPFS, IndexedDB, dan
+localStorage bisa tertinggal). Gunakan **ℹ → Hapus semua data…** di dalam app:
+perintah ini menutup DB, mengosongkan OPFS/IndexedDB/localStorage, menghapus
+cache + registrasi Service Worker, lalu memuat ulang dalam keadaan bersih.
+Setelah itu barulah hapus ikon PWA.
 
 ## Yang sengaja tidak dilakukan
 

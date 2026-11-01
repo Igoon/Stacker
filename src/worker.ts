@@ -20,7 +20,8 @@ import {
 } from "./bot";
 import { aiEnabled, aiStats, getAiConfig, setAiConfig } from "./ai";
 import { exportJson } from "./backup";
-import { decryptJson, encryptJson, hashPin, isEncrypted, safeEqual } from "./crypto";
+import { decryptJson, encryptJson, isEncrypted } from "./crypto";
+import { changePin, checkPin, removePin, setPin } from "./pin";
 import { APP_VERSION } from "./version";
 import { isoLocal } from "./dates";
 
@@ -58,6 +59,26 @@ interface PinCheckMsg {
   id: number;
   pin: string;
 }
+interface PinSetMsg {
+  type: "pinset";
+  id: number;
+  pin: string;
+}
+interface PinChangeMsg {
+  type: "pinchange";
+  id: number;
+  oldPin: string;
+  newPin: string;
+}
+interface PinDelMsg {
+  type: "pindel";
+  id: number;
+  pin: string;
+}
+interface WipeMsg {
+  type: "wipe";
+  id: number;
+}
 interface MarkBackupMsg {
   type: "markbackup";
   id: number;
@@ -85,9 +106,16 @@ type InMsg =
   | GetAiMsg
   | SetAiMsg
   | PinCheckMsg
+  | PinSetMsg
+  | PinChangeMsg
+  | PinDelMsg
+  | WipeMsg
   | MarkBackupMsg;
 
 let mini: MiniDb;
+// Referensi untuk wipe bersih: tutup koneksi lalu kosongkan file OPFS.
+let dbRef: { close(): void } | null = null;
+let poolRef: { wipeFiles(): Promise<void> } | null = null;
 
 async function boot(): Promise<void> {
   const sqlite3 = await (
@@ -101,6 +129,8 @@ async function boot(): Promise<void> {
   const poolUtil = await sqlite3.installOpfsSAHPoolVfs({});
   const db = new poolUtil.OpfsSAHPoolDb("/stacker.db");
   mini = createMiniDb(sqlite3, db as never);
+  dbRef = db;
+  poolRef = poolUtil;
   initDb(mini);
   runRecurringWithUndo();
 }
@@ -205,6 +235,20 @@ async function onMessage(msg: InMsg): Promise<void> {
       reply(msg.id, { ok: true });
       break;
     }
+    case "wipe": {
+      // Hapus total: tutup DB dulu (WAJIB sebelum wipeFiles), lalu kosongkan
+      // seluruh file OPFS SAH pool. UI akan reload dan DB dibuka ulang bersih.
+      try {
+        dbRef?.close();
+        dbRef = null;
+        if (poolRef) await poolRef.wipeFiles();
+        poolRef = null;
+        reply(msg.id, { ok: true });
+      } catch (e) {
+        reply(msg.id, { ok: false, error: (e as Error).message });
+      }
+      break;
+    }
     case "import": {
       try {
         let json = msg.json;
@@ -227,17 +271,19 @@ async function onMessage(msg: InMsg): Promise<void> {
       break;
     }
     case "pincheck": {
-      const h = getSetting("pin_hash");
-      if (!h) {
-        reply(msg.id, { ok: true, pinSet: false });
-        break;
-      }
-      const c = await hashPin(
-        msg.pin,
-        getSetting("pin_salt") ?? undefined,
-        Number(getSetting("pin_iter") ?? 120000)
-      );
-      reply(msg.id, { ok: safeEqual(c.hash, h) });
+      reply(msg.id, await checkPin(msg.pin));
+      break;
+    }
+    case "pinset": {
+      reply(msg.id, await setPin(msg.pin));
+      break;
+    }
+    case "pinchange": {
+      reply(msg.id, await changePin(msg.oldPin, msg.newPin));
+      break;
+    }
+    case "pindel": {
+      reply(msg.id, await removePin(msg.pin));
       break;
     }
     case "getai":

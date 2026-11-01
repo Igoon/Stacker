@@ -1,5 +1,6 @@
 // main.ts — UI chat di main thread. Semua logika + DB berjalan di worker.
 import "./style.css";
+import { startsWithCommand } from "./commands";
 import type { Tx } from "./db";
 import {
   folderPermission,
@@ -614,28 +615,276 @@ let idleTimer: number | undefined;
 const IDLE_MS = 2 * 60 * 1000;
 
 const lockEl = document.getElementById("lock")!;
-const lockPin = document.getElementById("lockPin") as HTMLInputElement;
+const lockDots = document.getElementById("lockDots")!;
+const lockPad = document.getElementById("lockPad")!;
 const lockMsg = document.getElementById("lockMsg")!;
+const pinModal = document.getElementById("pinModal")!;
+const pinTitle = document.getElementById("pinTitle")!;
+const pinHint = document.getElementById("pinHint")!;
+const pinDots = document.getElementById("pinDots")!;
+const pinPad = document.getElementById("pinPad")!;
+const pinMsg = document.getElementById("pinMsg")!;
+
+let pinBuffer = "";
+let pinModalBuffer = "";
+let pinFlow: {
+  mode: PinMode;
+  step: number;
+  oldPin?: string;
+  newPin?: string;
+} | null = null;
+// Resolver untuk mode "verify" (dipakai sebelum hapus semua data).
+let pinVerifyResolve: ((ok: boolean) => void) | null = null;
+type PinMode = "set" | "change" | "delete" | "verify";
+
+function renderDots(el: HTMLElement, value: string): void {
+  el.replaceChildren();
+  const n = Math.max(4, value.length);
+  for (let i = 0; i < n; i++) {
+    const d = document.createElement("span");
+    d.className = "pin-dot" + (i < value.length ? " on" : "");
+    el.appendChild(d);
+  }
+  el.setAttribute("aria-label", `${value.length} digit dimasukkan`);
+}
+
+function buildKeypad(el: HTMLElement, onKey: (k: string) => void): void {
+  el.replaceChildren();
+  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "back", "0", "ok"];
+  for (const k of keys) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.dataset.key = k;
+    b.textContent = k === "back" ? "⌫" : k === "ok" ? "✓" : k;
+    b.setAttribute(
+      "aria-label",
+      k === "back" ? "Hapus digit" : k === "ok" ? "Konfirmasi PIN" : `Angka ${k}`
+    );
+    b.onclick = () => onKey(k);
+    el.appendChild(b);
+  }
+}
+
+function lockKey(k: string): void {
+  if (lockEl.hidden) return;
+  if (Date.now() < lockCooldownUntil) {
+    lockMsg.textContent = `Tunggu ${Math.ceil((lockCooldownUntil - Date.now()) / 1000)} detik.`;
+    return;
+  }
+  if (k === "back") pinBuffer = pinBuffer.slice(0, -1);
+  else if (k === "ok") return void tryUnlock();
+  else if (/^\d$/.test(k) && pinBuffer.length < 8) pinBuffer += k;
+  renderDots(lockDots, pinBuffer);
+}
+
+function pinModalKey(k: string): void {
+  if (pinModal.hidden) return;
+  if (k === "back") pinModalBuffer = pinModalBuffer.slice(0, -1);
+  else if (k === "ok") return void submitPinModal();
+  else if (/^\d$/.test(k) && pinModalBuffer.length < 8) pinModalBuffer += k;
+  renderDots(pinDots, pinModalBuffer);
+}
+
+function pinHintText(flow: { mode: PinMode; step: number }): string {
+  if (flow.mode === "set") {
+    return flow.step === 0 ? "Masukkan PIN baru (4-8 digit)." : "Ulangi PIN baru.";
+  }
+  if (flow.mode === "change") {
+    if (flow.step === 0) return "Masukkan PIN lama.";
+    return flow.step === 1 ? "Masukkan PIN baru (4-8 digit)." : "Ulangi PIN baru.";
+  }
+  if (flow.mode === "verify") return "Masukkan PIN untuk menghapus semua data.";
+  return "Masukkan PIN lama untuk menghapus kunci.";
+}
+
+function renderPinStep(): void {
+  const flow = pinFlow;
+  if (!flow) return;
+  pinTitle.textContent =
+    flow.mode === "set"
+      ? "Atur PIN"
+      : flow.mode === "change"
+        ? "Ubah PIN"
+        : flow.mode === "verify"
+          ? "Hapus semua data"
+          : "Hapus PIN";
+  pinHint.textContent = pinHintText(flow);
+  renderDots(pinDots, pinModalBuffer);
+}
+
+function openPinModal(mode: PinMode): void {
+  pinFlow = { mode, step: 0 };
+  pinModalBuffer = "";
+  pinMsg.textContent = "";
+  infoModal.hidden = true;
+  pinModal.hidden = false;
+  renderPinStep();
+}
+
+function closePinModal(backToInfo: boolean): void {
+  pinFlow = null;
+  pinModalBuffer = "";
+  pinModal.hidden = true;
+  pinMsg.textContent = "";
+  if (pinVerifyResolve) {
+    const resolve = pinVerifyResolve;
+    pinVerifyResolve = null;
+    resolve(false);
+  }
+  if (backToInfo) {
+    infoModal.hidden = false;
+    renderInfo();
+  }
+}
+
+async function submitPinModal(): Promise<void> {
+  const flow = pinFlow;
+  if (!flow) return;
+  if (pinModalBuffer.length < 4) {
+    pinMsg.textContent = "PIN harus 4-8 digit.";
+    return;
+  }
+  const pin = pinModalBuffer;
+
+  if (flow.mode === "verify") {
+    const r = await call({ type: "pincheck", pin });
+    if (!r.ok) {
+      pinMsg.textContent = "PIN salah.";
+      pinModalBuffer = "";
+      renderDots(pinDots, "");
+      return;
+    }
+    const resolve = pinVerifyResolve;
+    pinVerifyResolve = null;
+    closePinModal(false);
+    resolve?.(true);
+    return;
+  }
+
+  if (flow.mode === "delete") {
+    const r = await call({ type: "pindel", pin });
+    if (!r.ok) {
+      pinMsg.textContent = String(r.error ?? "PIN salah.");
+      pinModalBuffer = "";
+      renderDots(pinDots, "");
+      return;
+    }
+    pinSet = false;
+    lockFails = 0;
+    lockCooldownUntil = 0;
+    saveLockState();
+    closePinModal(true);
+    addBubble("PIN dihapus. App tak lagi terkunci.", "bot");
+    renderInfo();
+    return;
+  }
+
+  if (flow.mode === "set") {
+    if (flow.step === 0) {
+      flow.newPin = pin;
+      flow.step = 1;
+      pinModalBuffer = "";
+      pinMsg.textContent = "";
+      renderPinStep();
+      return;
+    }
+    if (pin !== flow.newPin) {
+      flow.step = 0;
+      flow.newPin = undefined;
+      pinModalBuffer = "";
+      renderPinStep();
+      pinMsg.textContent = "PIN tidak sama. Ulangi.";
+      return;
+    }
+    const r = await call({ type: "pinset", pin });
+    if (!r.ok) {
+      pinMsg.textContent = String(r.error ?? "Gagal menyimpan PIN.");
+      pinModalBuffer = "";
+      renderDots(pinDots, "");
+      return;
+    }
+    pinSet = true;
+    lockFails = 0;
+    lockCooldownUntil = 0;
+    saveLockState();
+    closePinModal(false);
+    addBubble("PIN aktif. App mengunci sekarang.", "bot");
+    renderInfo();
+    lockNow();
+    return;
+  }
+
+  // change
+  if (flow.step === 0) {
+    const r = await call({ type: "pincheck", pin });
+    if (!r.ok) {
+      pinMsg.textContent = "PIN lama salah.";
+      pinModalBuffer = "";
+      renderDots(pinDots, "");
+      return;
+    }
+    flow.oldPin = pin;
+    flow.step = 1;
+    pinModalBuffer = "";
+    pinMsg.textContent = "";
+    renderPinStep();
+    return;
+  }
+  if (flow.step === 1) {
+    flow.newPin = pin;
+    flow.step = 2;
+    pinModalBuffer = "";
+    pinMsg.textContent = "";
+    renderPinStep();
+    return;
+  }
+  if (pin !== flow.newPin) {
+    flow.step = 1;
+    flow.newPin = undefined;
+    pinModalBuffer = "";
+    renderPinStep();
+    pinMsg.textContent = "PIN baru tidak sama. Ulangi.";
+    return;
+  }
+  const r = await call({ type: "pinchange", oldPin: flow.oldPin, newPin: pin });
+  if (!r.ok) {
+    pinMsg.textContent = String(r.error ?? "Gagal mengganti PIN.");
+    pinModalBuffer = "";
+    renderDots(pinDots, "");
+    return;
+  }
+  pinSet = true;
+  lockFails = 0;
+  lockCooldownUntil = 0;
+  saveLockState();
+  closePinModal(false);
+  addBubble("PIN diganti. App mengunci sekarang.", "bot");
+  renderInfo();
+  lockNow();
+}
 
 function lockNow(): void {
   if (!pinSet) return;
   if (idleTimer) window.clearTimeout(idleTimer);
-  // Jangan biarkan modal (AI/import/info) tetap terbuka di belakang lock.
+  // Jangan biarkan modal (AI/import/PIN) tetap terbuka di belakang lock.
   document.querySelectorAll<HTMLElement>(".modal").forEach((m) => (m.hidden = true));
   document
     .querySelectorAll<HTMLInputElement>('.modal input[type="password"]')
     .forEach((i) => (i.value = ""));
   pendingImport = null;
   pendingAction = "import";
+  pinFlow = null;
+  pinModalBuffer = "";
+  pinBuffer = "";
+  renderDots(lockDots, "");
   lockEl.hidden = false;
-  lockPin.value = "";
   lockMsg.textContent = "";
-  window.setTimeout(() => lockPin.focus(), 60);
 }
 
 function unlockUi(): void {
   lockEl.hidden = true;
-  lockPin.value = "";
+  pinBuffer = "";
+  renderDots(lockDots, "");
   lockMsg.textContent = "";
   touchIdle();
   void refresh().then((s) => {
@@ -656,10 +905,16 @@ async function tryUnlock(): Promise<void> {
     lockMsg.textContent = `Tunggu ${Math.ceil((lockCooldownUntil - now) / 1000)} detik.`;
     return;
   }
-  const pin = lockPin.value.trim();
-  if (!pin) return;
+  if (pinBuffer.length < 4) {
+    lockMsg.textContent = "PIN harus 4-8 digit.";
+    return;
+  }
+  const pin = pinBuffer;
+  pinBuffer = "";
+  renderDots(lockDots, "");
   const r = await call({ type: "pincheck", pin });
   if (r.ok) {
+    if (!r.pinSet) pinSet = false;
     lockFails = 0;
     lockCooldownUntil = 0;
     saveLockState();
@@ -667,7 +922,6 @@ async function tryUnlock(): Promise<void> {
     return;
   }
   lockFails++;
-  lockPin.value = "";
   if (lockFails >= 5) {
     lockFails = 0;
     lockCooldownUntil = Date.now() + 30_000;
@@ -676,12 +930,25 @@ async function tryUnlock(): Promise<void> {
     lockMsg.textContent = `PIN salah (${lockFails}/5).`;
   }
   saveLockState();
-  lockPin.focus();
 }
 
-document.getElementById("lockBtn")!.onclick = () => void tryUnlock();
-lockPin.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") void tryUnlock();
+buildKeypad(lockPad, lockKey);
+buildKeypad(pinPad, pinModalKey);
+renderDots(lockDots, "");
+renderDots(pinDots, "");
+
+document.getElementById("pinCancel")!.onclick = () => closePinModal(true);
+
+window.addEventListener("keydown", (e) => {
+  const modalOpen = !pinModal.hidden;
+  if (lockEl.hidden && !modalOpen) return;
+  const handler = lockEl.hidden ? pinModalKey : lockKey;
+  let handled = true;
+  if (e.key === "Backspace") handler("back");
+  else if (e.key === "Enter") handler("ok");
+  else if (/^\d$/.test(e.key)) handler(e.key);
+  else handled = false;
+  if (handled) e.preventDefault();
 });
 for (const ev of ["pointerdown", "keydown", "touchstart"] as const) {
   window.addEventListener(ev, touchIdle, { passive: true });
@@ -842,6 +1109,78 @@ const infoLines = document.getElementById("infoLines")!;
 const pickDirBtn = document.getElementById("pickDir") as HTMLButtonElement;
 const backupNowBtn = document.getElementById("backupNow") as HTMLButtonElement;
 const clearDirBtn = document.getElementById("clearDir") as HTMLButtonElement;
+const pinSetBtn = document.getElementById("pinSetBtn") as HTMLButtonElement;
+const pinChangeBtn = document.getElementById("pinChangeBtn") as HTMLButtonElement;
+const pinDeleteBtn = document.getElementById("pinDeleteBtn") as HTMLButtonElement;
+const wipeDataBtn = document.getElementById("wipeData") as HTMLButtonElement;
+
+function renderPinButtons(): void {
+  pinSetBtn.hidden = pinSet;
+  pinChangeBtn.hidden = !pinSet;
+  pinDeleteBtn.hidden = !pinSet;
+}
+pinSetBtn.onclick = () => openPinModal("set");
+pinChangeBtn.onclick = () => openPinModal("change");
+pinDeleteBtn.onclick = () => openPinModal("delete");
+
+function verifyPinForWipe(): Promise<boolean> {
+  return new Promise((resolve) => {
+    pinVerifyResolve = resolve;
+    openPinModal("verify");
+  });
+}
+
+async function wipeAllData(): Promise<void> {
+  try {
+    infoModal.hidden = true;
+    const r = await call({ type: "wipe" });
+    if (!r.ok) throw new Error(String(r.error ?? "gagal menghapus database"));
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+    if (navigator.serviceWorker?.getRegistrations) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((reg) => reg.unregister()));
+    }
+    await new Promise<void>((resolve) => {
+      const req = indexedDB.deleteDatabase("stacker-fs");
+      req.onsuccess = req.onerror = req.onblocked = () => resolve();
+    });
+    for (const k of ["stacker-wallpaper", "stacker-lock", "stacker-retain"]) {
+      try {
+        localStorage.removeItem(k);
+      } catch {
+        // localStorage bisa diblokir; abaikan.
+      }
+    }
+  } catch (e) {
+    addBubble("Gagal menghapus data: " + (e as Error).message, "bot");
+    return;
+  }
+  location.reload();
+}
+
+wipeDataBtn.onclick = async () => {
+  if (!ready) return;
+  const sure = window.confirm(
+    "Hapus SEMUA data di perangkat ini?\n\n" +
+      "Meliputi transaksi, akun, kategori, anggaran, utang, pengaturan, PIN, " +
+      "cache, dan izin folder auto-backup. Tidak bisa dibatalkan.\n\n" +
+      "Disarankan backup dulu lewat tombol ⬇ Backup."
+  );
+  if (!sure) return;
+  if (pinSet && !(await verifyPinForWipe())) return;
+  if (
+    !window.confirm(
+      "Konfirmasi terakhir: semua data lokal akan dihapus permanen. " +
+        "Setelah ini kamu bisa hapus ikon dari home screen untuk uninstall total. Lanjut?"
+    )
+  ) {
+    return;
+  }
+  await wipeAllData();
+};
 
 async function nowReady(): Promise<void> {
   const s = await refresh();
@@ -982,6 +1321,7 @@ function renderInfo(): void {
   pickDirBtn.disabled = !supportsFolderBackup();
   backupNowBtn.disabled = !folder;
   clearDirBtn.disabled = !folder;
+  renderPinButtons();
 }
 
 document.getElementById("info")!.onclick = async () => {
@@ -1060,11 +1400,7 @@ function handleSharedText(): void {
   const shared = parts.join(" ").slice(0, 500);
   input.value = shared;
   input.focus();
-  if (
-    /^\s*(hapus|ubah|undo|batalkan|batal|pin|backup|reset|akun|kategori|saldo|transfer|anggaran|berulang|utang|piutang|hutang|bayar|laporan|ringkasan|report|grafik|chart|dashboard|csv|export|cari|lihat|riwayat|history|list|ai|versi|version|help|bantuan)\b/i.test(
-      shared
-    )
-  ) {
+  if (startsWithCommand(shared)) {
     addBubble("Teks yang dibagikan berisi perintah. Periksa dulu, lalu tekan kirim.", "bot");
     return;
   }

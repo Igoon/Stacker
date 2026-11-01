@@ -1,4 +1,5 @@
 // randomUUID dari crypto global (tersedia di browser & worker).
+import { COMMAND_WORD_SET } from "./commands";
 import {
   accountBalances,
   addAccount,
@@ -76,7 +77,7 @@ import {
   shortRpSigned,
 } from "./chart";
 import { exportJson, importJson } from "./backup";
-import { encryptJson, hashPin, safeEqual } from "./crypto";
+import { encryptJson } from "./crypto";
 import { aiEnabled, aiResetUsage, aiStats, parseGemini } from "./ai";
 import { APP_VERSION } from "./version";
 
@@ -162,8 +163,7 @@ const HELP =
   "  utang 100rb ke budi         (ledger utang/piutang)\n" +
   "  piutang 50rb dari andi\n" +
   "  bayar utang budi 50rb | utang hapus 3 | piutang hapus 4\n" +
-  "  pin | pin atur 1234 | pin ubah 1234 5678\n" +
-  "  pin hapus 1234              (matikan kunci)\n" +
+  "  pin                         (status kunci; atur lewat tombol ℹ)\n" +
   "  backup | backup kunci <sandi>   (JSON / terenkripsi)\n" +
   "  ai | ai reset               (pemakaian AI)\n" +
   "  versi                       (versi aplikasi)\n" +
@@ -539,49 +539,9 @@ async function handleMessageInner(input: string): Promise<Reply> {
     const set = !!getSetting("pin_hash");
     return {
       text: set
-        ? "PIN: aktif.\nApp mengunci otomatis setelah 2 menit idle atau saat pindah app.\nUbah: `pin ubah <lama> <baru>` · Matikan: `pin hapus <pin>`"
-        : "PIN: nonaktif.\nPasang: `pin atur 1234` (4-8 digit).\nPIN hanya mengunci tampilan — data tetap tersimpan di perangkat.",
+        ? "PIN: aktif.\nApp mengunci otomatis setelah 2 menit idle atau saat pindah app.\nUbah/hapus lewat tombol PIN di modal ℹ (keypad visual)."
+        : "PIN: nonaktif.\nAtur lewat tombol PIN di modal ℹ (keypad visual).\nPIN hanya mengunci tampilan — data tetap tersimpan di perangkat.",
     };
-  }
-
-  if ((m = text.match(/^pin atur\s+(\S+)$/i))) {
-    const pin = m[1].trim();
-    if (!/^\d{4,8}$/.test(pin)) return { text: "PIN harus 4-8 digit angka. Contoh: `pin atur 1234`" };
-    const h = await hashPin(pin);
-    setSetting("pin_hash", h.hash);
-    setSetting("pin_salt", h.salt);
-    setSetting("pin_iter", String(h.iter));
-    return {
-      text: "PIN dipasang. App akan terkunci sekarang; masukkan PIN untuk membuka.\nLupa PIN = data tak bisa dibuka, tapi backup JSON tetap bisa di-restore di perangkat lain.",
-      lock: true,
-    };
-  }
-
-  if ((m = text.match(/^pin ubah\s+(\S+)\s+(\S+)$/i))) {
-    const lama = m[1].trim();
-    const baru = m[2].trim();
-    if (!/^\d{4,8}$/.test(baru)) return { text: "PIN baru harus 4-8 digit angka." };
-    const h = getSetting("pin_hash");
-    if (!h) return { text: "Belum ada PIN. Pasang dengan `pin atur 1234`." };
-    const c = await hashPin(lama, getSetting("pin_salt") ?? undefined, Number(getSetting("pin_iter") ?? 120000));
-    if (!safeEqual(c.hash, h)) return { text: "PIN lama salah." };
-    const n = await hashPin(baru);
-    setSetting("pin_hash", n.hash);
-    setSetting("pin_salt", n.salt);
-    setSetting("pin_iter", String(n.iter));
-    return { text: "PIN diganti.", lock: true };
-  }
-
-  if ((m = text.match(/^pin hapus\s+(\S+)$/i))) {
-    const pin = m[1].trim();
-    const h = getSetting("pin_hash");
-    if (!h) return { text: "Belum ada PIN." };
-    const c = await hashPin(pin, getSetting("pin_salt") ?? undefined, Number(getSetting("pin_iter") ?? 120000));
-    if (!safeEqual(c.hash, h)) return { text: "PIN salah. PIN tidak dihapus." };
-    setSetting("pin_hash", null);
-    setSetting("pin_salt", null);
-    setSetting("pin_iter", null);
-    return { text: "PIN dihapus. App tak lagi terkunci." };
   }
 
   if ((m = text.match(/^backup(?:\s+kunci\s+(.+))?$/i))) {
@@ -1604,14 +1564,8 @@ async function handleMessageInner(input: string): Promise<Reply> {
     };
   }
 
-  const CMD_WORDS = [
-    "hapus", "ubah", "lihat", "cari", "laporan", "ringkasan", "report", "csv", "export",
-    "grafik", "chart", "dashboard", "anggaran",
-    "riwayat", "history", "list", "akun", "kategori", "saldo", "transfer", "reset", "ai",
-    "versi", "version", "help", "bantuan", "utang", "piutang", "hutang", "bayar", "pin", "backup",
-  ];
   const word = low.split(/\s+/)[0];
-  if (CMD_WORDS.includes(word)) {
+  if (COMMAND_WORD_SET.has(word)) {
     return { text: `Perintah "${word}" tidak dikenali. Ketik \`help\` untuk daftar perintah.` };
   }
 

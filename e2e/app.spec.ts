@@ -18,6 +18,32 @@ async function chat(page: Page, text: string): Promise<void> {
   await input.press("Enter");
 }
 
+async function tapPad(page: Page, pad: "#lockPad" | "#pinPad", pin: string): Promise<void> {
+  for (const d of pin) {
+    await page.locator(`${pad} button[data-key="${d}"]`).click();
+  }
+}
+
+async function submitPad(page: Page, pad: "#lockPad" | "#pinPad"): Promise<void> {
+  await page.locator(`${pad} button[data-key="ok"]`).click();
+}
+
+async function setPinUi(page: Page, pin: string): Promise<void> {
+  await page.locator("#info").click();
+  await page.locator("#pinSetBtn").click();
+  await tapPad(page, "#pinPad", pin);
+  await submitPad(page, "#pinPad");
+  await expect(page.locator("#pinHint")).toContainText("Ulangi");
+  await tapPad(page, "#pinPad", pin);
+  await submitPad(page, "#pinPad");
+  await expect(page.locator("#lock")).toBeVisible();
+}
+
+async function unlockUi(page: Page, pin: string): Promise<void> {
+  await tapPad(page, "#lockPad", pin);
+  await submitPad(page, "#lockPad");
+}
+
 test("catat transaksi, saldo akurat, undo mengembalikan", async ({ page }) => {
   await boot(page);
 
@@ -69,6 +95,22 @@ test("share target berisi perintah tidak auto-jalan", async ({ page }) => {
   await expect(
     page.locator("#chat .bubble").filter({ hasText: "Semua transaksi dihapus" })
   ).toHaveCount(0);
+  await expect(
+    page.locator("#chat .bubble").filter({ hasText: "berisi perintah" })
+  ).toBeVisible();
+});
+
+test("share target dengan alias/sesuaikan tidak auto-jalan", async ({ page }) => {
+  await page.goto("/?text=alias%20tf%20transfer");
+  await expect(page.locator("#sub")).toHaveText(/^v\d/, { timeout: 60_000 });
+  await expect(page.locator("#input")).toHaveValue("alias tf transfer");
+  await expect(
+    page.locator("#chat .bubble").filter({ hasText: "berisi perintah" })
+  ).toBeVisible();
+
+  await page.goto("/?text=sesuaikan%20bsi%20100jt");
+  await expect(page.locator("#sub")).toHaveText(/^v\d/, { timeout: 60_000 });
+  await expect(page.locator("#input")).toHaveValue("sesuaikan bsi 100jt");
   await expect(
     page.locator("#chat .bubble").filter({ hasText: "berisi perintah" })
   ).toBeVisible();
@@ -243,14 +285,14 @@ test("CSP aktif & panel keamanan menampilkan build + hash", async ({ page }) => 
   await expect(page.locator("#infoLines")).toContainText("Host AI:");
 });
 
-test("cooldown PIN bertahan setelah reload", async ({ page }) => {
+test("cooldown PIN bertahan setelah reload (keypad visual)", async ({ page }) => {
   await boot(page);
-  await chat(page, "pin atur 1234");
+  await setPinUi(page, "1234");
   await expect(page.locator("#lock")).toBeVisible();
 
   for (let i = 1; i <= 5; i++) {
-    await page.locator("#lockPin").fill("0000");
-    await page.locator("#lockBtn").click();
+    await tapPad(page, "#lockPad", "0000");
+    await submitPad(page, "#lockPad");
     await expect(page.locator("#lockMsg")).toContainText(
       i < 5 ? `PIN salah (${i}/5)` : "Terlalu banyak salah"
     );
@@ -258,32 +300,95 @@ test("cooldown PIN bertahan setelah reload", async ({ page }) => {
 
   await page.reload();
   await expect(page.locator("#lock")).toBeVisible({ timeout: 60_000 });
-  await page.locator("#lockPin").fill("1234");
-  await page.locator("#lockBtn").click();
+  await tapPad(page, "#lockPad", "1234");
+  await submitPad(page, "#lockPad");
   await expect(page.locator("#lockMsg")).toContainText("Tunggu");
   await expect(page.locator("#lock")).toBeVisible();
 });
 
-test("PIN: kunci otomatis, tolak PIN salah, buka, lalu hapus", async ({ page }) => {
+test("PIN: set via keypad, ubah, unlock, hapus", async ({ page }) => {
   await boot(page);
+  await setPinUi(page, "1234");
+  await expect(page.locator("#chat .bubble").filter({ hasText: "1234" })).toHaveCount(0);
 
-  await chat(page, "pin atur 1234");
-  await expect(page.locator("#lock")).toBeVisible();
-
-  await page.locator("#lockPin").fill("9999");
-  await page.locator("#lockBtn").click();
+  await tapPad(page, "#lockPad", "9999");
+  await submitPad(page, "#lockPad");
   await expect(page.locator("#lockMsg")).toContainText("PIN salah");
   await expect(page.locator("#lock")).toBeVisible();
 
-  await page.locator("#lockPin").fill("1234");
-  await page.locator("#lockBtn").click();
+  await unlockUi(page, "1234");
   await expect(page.locator("#lock")).toBeHidden();
 
-  await chat(page, "pin hapus 1234");
+  // Ubah PIN lewat modal ℹ.
+  await page.locator("#info").click();
+  await page.locator("#pinChangeBtn").click();
+  await tapPad(page, "#pinPad", "1234");
+  await submitPad(page, "#pinPad");
+  await expect(page.locator("#pinHint")).toContainText("PIN baru");
+  await tapPad(page, "#pinPad", "5678");
+  await submitPad(page, "#pinPad");
+  await expect(page.locator("#pinHint")).toContainText("Ulangi");
+  await tapPad(page, "#pinPad", "5678");
+  await submitPad(page, "#pinPad");
+  await expect(page.locator("#lock")).toBeVisible();
+
+  await unlockUi(page, "5678");
+  await expect(page.locator("#lock")).toBeHidden();
+
+  // Hapus PIN.
+  await page.locator("#info").click();
+  await page.locator("#pinDeleteBtn").click();
+  await tapPad(page, "#pinPad", "5678");
+  await submitPad(page, "#pinPad");
+  await page.locator("#infoClose").click();
   await expect(page.locator("#chat .bubble").filter({ hasText: "PIN dihapus" })).toBeVisible();
 
   // Reload: PIN sudah mati, jadi app langsung terbuka tanpa overlay.
   await page.reload();
   await expect(page.locator("#sub")).toHaveText(/^v\d/, { timeout: 60_000 });
   await expect(page.locator("#lock")).toBeHidden();
+});
+
+test("hapus semua data membersihkan storage dan mereset app", async ({ page }) => {
+  await boot(page);
+  await chat(page, "kopi 15rb");
+  await expect(page.locator("#saldo")).toHaveText(/-Rp15\.000/);
+  await page.evaluate(() =>
+    localStorage.setItem("stacker-wallpaper", JSON.stringify({ kind: "default" }))
+  );
+
+  page.on("dialog", (d) => void d.accept());
+  await page.locator("#info").click();
+  await page.locator("#wipeData").click();
+
+  // Reload otomatis: app kembali bersih dan localStorage dibersihkan.
+  await expect(page.locator("#sub")).toHaveText(/^v\d/, { timeout: 60_000 });
+  await expect(page.locator("#saldo")).toHaveText(/Rp0/);
+  expect(await page.evaluate(() => localStorage.getItem("stacker-wallpaper"))).toBeNull();
+});
+
+test("hapus semua data wajib PIN bila PIN aktif", async ({ page }) => {
+  await boot(page);
+  await chat(page, "kopi 15rb");
+  await setPinUi(page, "1234");
+  await unlockUi(page, "1234");
+  await expect(page.locator("#lock")).toBeHidden();
+
+  page.on("dialog", (d) => void d.accept());
+  await page.locator("#info").click();
+  await page.locator("#wipeData").click();
+  await expect(page.locator("#pinModal")).toBeVisible();
+
+  // PIN salah ditolak; modal tetap terbuka.
+  await tapPad(page, "#pinPad", "0000");
+  await submitPad(page, "#pinPad");
+  await expect(page.locator("#pinMsg")).toContainText("salah");
+  await expect(page.locator("#pinModal")).toBeVisible();
+
+  // PIN benar -> lanjut hapus.
+  await tapPad(page, "#pinPad", "1234");
+  await submitPad(page, "#pinPad");
+  await expect(page.locator("#sub")).toHaveText(/^v\d/, { timeout: 60_000 });
+  await expect(page.locator("#lock")).toBeHidden();
+  await expect(page.locator("#saldo")).toHaveText(/Rp0/);
 });
