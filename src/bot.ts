@@ -1393,8 +1393,7 @@ async function handleMessageInner(input: string): Promise<Reply> {
       const totalKeluar = rows.reduce((a, r) => a + r.keluar, 0);
       const lines = rows.map(
         (r) =>
-          `  ${r.per.label.padEnd(14)} masuk ${shortRp(r.masuk)} · keluar ${shortRp(r.keluar)} · ` +
-          `${r.masuk - r.keluar < 0 ? "-" : "+"}${shortRp(r.masuk - r.keluar)}`
+          `  ${r.per.label.slice(0, 3)}  +${shortRp(r.masuk).padStart(6)}  -${shortRp(r.keluar).padStart(6)}`
       );
       return {
         text:

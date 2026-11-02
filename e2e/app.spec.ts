@@ -89,6 +89,25 @@ test("grafik SVG & laporan banding tampil di chat", async ({ page }) => {
   await expect(page.locator("#chat .bubble.pre").last()).toBeVisible();
 });
 
+test("chart tidak terpotong di layar kecil", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 720 });
+  await boot(page);
+  for (const c of ["makan 50rb", "transport 30rb", "belanja 20rb", "kopi 10rb", "gaji 5jt"]) {
+    await chat(page, c);
+  }
+  await chat(page, "grafik");
+  await expect(page.locator("#chat .bubble").filter({ hasText: "Keluar per kategori" })).toBeVisible();
+  await chat(page, "grafik tren 6");
+  await expect(page.locator("#chat .bubble").filter({ hasText: "Tren 6 bulan" })).toBeVisible();
+
+  const overflow = await page.evaluate(() =>
+    Array.from(document.querySelectorAll("#chat .bubble")).some(
+      (b) => (b as HTMLElement).scrollWidth > (b as HTMLElement).clientWidth + 1
+    )
+  );
+  expect(overflow).toBe(false);
+});
+
 test("share target berisi perintah tidak auto-jalan", async ({ page }) => {
   await page.goto("/?text=reset%20transaksi");
   await expect(page.locator("#sub")).toHaveText(/^v\d/, { timeout: 60_000 });

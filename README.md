@@ -142,5 +142,5 @@ memverifikasi build (commit SHA + hash bundle di panel **ℹ**,
 
 ## Versi
 
-`v2.10.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
+`v2.10.1` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
 Nilai versi di-hardcode di `src/version.ts` (browser tak bisa baca `package.json`).

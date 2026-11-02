@@ -163,7 +163,7 @@ function addBubble(
   const row = document.createElement("div");
   row.className = "row " + side;
   const b = document.createElement("div");
-  b.className = "bubble" + (pre ? " pre" : "");
+  b.className = "bubble" + (pre ? " pre" : "") + (svg ? " has-chart" : "");
   b.textContent = text;
   if (svg) {
     // SVG dibuat lokal dari angka (tanpa lib, tanpa request keluar).

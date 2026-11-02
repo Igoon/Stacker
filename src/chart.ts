@@ -64,7 +64,7 @@ function catSection(title: string, cats: CatAgg[], barWidth: number, maxCats: nu
   if (restSum > 0) top.push({ kategori: "Lainnya", total: restSum });
 
   const max = Math.max(...top.map((c) => c.total), 1);
-  const labelW = Math.min(12, Math.max(...top.map((c) => c.kategori.length)));
+  const labelW = Math.min(9, Math.max(...top.map((c) => c.kategori.length)));
   const lines = [`${title}  ${shortRp(total)}`];
   for (const c of top) {
     const pct = total > 0 ? Math.round((c.total / total) * 100) : 0;
@@ -97,7 +97,7 @@ function sparkLine(daily: { tanggal: string; keluar: number }[]): string[] {
 }
 
 export function buildGrafik(g: GrafikInput): string {
-  const barWidth = g.barWidth ?? 12;
+  const barWidth = g.barWidth ?? 9;
   const maxCats = g.maxCats ?? 8;
   const out: string[] = [];
 
