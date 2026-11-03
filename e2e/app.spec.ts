@@ -7,6 +7,12 @@ async function boot(page: Page): Promise<void> {
   // (deterministik di headless).
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "canShare", { value: undefined, configurable: true });
+    // Saldo default tersamar; tes yang memeriksa nominal perlu menampilkannya.
+    try {
+      localStorage.setItem("stacker-hide-saldo", "0");
+    } catch {
+      // abaikan
+    }
   });
   await page.goto("/");
   await expect(page.locator("#sub")).toHaveText(/^v\d/, { timeout: 60_000 });
@@ -339,6 +345,15 @@ test("modal info ringkas + sub-modal (storage & tentang)", async ({ page }) => {
   await page.locator("#info").click();
   await page.locator("#infoClose").click();
   await expect(page.locator("#infoModal")).toBeHidden();
+});
+
+test("saldo tersamar default & ketuk untuk lihat", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator("#sub")).toHaveText(/^v\d/, { timeout: 60_000 });
+  await chat(page, "kopi 15rb");
+  await expect(page.locator("#saldo")).toContainText("••••");
+  await page.locator("#saldo").click();
+  await expect(page.locator("#saldo")).toContainText("-Rp15.000");
 });
 
 test("menu Kategori, Anggaran, dan Ringkasan", async ({ page }) => {

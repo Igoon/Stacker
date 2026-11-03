@@ -97,6 +97,31 @@ const saldoEl = document.getElementById("saldo")!;
 const subEl = document.getElementById("sub")!;
 const busyEl = document.getElementById("busy")!;
 
+// Privasi saldo: default TERSAMAR. Ketuk pil saldo untuk lihat; auto-samar
+// lagi saat app ditinggalkan.
+const HIDE_SALDO_KEY = "stacker-hide-saldo";
+function readHideSaldo(): boolean {
+  try {
+    const v = localStorage.getItem(HIDE_SALDO_KEY);
+    return v === null ? true : v === "1";
+  } catch {
+    return true;
+  }
+}
+let hideSaldo = readHideSaldo();
+let saldoRevealed = false;
+let lastSaldoRupiah = "-";
+
+function renderSaldo(): void {
+  saldoEl.textContent = "Saldo: " + (hideSaldo && !saldoRevealed ? "••••" : lastSaldoRupiah);
+  saldoEl.title = hideSaldo ? (saldoRevealed ? "Ketuk untuk samarkan" : "Ketuk untuk lihat saldo") : "";
+}
+saldoEl.addEventListener("click", () => {
+  if (!hideSaldo) return;
+  saldoRevealed = !saldoRevealed;
+  renderSaldo();
+});
+
 function setSub(text: string): void {
   subEl.textContent = text;
 }
@@ -254,7 +279,8 @@ function showStartupHint(s: Record<string, unknown>): void {
 
 async function refresh(): Promise<Record<string, unknown>> {
   const r = await call({ type: "state" });
-  saldoEl.textContent = "Saldo: " + r.saldoRupiah;
+  lastSaldoRupiah = String(r.saldoRupiah ?? "-");
+  renderSaldo();
   pinSet = !!r.pinSet;
   txCount = Number(r.txCount ?? 0);
   lastBackupAt = typeof r.lastBackupAt === "string" ? r.lastBackupAt : null;
@@ -507,11 +533,26 @@ for (const p of WALL_PRESETS) {
   wallSwatches.appendChild(btn);
 }
 
+const hideSaldoEl = document.getElementById("hideSaldo") as HTMLInputElement;
+
 document.getElementById("openWall")!.onclick = () => {
   for (const m of INFO_PANES) m.hidden = true;
   currentWall = readWall();
   syncWallControls(currentWall);
+  hideSaldoEl.checked = hideSaldo;
   wallModal.hidden = false;
+};
+
+hideSaldoEl.onchange = () => {
+  hideSaldo = hideSaldoEl.checked;
+  saldoRevealed = false;
+  try {
+    localStorage.setItem(HIDE_SALDO_KEY, hideSaldo ? "1" : "0");
+  } catch {
+    // localStorage bisa diblokir; abaikan.
+  }
+  renderSaldo();
+  addBubble(hideSaldo ? "Saldo disamarkan di header." : "Saldo ditampilkan di header.", "bot");
 };
 
 document.getElementById("wallClose")!.onclick = () => {
@@ -989,6 +1030,8 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     hiddenAt = Date.now();
     if (idleTimer) window.clearTimeout(idleTimer);
+    saldoRevealed = false;
+    renderSaldo();
     return;
   }
   if (pinSet && idleMs > 0 && hiddenAt > 0 && Date.now() - hiddenAt >= idleMs) {
@@ -1240,7 +1283,13 @@ async function wipeAllData(): Promise<void> {
       const req = indexedDB.deleteDatabase("stacker-fs");
       req.onsuccess = req.onerror = req.onblocked = () => resolve();
     });
-    for (const k of ["stacker-wallpaper", "stacker-lock", "stacker-retain", "stacker-idle"]) {
+    for (const k of [
+      "stacker-wallpaper",
+      "stacker-lock",
+      "stacker-retain",
+      "stacker-idle",
+      "stacker-hide-saldo",
+    ]) {
       try {
         localStorage.removeItem(k);
       } catch {
@@ -1724,8 +1773,21 @@ async function renderDash(): Promise<void> {
   const net = Number(r.net ?? 0);
   const cards = document.createElement("div");
   cards.className = "dash-cards";
+  const saldoCard = card(
+    "Saldo total",
+    hideSaldo && !saldoRevealed ? "••••" : fmtRp(Number(r.totalSaldo ?? 0)),
+    true
+  );
+  if (hideSaldo) {
+    saldoCard.style.cursor = "pointer";
+    saldoCard.onclick = () => {
+      saldoRevealed = !saldoRevealed;
+      renderSaldo();
+      void renderDash();
+    };
+  }
   cards.append(
-    card("Saldo total", fmtRp(Number(r.totalSaldo ?? 0)), true),
+    saldoCard,
     card(`Masuk · ${String(r.label ?? "")}`, fmtRp(Number(r.masuk ?? 0))),
     card("Keluar", fmtRp(Number(r.keluar ?? 0))),
     card("Net", (net < 0 ? "-" : "+") + fmtRp(Math.abs(net)), true)

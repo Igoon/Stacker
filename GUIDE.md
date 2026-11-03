@@ -384,6 +384,10 @@ Ketuk **ℹ → Tampilan (wallpaper)**.
   mana pun.
 - **Kegelapan lapisan** — geser slider supaya teks tetap kebaca di atas foto.
 - **Hapus wallpaper** — balik ke tampilan default.
+- **Samarkan saldo di header** — centang untuk menyembunyikan total saldo
+  (tampil `Saldo: ••••`). **Default aktif** demi privasi; **ketuk pil saldo**
+  untuk melihat sementara, dan otomatis tersamar lagi begitu app ditinggalkan.
+  Berlaku juga di **ℹ → Ringkasan**.
 
 Wallpaper bersifat kosmetik: disimpan di penyimpanan browser (localStorage),
 tidak ikut file backup, dan tidak mempengaruhi data transaksi.

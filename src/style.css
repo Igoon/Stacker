@@ -43,6 +43,9 @@ header .saldo {
   color: #d1f4cc;
   padding: 4px 10px;
   border-radius: 12px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .toolbar {
   display: flex;
