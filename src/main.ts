@@ -367,7 +367,7 @@ function toggleBaseRow(): void {
 aiProvider.addEventListener("change", toggleBaseRow);
 
 document.getElementById("openAI")!.onclick = async () => {
-  for (const m of [infoModal, secModal, storeModal, aboutModal, resetModal]) m.hidden = true;
+  for (const m of INFO_PANES) m.hidden = true;
   const r = await call({ type: "getai" });
   const c = (r.config ?? {}) as {
     provider?: string;
@@ -508,7 +508,7 @@ for (const p of WALL_PRESETS) {
 }
 
 document.getElementById("openWall")!.onclick = () => {
-  for (const m of [infoModal, secModal, storeModal, aboutModal, resetModal]) m.hidden = true;
+  for (const m of INFO_PANES) m.hidden = true;
   currentWall = readWall();
   syncWallControls(currentWall);
   wallModal.hidden = false;
@@ -626,7 +626,24 @@ const savedLock = readLockState();
 let lockFails = savedLock.fails;
 let lockCooldownUntil = savedLock.until;
 let idleTimer: number | undefined;
-const IDLE_MS = 2 * 60 * 1000;
+const IDLE_KEY = "stacker-idle";
+const IDLE_OPTIONS: { ms: number; label: string }[] = [
+  { ms: 30_000, label: "30 detik" },
+  { ms: 60_000, label: "1 menit" },
+  { ms: 2 * 60_000, label: "2 menit" },
+  { ms: 5 * 60_000, label: "5 menit" },
+  { ms: 15 * 60_000, label: "15 menit" },
+  { ms: 0, label: "Nonaktif" },
+];
+function readIdleMs(): number {
+  try {
+    const n = Number(localStorage.getItem(IDLE_KEY));
+    return IDLE_OPTIONS.some((o) => o.ms === n) ? n : 2 * 60 * 1000;
+  } catch {
+    return 2 * 60 * 1000;
+  }
+}
+let idleMs = readIdleMs();
 
 const lockEl = document.getElementById("lock")!;
 const lockDots = document.getElementById("lockDots")!;
@@ -730,7 +747,7 @@ function openPinModal(mode: PinMode): void {
   pinFlow = { mode, step: 0 };
   pinModalBuffer = "";
   pinMsg.textContent = "";
-  for (const m of [infoModal, secModal, storeModal, aboutModal, resetModal]) m.hidden = true;
+  for (const m of INFO_PANES) m.hidden = true;
   pinModal.hidden = false;
   renderPinStep();
 }
@@ -910,7 +927,7 @@ function unlockUi(): void {
 
 function touchIdle(): void {
   if (idleTimer) window.clearTimeout(idleTimer);
-  if (lockEl.hidden && pinSet) idleTimer = window.setTimeout(lockNow, IDLE_MS);
+  if (idleMs > 0 && lockEl.hidden && pinSet) idleTimer = window.setTimeout(lockNow, idleMs);
 }
 
 async function tryUnlock(): Promise<void> {
@@ -967,9 +984,23 @@ window.addEventListener("keydown", (e) => {
 for (const ev of ["pointerdown", "keydown", "touchstart"] as const) {
   window.addEventListener(ev, touchIdle, { passive: true });
 }
+let hiddenAt = 0;
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) lockNow();
-  else if (lockEl.hidden && ready) void refresh();
+  if (document.hidden) {
+    hiddenAt = Date.now();
+    if (idleTimer) window.clearTimeout(idleTimer);
+    return;
+  }
+  if (pinSet && idleMs > 0 && hiddenAt > 0 && Date.now() - hiddenAt >= idleMs) {
+    hiddenAt = 0;
+    lockNow();
+    return;
+  }
+  hiddenAt = 0;
+  if (lockEl.hidden && ready) {
+    touchIdle();
+    void refresh();
+  }
 });
 // App lama terbuka tetap mengejar transaksi berulang/notice.
 window.setInterval(() => {
@@ -989,7 +1020,7 @@ function askPass(text: string, message?: string, action: "import" | "encrypt" = 
   passInput.value = "";
   passMsg.textContent = message ?? "";
   passMsg.hidden = !message;
-  for (const m of [infoModal, secModal, storeModal, aboutModal, resetModal]) m.hidden = true;
+  for (const m of INFO_PANES) m.hidden = true;
   passModal.hidden = false;
   passInput.focus();
 }
@@ -1128,6 +1159,31 @@ const storeLines = document.getElementById("storeLines")!;
 const aboutModal = document.getElementById("aboutModal")!;
 const aboutLines = document.getElementById("aboutLines")!;
 const resetModal = document.getElementById("resetModal")!;
+const katModal = document.getElementById("katModal")!;
+const catListEl = document.getElementById("catList")!;
+const catNameEl = document.getElementById("catName") as HTMLInputElement;
+const catTipeEl = document.getElementById("catTipe") as HTMLSelectElement;
+const catKwEl = document.getElementById("catKw") as HTMLInputElement;
+const catMsgEl = document.getElementById("catMsg")!;
+const budgetModal = document.getElementById("budgetModal")!;
+const budgetListEl = document.getElementById("budgetList")!;
+const budgetCatEl = document.getElementById("budgetCat") as HTMLSelectElement;
+const budgetJumlahEl = document.getElementById("budgetJumlah") as HTMLInputElement;
+const budgetPeriodeEl = document.getElementById("budgetPeriode") as HTMLSelectElement;
+const budgetRolloverEl = document.getElementById("budgetRollover") as HTMLInputElement;
+const budgetMsgEl = document.getElementById("budgetMsg")!;
+const dashModal = document.getElementById("dashModal")!;
+const dashBodyEl = document.getElementById("dashBody")!;
+const INFO_PANES = [
+  infoModal,
+  secModal,
+  storeModal,
+  aboutModal,
+  resetModal,
+  katModal,
+  budgetModal,
+  dashModal,
+];
 const pickDirBtn = document.getElementById("pickDir") as HTMLButtonElement;
 const backupNowBtn = document.getElementById("backupNow") as HTMLButtonElement;
 const clearDirBtn = document.getElementById("clearDir") as HTMLButtonElement;
@@ -1135,15 +1191,30 @@ const pinSetBtn = document.getElementById("pinSetBtn") as HTMLButtonElement;
 const pinChangeBtn = document.getElementById("pinChangeBtn") as HTMLButtonElement;
 const pinDeleteBtn = document.getElementById("pinDeleteBtn") as HTMLButtonElement;
 const wipeDataBtn = document.getElementById("wipeData") as HTMLButtonElement;
+const idleRow = document.getElementById("idleRow")!;
+const idleSel = document.getElementById("idleSel") as HTMLSelectElement;
 
 function renderPinButtons(): void {
   pinSetBtn.hidden = pinSet;
   pinChangeBtn.hidden = !pinSet;
   pinDeleteBtn.hidden = !pinSet;
+  idleRow.hidden = !pinSet;
+  idleSel.value = String(idleMs);
 }
 pinSetBtn.onclick = () => openPinModal("set");
 pinChangeBtn.onclick = () => openPinModal("change");
 pinDeleteBtn.onclick = () => openPinModal("delete");
+idleSel.onchange = () => {
+  idleMs = IDLE_OPTIONS.some((o) => o.ms === Number(idleSel.value)) ? Number(idleSel.value) : 2 * 60 * 1000;
+  try {
+    localStorage.setItem(IDLE_KEY, String(idleMs));
+  } catch {
+    // localStorage bisa diblokir; abaikan.
+  }
+  touchIdle();
+  const label = IDLE_OPTIONS.find((o) => o.ms === idleMs)?.label ?? "";
+  addBubble(idleMs === 0 ? "Kunci otomatis dimatikan." : `Kunci otomatis: ${label} tanpa aktivitas.`, "bot");
+};
 
 function verifyPinForWipe(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -1154,7 +1225,7 @@ function verifyPinForWipe(): Promise<boolean> {
 
 async function wipeAllData(): Promise<void> {
   try {
-    for (const m of [infoModal, secModal, storeModal, aboutModal, resetModal]) m.hidden = true;
+    for (const m of INFO_PANES) m.hidden = true;
     const r = await call({ type: "wipe" });
     if (!r.ok) throw new Error(String(r.error ?? "gagal menghapus database"));
     if (window.caches) {
@@ -1169,7 +1240,7 @@ async function wipeAllData(): Promise<void> {
       const req = indexedDB.deleteDatabase("stacker-fs");
       req.onsuccess = req.onerror = req.onblocked = () => resolve();
     });
-    for (const k of ["stacker-wallpaper", "stacker-lock", "stacker-retain"]) {
+    for (const k of ["stacker-wallpaper", "stacker-lock", "stacker-retain", "stacker-idle"]) {
       try {
         localStorage.removeItem(k);
       } catch {
@@ -1352,7 +1423,7 @@ function renderInfo(): void {
 }
 
 function showInfoPane(pane: HTMLElement): void {
-  for (const m of [infoModal, secModal, storeModal, aboutModal, resetModal]) m.hidden = true;
+  for (const m of INFO_PANES) m.hidden = true;
   pane.hidden = false;
   renderInfo();
 }
@@ -1396,7 +1467,7 @@ async function runReset(kind: "transaksi" | "kategori" | "akun" | "semua"): Prom
   ) {
     return;
   }
-  for (const m of [infoModal, secModal, storeModal, aboutModal, resetModal]) m.hidden = true;
+  for (const m of INFO_PANES) m.hidden = true;
   addBubble(`reset ${kind}`, "me");
   busyEl.hidden = false;
   const r = await call({ type: "chat", text: `reset ${kind}` });
@@ -1418,6 +1489,300 @@ document.getElementById("resetTxBtn")!.onclick = () => void runReset("transaksi"
 document.getElementById("resetCatBtn")!.onclick = () => void runReset("kategori");
 document.getElementById("resetAccBtn")!.onclick = () => void runReset("akun");
 document.getElementById("resetAllBtn")!.onclick = () => void runReset("semua");
+
+// ---------- Manajemen kategori (UI) ----------
+interface CatRow {
+  id: number;
+  nama: string;
+  tipe: string;
+  keywords: string[];
+}
+let catNames = new Set<string>();
+
+function runCmd(text: string): Promise<Reply & Record<string, unknown>> {
+  return call({ type: "chat", text });
+}
+
+async function refreshCatList(): Promise<void> {
+  const r = await call({ type: "listcat" });
+  const cats = (Array.isArray(r.categories) ? r.categories : []) as CatRow[];
+  catNames = new Set(cats.map((c) => c.nama.toLowerCase()));
+  catListEl.replaceChildren();
+  if (!cats.length) {
+    const empty = document.createElement("p");
+    empty.className = "info-note";
+    empty.textContent = "Belum ada kategori.";
+    catListEl.appendChild(empty);
+    return;
+  }
+  for (const c of cats) {
+    const item = document.createElement("div");
+    item.className = "cat-item";
+    const head = document.createElement("div");
+    head.className = "cat-head";
+    const nm = document.createElement("span");
+    nm.className = "cat-name";
+    nm.textContent = c.nama;
+    const badge = document.createElement("span");
+    badge.className = "cat-badge";
+    badge.textContent = c.tipe;
+    head.append(nm, badge);
+    const kw = document.createElement("div");
+    kw.className = "cat-kw";
+    kw.textContent = c.keywords.length ? c.keywords.join(", ") : "(tanpa kata kunci)";
+    const actions = document.createElement("div");
+    actions.className = "cat-actions";
+    const edit = document.createElement("button");
+    edit.textContent = "Ubah";
+    edit.onclick = () => {
+      catNameEl.value = c.nama;
+      catTipeEl.value = c.tipe === "masuk" || c.tipe === "keduanya" ? c.tipe : "keluar";
+      catKwEl.value = c.keywords.join(", ");
+      catMsgEl.hidden = true;
+      catNameEl.focus();
+    };
+    const del = document.createElement("button");
+    del.textContent = "Hapus";
+    del.onclick = async () => {
+      if (!window.confirm(`Hapus kategori "${c.nama}"? Anggarannya ikut terhapus.`)) return;
+      const res = await runCmd(`kategori hapus ${c.nama}`);
+      if (res.text) addBubble(res.text, "bot");
+      await refreshCatList();
+    };
+    actions.append(edit, del);
+    item.append(head, kw, actions);
+    catListEl.appendChild(item);
+  }
+}
+
+document.getElementById("openCat")!.onclick = async () => {
+  showInfoPane(katModal);
+  catMsgEl.hidden = true;
+  await refreshCatList();
+};
+document.getElementById("catBack")!.onclick = () => showInfoPane(infoModal);
+document.getElementById("catReset")!.onclick = () => {
+  catNameEl.value = "";
+  catKwEl.value = "";
+  catMsgEl.hidden = true;
+};
+document.getElementById("catSave")!.onclick = async () => {
+  const nama = catNameEl.value.trim();
+  const tipe = catTipeEl.value;
+  const kws = catKwEl.value.split(",").map((s) => s.trim()).filter(Boolean);
+  if (!nama) {
+    catMsgEl.hidden = false;
+    catMsgEl.textContent = "Nama kategori wajib diisi.";
+    return;
+  }
+  const list = kws.length ? kws.join(", ") : nama.toLowerCase();
+  if (catNames.has(nama.toLowerCase())) {
+    const r1 = await runCmd(`kategori ubah ${nama} | ${list}`);
+    if (r1.text) addBubble(r1.text, "bot");
+    const r2 = await runCmd(`kategori sisi ${nama} ${tipe}`);
+    if (r2.text) addBubble(r2.text, "bot");
+  } else {
+    const r = await runCmd(`kategori tambah ${tipe} ${nama} | ${list}`);
+    if (r.text) addBubble(r.text, "bot");
+  }
+  catNameEl.value = "";
+  catKwEl.value = "";
+  catMsgEl.hidden = true;
+  await refreshCatList();
+};
+
+// ---------- Manajemen anggaran (UI) ----------
+function fmtRp(n: number): string {
+  return "Rp" + Math.round(n).toLocaleString("id-ID");
+}
+
+async function refreshBudgetCats(): Promise<void> {
+  const r = await call({ type: "listcat" });
+  const cats = (Array.isArray(r.categories) ? r.categories : []) as CatRow[];
+  const prev = budgetCatEl.value;
+  budgetCatEl.replaceChildren();
+  for (const c of cats) {
+    const o = document.createElement("option");
+    o.value = c.nama;
+    o.textContent = c.nama;
+    budgetCatEl.appendChild(o);
+  }
+  if (prev && cats.some((c) => c.nama === prev)) budgetCatEl.value = prev;
+}
+
+async function refreshBudgetList(): Promise<void> {
+  const r = await call({ type: "listbudget" });
+  const rows = (Array.isArray(r.budgets) ? r.budgets : []) as {
+    kategori: string;
+    jumlah: number;
+    periode: string;
+    rollover: boolean;
+    spent: number;
+    effective: number;
+    pct: number;
+  }[];
+  budgetListEl.replaceChildren();
+  if (!rows.length) {
+    const empty = document.createElement("p");
+    empty.className = "info-note";
+    empty.textContent = "Belum ada anggaran. Isi form di bawah.";
+    budgetListEl.appendChild(empty);
+    return;
+  }
+  for (const b of rows) {
+    const item = document.createElement("div");
+    item.className = "cat-item";
+    const head = document.createElement("div");
+    head.className = "cat-head";
+    const nm = document.createElement("span");
+    nm.className = "cat-name";
+    nm.textContent = b.kategori;
+    const badge = document.createElement("span");
+    badge.className = "cat-badge";
+    badge.textContent = b.periode + (b.rollover ? " ↻" : "");
+    head.append(nm, badge);
+    const info = document.createElement("div");
+    info.className = "cat-kw";
+    const sisa = b.effective - b.spent;
+    info.textContent =
+      `${fmtRp(b.spent)} / ${fmtRp(b.effective)} (${b.pct}%) · ` +
+      (sisa < 0 ? `tembus ${fmtRp(-sisa)}` : `sisa ${fmtRp(sisa)}`);
+    const bar = document.createElement("div");
+    const cls = b.pct >= 100 ? "over" : b.pct >= 80 ? "warn" : "";
+    bar.className = "bar" + (cls ? " " + cls : "");
+    const fill = document.createElement("span");
+    fill.style.width = Math.min(100, Math.max(0, b.pct)) + "%";
+    bar.appendChild(fill);
+    const actions = document.createElement("div");
+    actions.className = "cat-actions";
+    const edit = document.createElement("button");
+    edit.textContent = "Ubah";
+    edit.onclick = () => {
+      budgetCatEl.value = b.kategori;
+      budgetJumlahEl.value = String(b.jumlah);
+      budgetPeriodeEl.value = b.periode === "mingguan" ? "mingguan" : "bulanan";
+      budgetRolloverEl.checked = b.rollover;
+      budgetMsgEl.hidden = true;
+      budgetJumlahEl.focus();
+    };
+    const del = document.createElement("button");
+    del.textContent = "Hapus";
+    del.onclick = async () => {
+      if (!window.confirm(`Hapus anggaran "${b.kategori}"?`)) return;
+      const res = await runCmd(`anggaran hapus ${b.kategori}`);
+      if (res.text) addBubble(res.text, "bot");
+      await refreshBudgetList();
+    };
+    actions.append(edit, del);
+    item.append(head, info, bar, actions);
+    budgetListEl.appendChild(item);
+  }
+}
+
+document.getElementById("openBudget")!.onclick = async () => {
+  showInfoPane(budgetModal);
+  budgetMsgEl.hidden = true;
+  await Promise.all([refreshBudgetCats(), refreshBudgetList()]);
+};
+document.getElementById("budgetBack")!.onclick = () => showInfoPane(infoModal);
+document.getElementById("budgetSave")!.onclick = async () => {
+  const kat = budgetCatEl.value;
+  const jumlah = budgetJumlahEl.value.trim();
+  if (!kat || !jumlah) {
+    budgetMsgEl.hidden = false;
+    budgetMsgEl.textContent = "Pilih kategori dan isi batas anggaran.";
+    return;
+  }
+  const periodArg = budgetPeriodeEl.value === "mingguan" ? " mingguan" : "";
+  const r = await runCmd(`anggaran ${kat} ${jumlah}${periodArg}`);
+  if (r.text) addBubble(r.text, "bot");
+  const r2 = await runCmd(
+    `anggaran ${budgetRolloverEl.checked ? "rollover" : "no-rollover"} ${kat}`
+  );
+  if (r2.text) addBubble(r2.text, "bot");
+  budgetJumlahEl.value = "";
+  budgetMsgEl.hidden = true;
+  await refreshBudgetList();
+};
+
+// ---------- Dashboard / Ringkasan (UI) ----------
+async function renderDash(): Promise<void> {
+  const r = await call({ type: "dashboard" });
+  dashBodyEl.replaceChildren();
+  const card = (k: string, v: string, wide = false): HTMLElement => {
+    const d = document.createElement("div");
+    d.className = "dash-card" + (wide ? " wide" : "");
+    const kk = document.createElement("div");
+    kk.className = "k";
+    kk.textContent = k;
+    const vv = document.createElement("div");
+    vv.className = "v";
+    vv.textContent = v;
+    d.append(kk, vv);
+    return d;
+  };
+  const net = Number(r.net ?? 0);
+  const cards = document.createElement("div");
+  cards.className = "dash-cards";
+  cards.append(
+    card("Saldo total", fmtRp(Number(r.totalSaldo ?? 0)), true),
+    card(`Masuk · ${String(r.label ?? "")}`, fmtRp(Number(r.masuk ?? 0))),
+    card("Keluar", fmtRp(Number(r.keluar ?? 0))),
+    card("Net", (net < 0 ? "-" : "+") + fmtRp(Math.abs(net)), true)
+  );
+  dashBodyEl.appendChild(cards);
+
+  const top = (Array.isArray(r.top) ? r.top : []) as { kategori: string; total: number }[];
+  if (top.length) {
+    const t = document.createElement("div");
+    t.className = "dash-title";
+    t.textContent = "Top pengeluaran";
+    const list = document.createElement("div");
+    list.className = "dash-list";
+    for (const c of top) {
+      const row = document.createElement("div");
+      row.className = "dr";
+      const a = document.createElement("span");
+      a.textContent = c.kategori;
+      const b = document.createElement("span");
+      b.textContent = fmtRp(c.total);
+      row.append(a, b);
+      list.appendChild(row);
+    }
+    dashBodyEl.append(t, list);
+  }
+  if (typeof r.svg === "string" && r.svg) {
+    const wrap = document.createElement("div");
+    wrap.className = "chart";
+    wrap.innerHTML = r.svg;
+    dashBodyEl.appendChild(wrap);
+  }
+  const accounts = (Array.isArray(r.accounts) ? r.accounts : []) as { nama: string; saldo: number }[];
+  if (accounts.length) {
+    const t = document.createElement("div");
+    t.className = "dash-title";
+    t.textContent = "Saldo akun";
+    const list = document.createElement("div");
+    list.className = "dash-list";
+    for (const a of accounts) {
+      const row = document.createElement("div");
+      row.className = "dr";
+      const x = document.createElement("span");
+      x.textContent = a.nama;
+      const y = document.createElement("span");
+      y.textContent = fmtRp(a.saldo);
+      row.append(x, y);
+      list.appendChild(row);
+    }
+    dashBodyEl.append(t, list);
+  }
+}
+
+document.getElementById("openDash")!.onclick = async () => {
+  showInfoPane(dashModal);
+  await renderDash();
+};
+document.getElementById("dashBack")!.onclick = () => showInfoPane(infoModal);
 
 document.getElementById("updateReload")!.onclick = () => location.reload();
 

@@ -402,8 +402,9 @@ pin                     → status kunci
   di chat.
 - Keypad visual (1–9, 0, ⌫, ✓) dipakai untuk set/ubah/unlock. Tidak ada input
   password yang memunculkan keyboard OS.
-- App mengunci otomatis setelah **2 menit tanpa aktivitas**, atau begitu app
-  ditinggalkan (pindah app / tab disembunyikan).
+- **Kunci otomatis** bisa diatur di **ℹ → Keamanan**: 30 dtk / 1 mnt / 2 mnt
+  (default) / 5 mnt / 15 mnt / Nonaktif. Berlaku saat app dibiarkan tanpa
+  aktivitas atau ditinggalkan. PIN tetap diminta saat app dibuka ulang.
 - Salah PIN 5× → tunggu 30 detik sebelum bisa coba lagi.
 - PIN **hanya mengunci tampilan**, bukan mengenkripsi database. Hash PIN
   (PBKDF2-SHA256, 120.000 iterasi + salt) disimpan lokal dan **tidak ikut
@@ -453,10 +454,21 @@ transaksi/kategori/akun` bisa dibatalkan dengan `undo`; `Reset semua` tidak.
 
 ### Penyimpanan permanen & auto-backup
 
-Modal **ℹ** kini ringkas: ringkasan di atas, lalu sub-menu **Keamanan & PIN**,
-**Backup & penyimpanan**, **Tampilan**, **AI**, **Reset data**, dan **Tentang**.
-Detail penyimpanan ada di **ℹ → Backup & penyimpanan**; info teknis build ada di
-**ℹ → Tentang**.
+Modal **ℹ** kini ringkas: ringkasan di atas, lalu sub-menu **Ringkasan**,
+**Kategori**, **Anggaran**, **Keamanan & PIN**, **Backup & penyimpanan**,
+**Tampilan**, **AI**, **Reset data**, dan **Tentang**. Detail penyimpanan ada di
+**ℹ → Backup & penyimpanan**; info teknis build ada di **ℹ → Tentang**.
+
+### Kategori, Anggaran & Ringkasan (lewat menu)
+
+- **ℹ → Kategori** — daftar kategori (nama, sisi, kata kunci). Tambah/ubah lewat
+  form (nama + sisi + kata kunci), hapus dengan tombol. Validasi bentrok otomatis
+  (sama seperti perintah chat).
+- **ℹ → Anggaran** — daftar anggaran dengan **bar progres** (hijau <80%, kuning
+  ≥80%, merah tembus), sisa/tembus, serta form set/ubah (kategori, batas,
+  periode bulanan/mingguan, rollover) dan hapus.
+- **ℹ → Ringkasan** — dashboard bulan berjalan: saldo total, masuk/keluar/net
+  bulan ini, top pengeluaran, donut komposisi, dan saldo per akun.
 
 - **Penyimpanan permanen** — app meminta `navigator.storage.persist()` saat
   dibuka supaya browser tidak membersihkan data saat storage menipis. Status

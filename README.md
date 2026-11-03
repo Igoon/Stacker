@@ -76,8 +76,11 @@ ter-deploy kalau logika rusak.
   periode `bulanan`/`mingguan` per kategori.
 - **Utang/piutang** ledger terpisah (tidak mengubah saldo akun).
 - **Transaksi berulang** bulanan (idempotent), **undo** 20 langkah.
-- **PIN + auto-lock** (2 menit idle / app ditinggalkan) — keypad visual tanpa
-  keyboard OS, atur/ubah/hapus lewat **ℹ › Keamanan**; hash PBKDF2, bukan enkripsi disk.
+- **PIN + auto-lock** (durasi bisa diatur: 30 dtk–15 mnt / nonaktif) — keypad
+  visual tanpa keyboard OS, atur/ubah/hapus lewat **ℹ › Keamanan**; hash PBKDF2,
+  bukan enkripsi disk.
+- **Manajemen lewat menu**: **ℹ › Kategori** (daftar + form), **ℹ › Anggaran**
+  (form + bar progres), **ℹ › Ringkasan** (dashboard bulan berjalan).
 - **Backup terenkripsi** (`backup kunci <sandi>`, AES-GCM 256 + PBKDF2).
 - **Auto-backup folder** (File System Access API) + pengingat backup 14 hari,
   status storage permanen (`navigator.storage.persist()`) di modal **ℹ**.
@@ -142,5 +145,5 @@ memverifikasi build (commit SHA + hash bundle di panel **ℹ**,
 
 ## Versi
 
-`v2.10.1` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
+`v2.11.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
 Nilai versi di-hardcode di `src/version.ts` (browser tak bisa baca `package.json`).

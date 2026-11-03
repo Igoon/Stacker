@@ -341,6 +341,31 @@ test("modal info ringkas + sub-modal (storage & tentang)", async ({ page }) => {
   await expect(page.locator("#infoModal")).toBeHidden();
 });
 
+test("menu Kategori, Anggaran, dan Ringkasan", async ({ page }) => {
+  await boot(page);
+
+  await page.locator("#info").click();
+  await page.locator("#openCat").click();
+  await page.locator("#catName").fill("Sosial");
+  await page.locator("#catTipe").selectOption("keluar");
+  await page.locator("#catKw").fill("sosial, jimpitan");
+  await page.locator("#catSave").click();
+  await expect(page.locator("#catList")).toContainText("Sosial");
+  await page.locator("#catBack").click();
+
+  await page.locator("#openBudget").click();
+  await page.locator("#budgetCat").selectOption("Sosial");
+  await page.locator("#budgetJumlah").fill("100rb");
+  await page.locator("#budgetSave").click();
+  await expect(page.locator("#budgetList")).toContainText("Sosial");
+  await expect(page.locator("#budgetList .bar")).toBeVisible();
+  await page.locator("#budgetBack").click();
+
+  await page.locator("#openDash").click();
+  await expect(page.locator("#dashBody .dash-card").first()).toBeVisible();
+  await page.locator("#dashBack").click();
+});
+
 test("CSP aktif & panel keamanan menampilkan build + hash", async ({ page }) => {
   await boot(page);
 

@@ -345,6 +345,70 @@ function budgetEffective(b: Budget): number {
   return Math.max(0, b.jumlah + budgetCarry(b));
 }
 
+export interface BudgetRow {
+  kategori: string;
+  jumlah: number;
+  periode: string;
+  rollover: boolean;
+  spent: number;
+  effective: number;
+  carry: number;
+  pct: number;
+}
+
+// Data anggaran terstruktur untuk UI (dipakai worker).
+export function budgetOverview(): BudgetRow[] {
+  return listBudgets()
+    .map((b) => {
+      const w = budgetWindow(b);
+      const spent = w ? spentIn(b.kategori, w) : 0;
+      const carry = budgetCarry(b);
+      const effective = budgetEffective(b);
+      const pct = effective > 0 ? Math.round((spent / effective) * 100) : 0;
+      return {
+        kategori: b.kategori,
+        jumlah: b.jumlah,
+        periode: b.periode,
+        rollover: !!b.rollover,
+        spent,
+        effective,
+        carry,
+        pct,
+      };
+    })
+    .sort((a, b) => a.kategori.localeCompare(b.kategori));
+}
+
+// Ringkasan dashboard (bulan berjalan) untuk UI.
+export function dashboardData(): {
+  label: string;
+  masuk: number;
+  keluar: number;
+  net: number;
+  totalSaldo: number;
+  top: { kategori: string; total: number }[];
+  accounts: { nama: string; saldo: number }[];
+  svg: string;
+} {
+  const per = parsePeriod("");
+  const label = per?.label ?? "bulan ini";
+  const rows = per ? ringkasRange(per.from, per.to) : [];
+  const keluarCats = rows
+    .filter((r) => r.tipe === "keluar")
+    .map((r) => ({ kategori: r.kategori, total: r.total }));
+  const masukCats = rows
+    .filter((r) => r.tipe === "masuk")
+    .map((r) => ({ kategori: r.kategori, total: r.total }));
+  const masuk = masukCats.reduce((a, c) => a + c.total, 0);
+  const keluar = keluarCats.reduce((a, c) => a + c.total, 0);
+  const top = [...keluarCats].sort((a, b) => b.total - a.total).slice(0, 5);
+  const svg = keluarCats.length ? buildDonutSvg(keluarCats, { maxCats: 5, centerLabel: "keluar" }) : "";
+  const accounts = accountBalances()
+    .filter((a) => (a.saldo ?? 0) !== 0)
+    .map((a) => ({ nama: a.nama, saldo: a.saldo ?? 0 }));
+  return { label, masuk, keluar, net: masuk - keluar, totalSaldo: saldo(), top, accounts, svg };
+}
+
 function budgetWarn(t: Tx): string | null {
   if (t.tipe !== "keluar") return null;
   const b = getBudget(t.kategori);

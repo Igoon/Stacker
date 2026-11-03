@@ -11,8 +11,11 @@ import {
   accountBalances,
   getSetting,
   setSetting,
+  listCategories,
 } from "./db";
 import {
+  budgetOverview,
+  dashboardData,
   deleteTxWithUndo,
   handleMessage,
   importJsonWithUndo,
@@ -79,6 +82,18 @@ interface WipeMsg {
   type: "wipe";
   id: number;
 }
+interface ListCatMsg {
+  type: "listcat";
+  id: number;
+}
+interface ListBudgetMsg {
+  type: "listbudget";
+  id: number;
+}
+interface DashMsg {
+  type: "dashboard";
+  id: number;
+}
 interface MarkBackupMsg {
   type: "markbackup";
   id: number;
@@ -110,6 +125,9 @@ type InMsg =
   | PinChangeMsg
   | PinDelMsg
   | WipeMsg
+  | ListCatMsg
+  | ListBudgetMsg
+  | DashMsg
   | MarkBackupMsg;
 
 let mini: MiniDb;
@@ -235,6 +253,15 @@ async function onMessage(msg: InMsg): Promise<void> {
       reply(msg.id, { ok: true });
       break;
     }
+    case "listcat":
+      reply(msg.id, { ok: true, categories: listCategories() });
+      break;
+    case "listbudget":
+      reply(msg.id, { ok: true, budgets: budgetOverview() });
+      break;
+    case "dashboard":
+      reply(msg.id, { ok: true, ...dashboardData() });
+      break;
     case "wipe": {
       // Hapus total: tutup DB dulu (WAJIB sebelum wipeFiles), lalu kosongkan
       // seluruh file OPFS SAH pool. UI akan reload dan DB dibuka ulang bersih.

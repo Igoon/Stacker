@@ -12,7 +12,8 @@ const mini = createMiniDb(sqlite3, oo1db as never);
 const { initDb } = await import("./db");
 initDb(mini);
 
-const { handleMessage, deleteTxWithUndo, importJsonWithUndo, aiEnabled } = await import("./bot");
+const { handleMessage, deleteTxWithUndo, importJsonWithUndo, aiEnabled, budgetOverview, dashboardData } =
+  await import("./bot");
 const dbmod = await import("./db");
 const { parseLocal } = await import("./parser");
 const { setPin, checkPin, changePin, removePin, hasPin } = await import("./pin");
@@ -765,6 +766,18 @@ await check("hapus semua kategori tidak memunculkan seed default lagi", async ()
   assert.equal(dbmod.listCategories().length, 0, "kategori kosong");
   initDb(mini);
   assert.equal(dbmod.listCategories().length, 0, "init ulang tidak re-seed");
+});
+
+await check("budgetOverview & dashboardData (untuk UI)", async () => {
+  await handleMessage("kategori tambah keluar UjiDash | ujidash");
+  await handleMessage("anggaran UjiDash 100rb");
+  await handleMessage("ujidash 30rb");
+  const b = budgetOverview().find((x) => x.kategori === "UjiDash");
+  assert(b && b.spent >= 30000 && b.effective >= 100000, "budget overview terhitung");
+  const d = dashboardData();
+  assert(typeof d.totalSaldo === "number" && !!d.label, "dashboard data terisi");
+  await handleMessage("anggaran hapus UjiDash");
+  await handleMessage("kategori hapus UjiDash");
 });
 
 await check("reset akun/kategori/semua + backup", async () => {
