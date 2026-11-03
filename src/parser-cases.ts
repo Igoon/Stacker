@@ -30,4 +30,10 @@ export const PARSER_CASES: ParserCase[] = [
   { input: "2026-09-03 jajan 20rb", tipe: "keluar", kategori: "Makanan", jumlah: 20_000, confidence: "high", tanggal: "2026-09-03" },
   { input: "kopi 18rb sama makan 20rb", tipe: "keluar", kategori: "Makanan", jumlah: 18_000, confidence: "low" },
   { input: "bayar air 90rb", tipe: "keluar", kategori: "Tagihan", jumlah: 90_000, confidence: "high" },
+  // Nama akun tak boleh menentukan kategori (mis. "shopeepay" memuat "shopee").
+  { input: "shopeepay kopi 19300", tipe: "keluar", kategori: "Makanan", jumlah: 19_300, confidence: "high" },
+  { input: "gopay makan 50rb", tipe: "keluar", kategori: "Makanan", jumlah: 50_000, confidence: "high" },
+  // Imbuhan tetap cocok setelah batas kanan diperketat.
+  { input: "kopinya 10rb", tipe: "keluar", kategori: "Makanan", jumlah: 10_000, confidence: "high" },
+  { input: "makanan 50rb", tipe: "keluar", kategori: "Makanan", jumlah: 50_000, confidence: "high" },
 ];

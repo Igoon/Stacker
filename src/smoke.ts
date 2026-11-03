@@ -287,6 +287,16 @@ await check("kategori ubah/hapus: aman & sinonim", async () => {
   assert(!dbmod.getCategoryByName("TempUnik"), "kategori terhapus");
 });
 
+await check("akun tidak memicu kategori salah", async () => {
+  const r = await handleMessage("shopeepay kopi 19300");
+  const tx = last(r);
+  assert(tx, "transaksi tercatat");
+  assert.equal(tx!.kategori, "Makanan", "kopi = Makanan walau akun ShopeePay");
+  const shopee = dbmod.getAccountByName("ShopeePay");
+  assert(shopee, "akun ShopeePay ada");
+  assert.equal(dbmod.getTx(tx!.id)!.account_id, shopee!.id, "akun terdeteksi ShopeePay");
+});
+
 await check("kata perintah tak jadi transaksi", async () => {
   const before = count();
   const r = await handleMessage("hapus apa");
@@ -626,7 +636,7 @@ await check("backup kunci: file terenkripsi & bisa dipulihkan", async () => {
   assert(!short.file && short.text.includes("minimal 8"), "tolak sandi pendek");
 });
 
-await check("parser korpus: 20 kalimat nyata", async () => {
+await check("parser korpus: kalimat nyata", async () => {
   for (const c of PARSER_CASES) {
     const p = parseLocal(c.input);
     assert(p, `tak terparse: ${c.input}`);

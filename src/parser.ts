@@ -1,5 +1,5 @@
 import { extractDate } from "./dates";
-import { listCategories } from "./db";
+import { listAccounts, listCategories } from "./db";
 
 export interface ParseResult {
   jumlah: number;
@@ -39,8 +39,20 @@ function kwMatch(low: string, kw: string): boolean {
   const re =
     k.length <= 3
       ? new RegExp(`(?<![a-z0-9])${esc}(?![a-z0-9])`, "i")
-      : new RegExp(`(?<![a-z0-9])${esc}`, "i");
+      : new RegExp(`(?<![a-z0-9])${esc}(?:an|nya|kan|lah|kah|i)?(?![a-z0-9])`, "i");
   return re.test(low);
+}
+
+// Buang nama akun & @mention supaya tak ikut menentukan kategori
+// (mis. "shopeepay" yang memuat kata kunci "shopee").
+function stripAccounts(low: string): string {
+  let out = low;
+  for (const acc of listAccounts()) {
+    const n = acc.nama.toLowerCase().trim();
+    if (!n) continue;
+    out = out.replace(new RegExp(`(?<![a-z0-9])@?${escapeRe(n)}(?![a-z0-9])`, "g"), " ");
+  }
+  return out;
 }
 
 // Arah (masuk/keluar) hanya boleh imbuhan wajar: "gajian" cocok, tapi
@@ -195,6 +207,7 @@ export function parseLocal(text: string): LocalParse | null {
     tipe = masuk ? "masuk" : "keluar";
   }
 
+  const catLow = stripAccounts(low);
   let kategori = "Lainnya";
   let kategoriKetemu = false;
   let bestLen = 0;
@@ -202,7 +215,7 @@ export function parseLocal(text: string): LocalParse | null {
     for (const k of cat.keywords) {
       const kk = k.toLowerCase().trim();
       if (!kk) continue;
-      if (kk.length > bestLen && kwMatch(low, kk)) {
+      if (kk.length > bestLen && kwMatch(catLow, kk)) {
         bestLen = kk.length;
         kategori = cat.nama;
         kategoriKetemu = true;
@@ -216,7 +229,7 @@ export function parseLocal(text: string): LocalParse | null {
       for (const k of cat.keywords) {
         const kk = k.toLowerCase().trim();
         if (!kk) continue;
-        if (kk.length > bestLen && fuzzyKwMatch(low, kk)) {
+        if (kk.length > bestLen && fuzzyKwMatch(catLow, kk)) {
           bestLen = kk.length;
           kategori = cat.nama;
           kategoriKetemu = true;
