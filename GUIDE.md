@@ -458,21 +458,10 @@ transaksi/kategori/akun` bisa dibatalkan dengan `undo`; `Reset semua` tidak.
 
 ### Penyimpanan permanen & auto-backup
 
-Modal **ℹ** kini ringkas: ringkasan di atas, lalu sub-menu **Ringkasan**,
-**Kategori**, **Anggaran**, **Keamanan & PIN**, **Backup & penyimpanan**,
-**Tampilan**, **AI**, **Reset data**, dan **Tentang**. Detail penyimpanan ada di
+Modal **ℹ** kini ringkas dengan grup: **Keuangan** (Ringkasan, Kategori, Akun,
+Anggaran), **Pengaturan** (Keamanan & PIN, Backup & penyimpanan, Tampilan, AI,
+Reset data), dan **Lainnya** (Tentang). Detail penyimpanan ada di
 **ℹ → Backup & penyimpanan**; info teknis build ada di **ℹ → Tentang**.
-
-### Kategori, Anggaran & Ringkasan (lewat menu)
-
-- **ℹ → Kategori** — daftar kategori (nama, sisi, kata kunci). Tambah/ubah lewat
-  form (nama + sisi + kata kunci), hapus dengan tombol. Validasi bentrok otomatis
-  (sama seperti perintah chat).
-- **ℹ → Anggaran** — daftar anggaran dengan **bar progres** (hijau <80%, kuning
-  ≥80%, merah tembus), sisa/tembus, serta form set/ubah (kategori, batas,
-  periode bulanan/mingguan, rollover) dan hapus.
-- **ℹ → Ringkasan** — dashboard bulan berjalan: saldo total, masuk/keluar/net
-  bulan ini, top pengeluaran, donut komposisi, dan saldo per akun.
 
 - **Penyimpanan permanen** — app meminta `navigator.storage.persist()` saat
   dibuka supaya browser tidak membersihkan data saat storage menipis. Status
@@ -484,13 +473,31 @@ Modal **ℹ** kini ringkas: ringkasan di atas, lalu sub-menu **Ringkasan**,
   ke internet. File ditulis plaintext JSON — kalau perlu terenkripsi, pakai
   `backup kunci <sandi>` manual. Retensi file backup diatur di
   **ℹ → Backup & penyimpanan** (10–100 file terbaru).
-- **Pengingat** — chat menampilkan notice bila belum pernah backup atau backup
-  terakhir ≥ 14 hari.
+- **Pengingat** — saat dibuka, chat menampilkan notice untuk: belum pernah
+  backup / backup ≥ 14 hari, **anggaran hampir (≥80%) atau tembus**, dan
+  **transaksi berulang** yang baru dicatat.
 - **Bar "Versi baru tersedia"** — saat service worker memperbarui cache, app
   menampilkan tombol **Muat ulang** (tidak auto-reload supaya ketikan tak hilang).
 - **Info teknis** — **ℹ → Tentang** menampilkan commit SHA build, hash
   bundle SHA-256, host AI yang boleh dihubungi, dan status "data lokal", plus
   nama app, pembuat (Igoon / I Go On), lisensi Apache-2.0, dan tautan kode sumber.
+
+### Kategori, Akun, Anggaran & Ringkasan (lewat menu)
+
+- **ℹ → Kategori** — daftar kategori (nama, sisi, kata kunci). Tambah/ubah lewat
+  form (nama + sisi + kata kunci), hapus dengan tombol. Validasi bentrok otomatis
+  (sama seperti perintah chat).
+- **ℹ → Akun** — daftar akun (nama, tipe, saldo). Form tambah (nama boleh
+  **multi-kata** + tipe + saldo awal). Aksi per baris: **Ubah nama**,
+  **Sesuaikan** (paksa saldo ke nilai nyata), **Hapus**.
+- **ℹ → Anggaran** — daftar anggaran dengan **bar progres** (hijau <80%, kuning
+  ≥80%, merah tembus), sisa/tembus, serta form set/ubah (kategori, batas,
+  periode bulanan/mingguan, rollover) dan hapus.
+- **ℹ → Ringkasan** — dashboard bulan berjalan: saldo total, masuk/keluar/net
+  bulan ini, top pengeluaran, donut komposisi, dan saldo per akun.
+
+Saat belum ada transaksi, muncul **chip contoh** di atas kolom chat ("makan
+siang 50rb", "gaji 5jt", …) — ketuk untuk mengisi kolom.
 
 ### Verifikasi keamanan (30 detik)
 

@@ -381,6 +381,41 @@ test("menu Kategori, Anggaran, dan Ringkasan", async ({ page }) => {
   await page.locator("#dashBack").click();
 });
 
+test("menu Akun: tambah multi-kata, sesuaikan, hapus", async ({ page }) => {
+  await boot(page);
+  await page.locator("#info").click();
+  await page.locator("#openAcc").click();
+  await page.locator("#accName").fill("Rumah Tangga");
+  await page.locator("#accTipe").selectOption("bank");
+  await page.locator("#accSaldo").fill("1jt");
+  await page.locator("#accSave").click();
+  await expect(page.locator("#accList")).toContainText("Rumah Tangga");
+
+  page.once("dialog", (d) => void d.accept("2jt"));
+  await page
+    .locator("#accList .cat-item")
+    .filter({ hasText: "Rumah Tangga" })
+    .getByText("Sesuaikan")
+    .click();
+  await expect(page.locator("#accList")).toContainText("Rp2.000.000");
+
+  page.once("dialog", (d) => void d.accept());
+  await page
+    .locator("#accList .cat-item")
+    .filter({ hasText: "Rumah Tangga" })
+    .getByText("Hapus")
+    .click();
+  await expect(page.locator("#accList")).not.toContainText("Rumah Tangga");
+  await page.locator("#accBack").click();
+});
+
+test("chip cepat mengisi input saat belum ada transaksi", async ({ page }) => {
+  await boot(page);
+  await expect(page.locator("#chips")).toBeVisible();
+  await page.locator("#chips button", { hasText: "gaji 5jt" }).click();
+  await expect(page.locator("#input")).toHaveValue("gaji 5jt");
+});
+
 test("CSP aktif & panel keamanan menampilkan build + hash", async ({ page }) => {
   await boot(page);
 

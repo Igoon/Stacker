@@ -731,10 +731,11 @@ async function handleMessageInner(input: string): Promise<Reply> {
     const rest = m[1].trim();
     const saldoPart = rest.match(/\bsaldo\s+(.+)$/i);
     const before = saldoPart ? rest.slice(0, saldoPart.index).trim() : rest;
-    const toks = before.split(/\s+/);
-    const nama = toks[0];
-    const tipeRaw = (toks[1] ?? "ewallet").toLowerCase();
-    const tipe = TIPE_AKUN.includes(tipeRaw) ? tipeRaw : "ewallet";
+    const toks = before.split(/\s+/).filter(Boolean);
+    // Nama boleh multi-kata; token tipe (bank/ewallet/cash) memisahkannya.
+    const ti = toks.findIndex((t) => TIPE_AKUN.includes(t.toLowerCase()));
+    const tipe = ti >= 0 ? toks[ti].toLowerCase() : "ewallet";
+    const nama = (ti >= 0 ? [...toks.slice(0, ti), ...toks.slice(ti + 1)] : toks).join(" ").trim();
     if (!nama) return { text: "Format: `akun tambah <nama> <bank|ewallet|cash> [saldo 1jt]`" };
     if (getAccountByName(nama)) return { text: `Akun "${nama}" sudah ada.` };
     const aliasAcc = aliasConflict([nama]);

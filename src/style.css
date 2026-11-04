@@ -146,6 +146,24 @@ header .saldo {
   text-decoration: none;
   word-break: break-all;
 }
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px 0;
+}
+.chips[hidden] {
+  display: none;
+}
+.chips button {
+  border: 1px solid #2a3942;
+  background: #1f2c33;
+  color: #d1f4cc;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
 footer {
   display: flex;
   gap: 8px;
@@ -410,6 +428,17 @@ footer button {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+.menu-head {
+  margin: 8px 2px 0;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8696a0;
+}
+.menu-list > .menu-row:first-child + .menu-head,
+.menu-head:first-child {
+  margin-top: 2px;
 }
 .menu-row {
   display: flex;

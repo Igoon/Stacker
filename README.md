@@ -79,8 +79,11 @@ ter-deploy kalau logika rusak.
 - **PIN + auto-lock** (durasi bisa diatur: 30 dtk–15 mnt / nonaktif) — keypad
   visual tanpa keyboard OS, atur/ubah/hapus lewat **ℹ › Keamanan**; hash PBKDF2,
   bukan enkripsi disk.
-- **Manajemen lewat menu**: **ℹ › Kategori** (daftar + form), **ℹ › Anggaran**
-  (form + bar progres), **ℹ › Ringkasan** (dashboard bulan berjalan).
+- **Manajemen lewat menu** (grup Keuangan/Pengaturan): **ℹ › Kategori**, **ℹ › Akun**
+  (nama multi-kata, ubah/sesuaikan/hapus), **ℹ › Anggaran** (bar progres),
+  **ℹ › Ringkasan** (dashboard bulan berjalan).
+- **Onboarding**: chip contoh perintah saat belum ada transaksi. **Pengingat
+  in-app** saat buka: anggaran hampir/tembus & transaksi berulang.
 - **Privasi saldo**: total saldo **tersamar default** (`Saldo: ••••`); ketuk pil
   saldo untuk lihat sementara, auto-samar saat app ditinggalkan; toggle di
   **ℹ › Tampilan**.
@@ -148,5 +151,5 @@ memverifikasi build (commit SHA + hash bundle di panel **ℹ**,
 
 ## Versi
 
-`v2.12.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
+`v2.13.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
 Nilai versi di-hardcode di `src/version.ts` (browser tak bisa baca `package.json`).

@@ -96,6 +96,19 @@ const input = document.getElementById("input") as HTMLInputElement;
 const saldoEl = document.getElementById("saldo")!;
 const subEl = document.getElementById("sub")!;
 const busyEl = document.getElementById("busy")!;
+const chipsEl = document.getElementById("chips")!;
+
+// Onboarding: chip contoh perintah saat belum ada transaksi.
+for (const c of ["makan siang 50rb", "gaji 5jt", "kopi 18rb", "ringkasan"]) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.textContent = c;
+  b.onclick = () => {
+    input.value = c;
+    input.focus();
+  };
+  chipsEl.appendChild(b);
+}
 
 // Privasi saldo: default TERSAMAR. Ketuk pil saldo untuk lihat; auto-samar
 // lagi saat app ditinggalkan.
@@ -283,6 +296,7 @@ async function refresh(): Promise<Record<string, unknown>> {
   renderSaldo();
   pinSet = !!r.pinSet;
   txCount = Number(r.txCount ?? 0);
+  chipsEl.hidden = txCount > 0;
   lastBackupAt = typeof r.lastBackupAt === "string" ? r.lastBackupAt : null;
   // Notice dari worker (mis. transaksi berulang yang baru dicatat).
   const notes = Array.isArray(r.notices) ? (r.notices as string[]) : [];
@@ -1217,6 +1231,12 @@ const budgetRolloverEl = document.getElementById("budgetRollover") as HTMLInputE
 const budgetMsgEl = document.getElementById("budgetMsg")!;
 const dashModal = document.getElementById("dashModal")!;
 const dashBodyEl = document.getElementById("dashBody")!;
+const accModal = document.getElementById("accModal")!;
+const accListEl = document.getElementById("accList")!;
+const accNameEl = document.getElementById("accName") as HTMLInputElement;
+const accTipeEl = document.getElementById("accTipe") as HTMLSelectElement;
+const accSaldoEl = document.getElementById("accSaldo") as HTMLInputElement;
+const accMsgEl = document.getElementById("accMsg")!;
 const INFO_PANES = [
   infoModal,
   secModal,
@@ -1226,6 +1246,7 @@ const INFO_PANES = [
   katModal,
   budgetModal,
   dashModal,
+  accModal,
 ];
 const pickDirBtn = document.getElementById("pickDir") as HTMLButtonElement;
 const backupNowBtn = document.getElementById("backupNow") as HTMLButtonElement;
@@ -1845,6 +1866,117 @@ document.getElementById("openDash")!.onclick = async () => {
   await renderDash();
 };
 document.getElementById("dashBack")!.onclick = () => showInfoPane(infoModal);
+
+// ---------- Manajemen akun (UI) ----------
+interface AccRow {
+  id: number;
+  nama: string;
+  tipe: string;
+  saldo: number;
+  rupiah: string;
+}
+let accNames = new Set<string>();
+
+async function refreshAccList(): Promise<void> {
+  const r = await call({ type: "listacc" });
+  const accs = (Array.isArray(r.accounts) ? r.accounts : []) as AccRow[];
+  accNames = new Set(accs.map((a) => a.nama.toLowerCase()));
+  accListEl.replaceChildren();
+  if (!accs.length) {
+    const empty = document.createElement("p");
+    empty.className = "info-note";
+    empty.textContent = "Belum ada akun.";
+    accListEl.appendChild(empty);
+    return;
+  }
+  for (const a of accs) {
+    const item = document.createElement("div");
+    item.className = "cat-item";
+    const head = document.createElement("div");
+    head.className = "cat-head";
+    const nm = document.createElement("span");
+    nm.className = "cat-name";
+    nm.textContent = a.nama;
+    const badge = document.createElement("span");
+    badge.className = "cat-badge";
+    badge.textContent = a.tipe;
+    head.append(nm, badge);
+    const saldo = document.createElement("div");
+    saldo.className = "cat-kw";
+    saldo.textContent = "Saldo: " + (a.rupiah ?? fmtRp(a.saldo ?? 0));
+    const actions = document.createElement("div");
+    actions.className = "cat-actions";
+    const ren = document.createElement("button");
+    ren.textContent = "Ubah nama";
+    ren.onclick = async () => {
+      const baru = window.prompt(`Nama baru untuk "${a.nama}":`, a.nama);
+      if (baru == null || !baru.trim() || baru.trim() === a.nama) return;
+      const res = await runCmd(`akun ubah ${a.nama} jadi ${baru.trim()}`);
+      if (res.text) addBubble(res.text, "bot");
+      await refreshAccList();
+    };
+    const adj = document.createElement("button");
+    adj.textContent = "Sesuaikan";
+    adj.onclick = async () => {
+      const val = window.prompt(`Saldo nyata untuk "${a.nama}" (mis. 100jt):`, "");
+      if (val == null || !val.trim()) return;
+      const res = await runCmd(`sesuaikan ${a.nama} ${val.trim()}`);
+      if (res.text) addBubble(res.text, "bot");
+      await refreshAccList();
+    };
+    const del = document.createElement("button");
+    del.textContent = "Hapus";
+    del.onclick = async () => {
+      if (!window.confirm(`Hapus akun "${a.nama}"? Transaksinya dipindah ke akun lain.`)) return;
+      const res = await runCmd(`akun hapus ${a.nama}`);
+      if (res.text) addBubble(res.text, "bot");
+      await refreshAccList();
+    };
+    actions.append(ren, adj, del);
+    item.append(head, saldo, actions);
+    accListEl.appendChild(item);
+  }
+}
+
+document.getElementById("openAcc")!.onclick = async () => {
+  showInfoPane(accModal);
+  accMsgEl.hidden = true;
+  await refreshAccList();
+};
+document.getElementById("accBack")!.onclick = () => showInfoPane(infoModal);
+document.getElementById("accResetForm")!.onclick = () => {
+  accNameEl.value = "";
+  accSaldoEl.value = "";
+  accTipeEl.value = "ewallet";
+  accMsgEl.hidden = true;
+};
+document.getElementById("accSave")!.onclick = async () => {
+  const nama = accNameEl.value.trim();
+  const tipe = accTipeEl.value;
+  const saldo = accSaldoEl.value.trim();
+  if (!nama) {
+    accMsgEl.hidden = false;
+    accMsgEl.textContent = "Nama akun wajib diisi.";
+    return;
+  }
+  if (accNames.has(nama.toLowerCase())) {
+    if (!saldo) {
+      accMsgEl.hidden = false;
+      accMsgEl.textContent = `Akun "${nama}" sudah ada. Isi saldo untuk set saldo awal.`;
+      return;
+    }
+    const res = await runCmd(`saldo awal ${nama} ${saldo}`);
+    if (res.text) addBubble(res.text, "bot");
+  } else {
+    const cmd = `akun tambah ${nama} ${tipe}${saldo ? ` saldo ${saldo}` : ""}`;
+    const res = await runCmd(cmd);
+    if (res.text) addBubble(res.text, "bot");
+  }
+  accNameEl.value = "";
+  accSaldoEl.value = "";
+  accMsgEl.hidden = true;
+  await refreshAccList();
+};
 
 document.getElementById("updateReload")!.onclick = () => location.reload();
 

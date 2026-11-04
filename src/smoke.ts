@@ -239,6 +239,15 @@ await check("akun ubah nama", async () => {
   await handleMessage("akun ubah gopayx jadi GoPay");
 });
 
+await check("akun tambah multi-kata", async () => {
+  const r = await handleMessage("akun tambah Rumah Tangga bank saldo 1jt");
+  assert(r.text.includes("Rumah Tangga"), "nama multi-kata diterima");
+  const a = dbmod.getAccountByName("Rumah Tangga");
+  assert(a && a.tipe === "bank", "akun multi-kata dibuat dgn tipe benar");
+  assert.equal(dbmod.accountBalance(a!.id), 1_000_000, "saldo awal kebaca");
+  await handleMessage("akun hapus Rumah Tangga");
+});
+
 await check("kategori keduanya: dua arah", async () => {
   await handleMessage("kategori tambah keduanya Sedekah | sedekah, donasi");
   const out = last(await handleMessage("bsi sedekah 1jt"));

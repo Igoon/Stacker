@@ -90,6 +90,10 @@ interface ListBudgetMsg {
   type: "listbudget";
   id: number;
 }
+interface ListAccMsg {
+  type: "listacc";
+  id: number;
+}
 interface DashMsg {
   type: "dashboard";
   id: number;
@@ -127,6 +131,7 @@ type InMsg =
   | WipeMsg
   | ListCatMsg
   | ListBudgetMsg
+  | ListAccMsg
   | DashMsg
   | MarkBackupMsg;
 
@@ -158,6 +163,7 @@ function reply(id: number, payload: unknown): void {
 }
 
 let backupNoticeShown = false;
+let budgetNoticeShown = false;
 
 function state() {
   // Catat transaksi berulang yang jatuh tempo (idempotent). Bila ada yang
@@ -166,6 +172,20 @@ function state() {
   const notices: string[] = [];
   if (rec.created > 0) {
     notices.push(`Transaksi berulang otomatis dicatat (${rec.created}):\n${rec.entries.join("\n")}`);
+  }
+
+  // Pengingat anggaran (sekali per pembukaan app): tembus / hampir tembus.
+  if (!budgetNoticeShown) {
+    const bs = budgetOverview();
+    const over = bs.filter((b) => b.pct >= 100);
+    const near = bs.filter((b) => b.pct >= 80 && b.pct < 100);
+    if (over.length) {
+      notices.push("⚠️ Anggaran tembus: " + over.map((b) => `${b.kategori} ${b.pct}%`).join(", "));
+      budgetNoticeShown = true;
+    } else if (near.length) {
+      notices.push("⚠️ Anggaran hampir: " + near.map((b) => `${b.kategori} ${b.pct}%`).join(", "));
+      budgetNoticeShown = true;
+    }
   }
 
   // Pengingat backup: makin lama makin penting, terutama di iOS (storage bisa
@@ -258,6 +278,9 @@ async function onMessage(msg: InMsg): Promise<void> {
       break;
     case "listbudget":
       reply(msg.id, { ok: true, budgets: budgetOverview() });
+      break;
+    case "listacc":
+      reply(msg.id, { ok: true, accounts: accountBalances() });
       break;
     case "dashboard":
       reply(msg.id, { ok: true, ...dashboardData() });

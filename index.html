@@ -40,6 +40,7 @@
     <button id="updateReload">Muat ulang</button>
   </div>
   <div id="chat"></div>
+  <div id="chips" class="chips" hidden></div>
   <footer>
     <input id="input" placeholder="makan siang 50rb..." autocomplete="off" />
     <button id="send">&#10148;</button>
@@ -144,13 +145,17 @@
     <p id="infoSummary" class="info-summary"></p>
     <div class="menu-list">
       <button id="openDash" class="menu-row"><span>Ringkasan</span><span class="chev">›</span></button>
+      <div class="menu-head">Keuangan</div>
       <button id="openCat" class="menu-row"><span>Kategori</span><span class="chev">›</span></button>
+      <button id="openAcc" class="menu-row"><span>Akun</span><span class="chev">›</span></button>
       <button id="openBudget" class="menu-row"><span>Anggaran</span><span class="chev">›</span></button>
+      <div class="menu-head">Pengaturan</div>
       <button id="openSecurity" class="menu-row"><span>Keamanan &amp; PIN</span><span class="chev">›</span></button>
       <button id="openStorage" class="menu-row"><span>Backup &amp; penyimpanan</span><span class="chev">›</span></button>
       <button id="openWall" class="menu-row"><span>Tampilan (wallpaper)</span><span class="chev">›</span></button>
       <button id="openAI" class="menu-row"><span>AI (opsional)</span><span class="chev">›</span></button>
       <button id="openReset" class="menu-row"><span>Reset data</span><span class="chev">›</span></button>
+      <div class="menu-head">Lainnya</div>
       <button id="openAbout" class="menu-row"><span>Tentang</span><span class="chev">›</span></button>
     </div>
     <div class="modal-actions">
@@ -309,6 +314,36 @@
     <div id="dashBody"></div>
     <div class="modal-actions">
       <button id="dashBack">Kembali</button>
+    </div>
+  </div>
+</div>
+
+<div id="accModal" class="modal" hidden>
+  <div class="modal-box">
+    <h3>Akun</h3>
+    <div id="accList" class="cat-list"></div>
+    <div class="cat-form">
+      <label>Nama
+        <input id="accName" placeholder="Rumah Tangga" autocomplete="off" />
+      </label>
+      <label>Tipe
+        <select id="accTipe">
+          <option value="bank">bank</option>
+          <option value="ewallet">ewallet</option>
+          <option value="cash">cash</option>
+        </select>
+      </label>
+      <label>Saldo awal (opsional, mis. 500rb)
+        <input id="accSaldo" placeholder="0" autocomplete="off" />
+      </label>
+      <p id="accMsg" class="hint" hidden></p>
+      <div class="info-actions">
+        <button id="accSave">Simpan akun</button>
+        <button id="accResetForm">Kosongkan form</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button id="accBack">Kembali</button>
     </div>
   </div>
 </div>
