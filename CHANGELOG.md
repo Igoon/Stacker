@@ -3,6 +3,13 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.17.1]
+- **Banner update tidak muncul palsu**: dibandingkan dulu dengan versi yang
+  sedang berjalan; bila sudah sama → tidak ditampilkan. Teks kini jelas:
+  "Versi baru X — kamu di vY".
+- **Sapaan "Halo…" hanya untuk pengguna baru** (belum ada transaksi). Pengguna
+  yang sudah punya data melihat hint "N transaksi tersimpan…".
+
 ## [2.17.0]
 - **App Shortcuts** (manifest): tekan-lama ikon PWA → **Catat cepat / Ringkasan /
   Cari** (`?action=`), berlaku Android & desktop.

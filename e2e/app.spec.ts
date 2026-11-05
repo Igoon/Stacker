@@ -409,6 +409,23 @@ test("menu Akun: tambah multi-kata, sesuaikan, hapus", async ({ page }) => {
   await page.locator("#accBack").click();
 });
 
+test("sapaan hanya untuk pengguna baru", async ({ page }) => {
+  await boot(page);
+  await expect(
+    page.locator("#chat .bubble").filter({ hasText: "Halo! Catat transaksi" })
+  ).toBeVisible();
+
+  await chat(page, "kopi 15rb");
+  await page.reload();
+  await expect(page.locator("#sub")).toHaveText(/^v\d/, { timeout: 60_000 });
+  await expect(
+    page.locator("#chat .bubble").filter({ hasText: "transaksi tersimpan" })
+  ).toBeVisible();
+  await expect(
+    page.locator("#chat .bubble").filter({ hasText: "Halo! Catat transaksi" })
+  ).toHaveCount(0);
+});
+
 test("chip cepat mengisi input saat belum ada transaksi", async ({ page }) => {
   await boot(page);
   await expect(page.locator("#chips")).toBeVisible();

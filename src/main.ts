@@ -36,26 +36,39 @@ if ("serviceWorker" in navigator) {
   const showUpdateBar = async (): Promise<void> => {
     const bar = document.getElementById("update");
     if (!bar) return;
-    bar.hidden = false;
     const title = document.getElementById("updateTitle");
     const list = document.getElementById("updateNotes");
+    let ver = "";
     try {
       const res = await fetch(`./version.json?t=${Date.now()}`, { cache: "no-store" });
-      if (!res.ok) return;
-      const v = (await res.json()) as { version?: string; notes?: string[] };
-      if (v.version && title) title.textContent = `Versi baru: v${v.version}`;
-      if (list && Array.isArray(v.notes) && v.notes.length > 0) {
-        list.replaceChildren();
-        for (const n of v.notes.slice(0, 5)) {
-          const li = document.createElement("li");
-          li.textContent = n;
-          list.appendChild(li);
+      if (res.ok) {
+        const v = (await res.json()) as { version?: string; notes?: string[] };
+        ver = String(v.version ?? "");
+        // Bandingkan dengan versi yang SEDANG berjalan. Kalau sama, berarti
+        // sudah memakai versi terbaru → jangan tampilkan notif palsu.
+        if (ver && appVersion && ver === appVersion) {
+          bar.hidden = true;
+          return;
         }
-        list.hidden = false;
+        if (list && Array.isArray(v.notes) && v.notes.length > 0) {
+          list.replaceChildren();
+          for (const n of v.notes.slice(0, 5)) {
+            const li = document.createElement("li");
+            li.textContent = n;
+            list.appendChild(li);
+          }
+          list.hidden = false;
+        }
       }
     } catch {
-      // Offline / version.json tak tersedia: biarkan teks umum.
+      // Offline / version.json tak tersedia: pakai teks umum.
     }
+    if (title) {
+      title.textContent = ver
+        ? `Versi baru ${ver}${appVersion ? ` — kamu di v${appVersion}` : ""}`
+        : `Versi baru tersedia${appVersion ? ` (kamu di v${appVersion})` : ""}`;
+    }
+    bar.hidden = false;
   };
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (!hadController) return;
@@ -620,7 +633,13 @@ function showStartupHint(s: Record<string, unknown>): void {
         "Ketik `riwayat` untuk melihat, `help` untuk daftar perintah.",
       "bot"
     );
+    return;
   }
+  // Pengguna baru / belum ada transaksi: tampilkan sapaan & contoh.
+  addBubble(
+    "Halo! Catat transaksi tinggal ketik.\nContoh: `makan siang 50rb` / `gaji 5jt`\nKetik `help` buat perintah.",
+    "bot"
+  );
 }
 
 async function refresh(): Promise<Record<string, unknown>> {
@@ -2513,7 +2532,4 @@ function handleSharedText(): void {
   void send();
 }
 
-addBubble(
-  "Halo! Catat transaksi tinggal ketik.\nContoh: `makan siang 50rb` / `gaji 5jt`\nKetik `help` buat perintah.",
-  "bot"
-);
+
