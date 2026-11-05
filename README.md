@@ -98,7 +98,10 @@ ter-deploy kalau logika rusak.
 - **Reset data lewat menu** (ℹ → Reset data): transaksi/kategori/akun/semua —
   konfirmasi + auto-backup; `semua` reset pabrik (butuh PIN / ketik `RESET`).
 - **Alias perintah** (`alias tf transfer`, target multi-kata, hapus/reset, tampil di `alias`/`help`).
-- **Update prompt** service worker ("Versi baru tersedia → Muat ulang").
+- **Update transparan**: banner menampilkan **versi baru + catatan rilis**
+  (`version.json`) sebelum "Muat ulang".
+- **Feedback menu**: aksi di menu memberi **toast** di atas modal; "Periksa data"
+  menampilkan hasil inline.
 - **CSP ketat** (script self, connect hanya Gemini + localhost) + panel **ℹ**
   berisi commit SHA, hash bundle SHA-256, host AI, dan **Tentang** (pembuat,
   lisensi Apache-2.0, kode sumber). Threat model di
@@ -154,5 +157,5 @@ memverifikasi build (commit SHA + hash bundle di panel **ℹ**,
 
 ## Versi
 
-`v2.14.1` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
+`v2.15.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
 Nilai versi di-hardcode di `src/version.ts` (browser tak bisa baca `package.json`).

@@ -374,6 +374,43 @@ footer button {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+  flex: 0 0 auto;
+}
+.update-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.update-notes {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.update-notes[hidden] {
+  display: none;
+}
+/* Toast: feedback aksi menu (tampil di atas modal). */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(84px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 60;
+  max-width: min(92vw, 420px);
+  background: #005c4b;
+  color: #d1f4cc;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: pre-line;
+  text-align: center;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+.toast[hidden] {
+  display: none;
 }
 
 /* ---------- Modal info ---------- */

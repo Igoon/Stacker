@@ -36,7 +36,10 @@
     </div>
   </header>
   <div id="update" class="updatebar" hidden>
-    <span>Versi baru tersedia.</span>
+    <div class="update-msg">
+      <strong id="updateTitle">Versi baru tersedia</strong>
+      <ul id="updateNotes" class="update-notes" hidden></ul>
+    </div>
     <button id="updateReload">Muat ulang</button>
   </div>
   <div id="chat" aria-live="polite" aria-relevant="additions"></div>
@@ -363,6 +366,7 @@
       <button id="resetAllBtn" class="danger">Reset semua (pabrik)</button>
       <button id="wipeData" class="danger">Hapus semua data (uninstall bersih)</button>
     </div>
+    <p id="checkResult" class="info-note" hidden></p>
     <p class="info-note">
       <strong>Reset</strong> mengembalikan data ke kondisi awal (app tetap
       terinstall). <strong>Hapus semua data</strong> juga membuang cache, PIN, dan
@@ -373,6 +377,7 @@
     </div>
   </div>
 </div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

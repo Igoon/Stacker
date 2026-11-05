@@ -432,17 +432,14 @@ test("Periksa data & toggle bunyi pengingat", async ({ page }) => {
   await page.locator("#info").click();
   await page.locator("#openReset").click();
   await page.locator("#checkData").click();
-  await expect(
-    page.locator("#chat .bubble").filter({ hasText: "tidak ada masalah" })
-  ).toBeVisible();
+  await expect(page.locator("#checkResult")).toContainText("tidak ada masalah");
+  await expect(page.locator("#resetModal")).toBeVisible();
   await page.locator("#resetBack").click();
 
   await page.locator("#openWall").click();
   await expect(page.locator("#soundNotice")).toBeChecked();
   await page.locator("#soundNotice").uncheck();
-  await expect(
-    page.locator("#chat .bubble").filter({ hasText: "Bunyi pengingat dimatikan" })
-  ).toBeVisible();
+  await expect(page.locator("#toast")).toContainText("Bunyi pengingat dimatikan");
   await page.locator("#wallClose").click();
 });
 
@@ -524,7 +521,7 @@ test("PIN: set via keypad, ubah, unlock, hapus", async ({ page }) => {
   await expect(page.locator("#secModal")).toBeVisible();
   await page.locator("#secBack").click();
   await page.locator("#infoClose").click();
-  await expect(page.locator("#chat .bubble").filter({ hasText: "PIN dihapus" })).toBeVisible();
+  await expect(page.locator("#toast")).toContainText("PIN dihapus");
 
   // Reload: PIN sudah mati, jadi app langsung terbuka tanpa overlay.
   await page.reload();

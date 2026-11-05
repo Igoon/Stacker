@@ -31,10 +31,35 @@ const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "modu
 // "Muat ulang" — jangan reload otomatis supaya input user tak hilang.
 if ("serviceWorker" in navigator) {
   const hadController = !!navigator.serviceWorker.controller;
+  // Tampilkan versi baru + catatan rilis (dari version.json hasil build) supaya
+  // user tahu apa yang di-update, bukan sekadar "versi baru".
+  const showUpdateBar = async (): Promise<void> => {
+    const bar = document.getElementById("update");
+    if (!bar) return;
+    bar.hidden = false;
+    const title = document.getElementById("updateTitle");
+    const list = document.getElementById("updateNotes");
+    try {
+      const res = await fetch(`./version.json?t=${Date.now()}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const v = (await res.json()) as { version?: string; notes?: string[] };
+      if (v.version && title) title.textContent = `Versi baru: v${v.version}`;
+      if (list && Array.isArray(v.notes) && v.notes.length > 0) {
+        list.replaceChildren();
+        for (const n of v.notes.slice(0, 5)) {
+          const li = document.createElement("li");
+          li.textContent = n;
+          list.appendChild(li);
+        }
+        list.hidden = false;
+      }
+    } catch {
+      // Offline / version.json tak tersedia: biarkan teks umum.
+    }
+  };
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (!hadController) return;
-    const bar = document.getElementById("update");
-    if (bar) bar.hidden = false;
+    void showUpdateBar();
   });
   window.addEventListener("load", () => {
     navigator.serviceWorker
@@ -108,6 +133,18 @@ for (const c of ["makan siang 50rb", "gaji 5jt", "kopi 18rb", "ringkasan"]) {
     input.focus();
   };
   chipsEl.appendChild(b);
+}
+
+// Toast: feedback untuk aksi di menu (tampil di atas modal, tidak tertutup).
+const toastEl = document.getElementById("toast")!;
+let toastTimer: number | undefined;
+function showToast(msg: string): void {
+  toastEl.textContent = msg;
+  toastEl.hidden = false;
+  if (toastTimer) window.clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => {
+    toastEl.hidden = true;
+  }, 3600);
 }
 
 // Privasi saldo: default TERSAMAR. Ketuk pil saldo untuk lihat; auto-samar
@@ -664,7 +701,7 @@ hideSaldoEl.onchange = () => {
     // localStorage bisa diblokir; abaikan.
   }
   renderSaldo();
-  addBubble(hideSaldo ? "Saldo disamarkan di header." : "Saldo ditampilkan di header.", "bot");
+  showToast(hideSaldo ? "Saldo disamarkan di header." : "Saldo ditampilkan di header.");
 };
 
 soundNoticeEl.onchange = () => {
@@ -678,7 +715,7 @@ soundNoticeEl.onchange = () => {
     unlockAudio();
     playTing();
   }
-  addBubble(soundOn ? 'Bunyi pengingat aktif ("ting").' : "Bunyi pengingat dimatikan.", "bot");
+  showToast(soundOn ? 'Bunyi pengingat aktif ("ting").' : "Bunyi pengingat dimatikan.");
 };
 
 document.getElementById("wallClose")!.onclick = () => {
@@ -972,7 +1009,7 @@ async function submitPinModal(): Promise<void> {
     lockCooldownUntil = 0;
     saveLockState();
     closePinModal(true);
-    addBubble("PIN dihapus. App tak lagi terkunci.", "bot");
+    showToast("PIN dihapus. App tak lagi terkunci.");
     renderInfo();
     return;
   }
@@ -1316,7 +1353,7 @@ retainSel.onchange = () => {
   } catch {
     // abaikan
   }
-  addBubble(`Retensi backup: ${retainSel.value} file terbaru.`, "bot");
+  showToast(`Retensi backup: ${retainSel.value} file terbaru.`);
 };
 
 const infoModal = document.getElementById("infoModal")!;
@@ -1402,7 +1439,7 @@ idleSel.onchange = () => {
   }
   touchIdle();
   const label = IDLE_OPTIONS.find((o) => o.ms === idleMs)?.label ?? "";
-  addBubble(idleMs === 0 ? "Kunci otomatis dimatikan." : `Kunci otomatis: ${label} tanpa aktivitas.`, "bot");
+  showToast(idleMs === 0 ? "Kunci otomatis dimatikan." : `Kunci otomatis: ${label} tanpa aktivitas.`);
 };
 
 function verifyPinForWipe(): Promise<boolean> {
@@ -1524,13 +1561,13 @@ async function autoBackup(force = false): Promise<void> {
     void pruneBackups(dir, readRetain()).catch(() => 0); // rotasi sesuai retensi
     lastBackupAt = todayStr();
     await call({ type: "markbackup", tanggal: lastBackupAt });
-    addBubble(
-      `${force ? "Backup disimpan" : "Auto-backup disimpan"}: ${name} (folder ${dir.name}).`,
-      "bot"
-    );
+    const msg = `${force ? "Backup disimpan" : "Auto-backup disimpan"}: ${name} (folder ${dir.name}).`;
+    addBubble(msg, "bot");
+    showToast(msg);
     renderInfo();
   } catch (e) {
     addBubble("Auto-backup gagal: " + (e as Error).message, "bot");
+    showToast("Auto-backup gagal: " + (e as Error).message);
   }
 }
 
@@ -1639,7 +1676,11 @@ document.getElementById("infoClose")!.onclick = () => {
 document.getElementById("openSecurity")!.onclick = () => showInfoPane(secModal);
 document.getElementById("openStorage")!.onclick = () => showInfoPane(storeModal);
 document.getElementById("openAbout")!.onclick = () => showInfoPane(aboutModal);
-document.getElementById("openReset")!.onclick = () => showInfoPane(resetModal);
+document.getElementById("openReset")!.onclick = () => {
+  showInfoPane(resetModal);
+  const out = document.getElementById("checkResult");
+  if (out) out.hidden = true;
+};
 document.getElementById("secBack")!.onclick = () => showInfoPane(infoModal);
 document.getElementById("storeBack")!.onclick = () => showInfoPane(infoModal);
 document.getElementById("aboutBack")!.onclick = () => showInfoPane(infoModal);
@@ -1688,10 +1729,14 @@ document.getElementById("resetAllBtn")!.onclick = () => void runReset("semua");
 document.getElementById("checkData")!.onclick = async () => {
   const r = await call({ type: "checkdata" });
   const issues = (Array.isArray(r.issues) ? r.issues : []) as string[];
+  const out = document.getElementById("checkResult")!;
+  out.hidden = false;
   if (!issues.length) {
-    addBubble("Periksa data selesai: tidak ada masalah ✓", "bot");
+    out.textContent = "Periksa data selesai: tidak ada masalah ✓";
+    showToast("Integritas data: sehat ✓");
   } else {
-    addBubble(`Periksa data: ${issues.length} masalah\n- ${issues.join("\n- ")}`, "bot");
+    out.textContent = `Ditemukan ${issues.length} masalah:\n- ${issues.join("\n- ")}`;
+    showToast(`Periksa data: ${issues.length} masalah (lihat detail di sini)`);
   }
 };
 
@@ -1751,7 +1796,7 @@ async function refreshCatList(): Promise<void> {
     del.onclick = async () => {
       if (!window.confirm(`Hapus kategori "${c.nama}"? Anggarannya ikut terhapus.`)) return;
       const res = await runCmd(`kategori hapus ${c.nama}`);
-      if (res.text) addBubble(res.text, "bot");
+      showToast(res.text || `Kategori ${c.nama} dihapus.`);
       await refreshCatList();
     };
     actions.append(edit, del);
@@ -1783,12 +1828,11 @@ document.getElementById("catSave")!.onclick = async () => {
   const list = kws.length ? kws.join(", ") : nama.toLowerCase();
   if (catNames.has(nama.toLowerCase())) {
     const r1 = await runCmd(`kategori ubah ${nama} | ${list}`);
-    if (r1.text) addBubble(r1.text, "bot");
-    const r2 = await runCmd(`kategori sisi ${nama} ${tipe}`);
-    if (r2.text) addBubble(r2.text, "bot");
+    await runCmd(`kategori sisi ${nama} ${tipe}`);
+    showToast(r1.text || `Kategori ${nama} diperbarui (${tipe}).`);
   } else {
     const r = await runCmd(`kategori tambah ${tipe} ${nama} | ${list}`);
-    if (r.text) addBubble(r.text, "bot");
+    showToast(r.text || `Kategori ${nama} ditambah.`);
   }
   catNameEl.value = "";
   catKwEl.value = "";
@@ -1875,7 +1919,7 @@ async function refreshBudgetList(): Promise<void> {
     del.onclick = async () => {
       if (!window.confirm(`Hapus anggaran "${b.kategori}"?`)) return;
       const res = await runCmd(`anggaran hapus ${b.kategori}`);
-      if (res.text) addBubble(res.text, "bot");
+      showToast(res.text || `Anggaran ${b.kategori} dihapus.`);
       await refreshBudgetList();
     };
     actions.append(edit, del);
@@ -1900,11 +1944,8 @@ document.getElementById("budgetSave")!.onclick = async () => {
   }
   const periodArg = budgetPeriodeEl.value === "mingguan" ? " mingguan" : "";
   const r = await runCmd(`anggaran ${kat} ${jumlah}${periodArg}`);
-  if (r.text) addBubble(r.text, "bot");
-  const r2 = await runCmd(
-    `anggaran ${budgetRolloverEl.checked ? "rollover" : "no-rollover"} ${kat}`
-  );
-  if (r2.text) addBubble(r2.text, "bot");
+  await runCmd(`anggaran ${budgetRolloverEl.checked ? "rollover" : "no-rollover"} ${kat}`);
+  showToast(r.text || `Anggaran ${kat} disimpan.`);
   budgetJumlahEl.value = "";
   budgetMsgEl.hidden = true;
   await refreshBudgetList();
@@ -2047,7 +2088,7 @@ async function refreshAccList(): Promise<void> {
       const baru = window.prompt(`Nama baru untuk "${a.nama}":`, a.nama);
       if (baru == null || !baru.trim() || baru.trim() === a.nama) return;
       const res = await runCmd(`akun ubah ${a.nama} jadi ${baru.trim()}`);
-      if (res.text) addBubble(res.text, "bot");
+      showToast(res.text || `Akun ${a.nama} → ${baru.trim()}.`);
       await refreshAccList();
     };
     const adj = document.createElement("button");
@@ -2056,7 +2097,7 @@ async function refreshAccList(): Promise<void> {
       const val = window.prompt(`Saldo nyata untuk "${a.nama}" (mis. 100jt):`, "");
       if (val == null || !val.trim()) return;
       const res = await runCmd(`sesuaikan ${a.nama} ${val.trim()}`);
-      if (res.text) addBubble(res.text, "bot");
+      showToast(res.text || `Saldo ${a.nama} disesuaikan.`);
       await refreshAccList();
     };
     const del = document.createElement("button");
@@ -2064,7 +2105,7 @@ async function refreshAccList(): Promise<void> {
     del.onclick = async () => {
       if (!window.confirm(`Hapus akun "${a.nama}"? Transaksinya dipindah ke akun lain.`)) return;
       const res = await runCmd(`akun hapus ${a.nama}`);
-      if (res.text) addBubble(res.text, "bot");
+      showToast(res.text || `Akun ${a.nama} dihapus.`);
       await refreshAccList();
     };
     actions.append(ren, adj, del);
@@ -2101,11 +2142,11 @@ document.getElementById("accSave")!.onclick = async () => {
       return;
     }
     const res = await runCmd(`saldo awal ${nama} ${saldo}`);
-    if (res.text) addBubble(res.text, "bot");
+    showToast(res.text || `Saldo awal ${nama} disimpan.`);
   } else {
     const cmd = `akun tambah ${nama} ${tipe}${saldo ? ` saldo ${saldo}` : ""}`;
     const res = await runCmd(cmd);
-    if (res.text) addBubble(res.text, "bot");
+    showToast(res.text || `Akun ${nama} ditambah.`);
   }
   accNameEl.value = "";
   accSaldoEl.value = "";
@@ -2117,7 +2158,7 @@ document.getElementById("updateReload")!.onclick = () => location.reload();
 
 pickDirBtn.onclick = async () => {
   if (!supportsFolderBackup()) {
-    addBubble("Browser ini tak mendukung auto-backup folder. Pakai tombol ⬇ Backup.", "bot");
+    showToast("Browser ini tak mendukung auto-backup folder. Pakai tombol ⬇ Backup.");
     return;
   }
   try {
@@ -2126,7 +2167,7 @@ pickDirBtn.onclick = async () => {
     if (!ok) {
       folder = null;
       await forgetFolder();
-      addBubble("Izin folder ditolak. Auto-backup tidak aktif.", "bot");
+      showToast("Izin folder ditolak. Auto-backup tidak aktif.");
       renderInfo();
       return;
     }
@@ -2136,7 +2177,7 @@ pickDirBtn.onclick = async () => {
     renderInfo();
   } catch (e) {
     if ((e as Error).name !== "AbortError") {
-      addBubble("Gagal memilih folder: " + (e as Error).message, "bot");
+      showToast("Gagal memilih folder: " + (e as Error).message);
     }
   }
 };
@@ -2146,7 +2187,7 @@ backupNowBtn.onclick = async () => {
   const ok = await folderPermission(folder, true);
   if (!ok) {
     folderNeedsPermission = true;
-    addBubble("Izin folder ditolak. Pilih folder lagi lewat ℹ → Backup & penyimpanan.", "bot");
+    showToast("Izin folder ditolak. Pilih folder lagi lewat ℹ → Backup & penyimpanan.");
     return;
   }
   folderNeedsPermission = false;
@@ -2159,7 +2200,7 @@ clearDirBtn.onclick = async () => {
   folderNeedsPermission = false;
   backupPermWarned = false;
   await forgetFolder();
-  addBubble("Auto-backup dimatikan.", "bot");
+  showToast("Auto-backup dimatikan.");
   renderInfo();
 };
 

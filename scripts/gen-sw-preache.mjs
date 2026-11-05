@@ -49,4 +49,50 @@ const missing = refs.filter((r) => r !== "./" && !urls.includes(r));
 if (missing.length) throw new Error(`aset di index.html tidak masuk precache: ${missing.join(", ")}`);
 
 await writeFile(swOut, sw, "utf8");
+
+// version.json: dipakai UI untuk menampilkan "versi baru + apa yang baru".
+// Sengaja TIDAK di-precache supaya saat update, fetch selalu ambil versi baru.
+try {
+  const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
+  let notes = [];
+  try {
+    const cl = await readFile(join(root, "CHANGELOG.md"), "utf8");
+    const lines = cl.split(/\r?\n/);
+    const start = lines.findIndex((l) => /^## \[/.test(l));
+    const body = [];
+    for (let i = start + 1; i >= 0 && i < lines.length && !/^## \[/.test(lines[i]); i++) {
+      body.push(lines[i]);
+    }
+    const bullets = [];
+    let cur = null;
+    for (const rawLine of body) {
+      const line = rawLine.trimEnd();
+      if (/^\s*-\s+/.test(line)) {
+        if (cur) bullets.push(cur);
+        cur = line.replace(/^\s*-\s+/, "").trim();
+      } else if (cur && line.trim()) {
+        cur += " " + line.trim();
+      } else if (cur && !line.trim()) {
+        bullets.push(cur);
+        cur = null;
+      }
+    }
+    if (cur) bullets.push(cur);
+    notes = bullets
+      .filter(Boolean)
+      .map((s) => s.replace(/\*\*/g, "").replace(/`/g, "").replace(/\s+/g, " ").trim())
+      .map((s) => (s.length > 160 ? s.slice(0, 157) + "…" : s))
+      .slice(0, 5);
+  } catch {
+    // Tanpa changelog tetap jalan.
+  }
+  await writeFile(
+    join(dist, "version.json"),
+    JSON.stringify({ version: String(pkg.version ?? ""), notes }, null, 2),
+    "utf8"
+  );
+} catch (e) {
+  console.warn("[version.json] gagal dibuat:", e.message);
+}
+
 console.log(`sw.js: precache ${urls.length} aset (cache stacker-${hash})`);
