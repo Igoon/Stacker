@@ -3,6 +3,16 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.16.0]
+- **`cls` / `clear` / `bersihkan`** — membersihkan layar chat (bukan hapus data).
+- **Riwayat perintah**: panah ↑/↓ di kolom input untuk memanggil perintah
+  sebelumnya, plus **saran chip** dari riwayat saat mengetik.
+- **Tentang**: menampilkan **"Dipakai sejak … (N hari)"** + indikator mode
+  (terinstall/browser).
+- **Getar** (haptic) saat mencatat/undo, toggle di ℹ → Tampilan.
+- **Tombol Undo** nonaktif saat tidak ada aksi.
+- **Ringkasan**: kartu **"Hari ini"** (jumlah transaksi, keluar/masuk).
+
 ## [2.15.0]
 - **Update transparan**: banner update menampilkan **versi baru** + ringkasan
   catatan rilis (dibaca dari `version.json` hasil build) sebelum tombol

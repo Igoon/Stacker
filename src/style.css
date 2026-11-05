@@ -67,6 +67,10 @@ header .saldo {
 .toolbar button:hover {
   background: #3b4a54;
 }
+.toolbar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 #busy {
   margin-left: 6px;
   font-size: 12px;
@@ -154,6 +158,28 @@ header .saldo {
 }
 .chips[hidden] {
   display: none;
+}
+.suggest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px 0;
+}
+.suggest[hidden] {
+  display: none;
+}
+.suggest button {
+  border: 1px solid #2a3942;
+  background: #16222a;
+  color: #e9edef;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .chips button {
   border: 1px solid #2a3942;

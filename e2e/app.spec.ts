@@ -416,6 +416,57 @@ test("chip cepat mengisi input saat belum ada transaksi", async ({ page }) => {
   await expect(page.locator("#input")).toHaveValue("gaji 5jt");
 });
 
+test("cls membersihkan layar + riwayat perintah (panah atas)", async ({ page }) => {
+  await boot(page);
+  await chat(page, "kopi 10rb");
+  await expect(page.locator("#chat .bubble").first()).toBeVisible();
+
+  await chat(page, "cls");
+  await expect(page.locator("#chat .bubble")).toHaveCount(0);
+
+  await page.locator("#input").press("ArrowUp");
+  await expect(page.locator("#input")).toHaveValue("cls");
+  await page.locator("#input").press("ArrowUp");
+  await expect(page.locator("#input")).toHaveValue("kopi 10rb");
+});
+
+test("saran perintah dari riwayat saat mengetik", async ({ page }) => {
+  await boot(page);
+  await chat(page, "grafik");
+  await page.locator("#input").fill("gra");
+  await expect(page.locator("#suggest")).toBeVisible();
+  await page.locator("#suggest button", { hasText: "grafik" }).click();
+  await expect(page.locator("#input")).toHaveValue("grafik");
+});
+
+test("Tentang: dipakai sejak & mode; haptic toggle; undo state", async ({ page }) => {
+  await boot(page);
+  await expect(page.locator("#undo")).toBeDisabled();
+  await chat(page, "kopi 15rb");
+  await expect(page.locator("#undo")).toBeEnabled();
+
+  await page.locator("#info").click();
+  await page.locator("#openAbout").click();
+  await expect(page.locator("#aboutLines")).toContainText("Dipakai sejak");
+  await expect(page.locator("#aboutLines")).toContainText("Mode:");
+  await page.locator("#aboutBack").click();
+
+  await page.locator("#openWall").click();
+  await expect(page.locator("#hapticNotice")).toBeChecked();
+  await page.locator("#hapticNotice").uncheck();
+  await expect(page.locator("#toast")).toContainText("Getar dimatikan");
+  await page.locator("#wallClose").click();
+});
+
+test("Ringkasan menampilkan kartu Hari ini", async ({ page }) => {
+  await boot(page);
+  await chat(page, "kopi 15rb");
+  await page.locator("#info").click();
+  await page.locator("#openDash").click();
+  await expect(page.locator("#dashBody")).toContainText("Hari ini");
+  await page.locator("#dashBack").click();
+});
+
 test("Hapus semua data ada di Reset data, bukan Keamanan", async ({ page }) => {
   await boot(page);
   await page.locator("#info").click();

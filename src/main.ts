@@ -122,6 +122,87 @@ const saldoEl = document.getElementById("saldo")!;
 const subEl = document.getElementById("sub")!;
 const busyEl = document.getElementById("busy")!;
 const chipsEl = document.getElementById("chips")!;
+const suggestEl = document.getElementById("suggest")!;
+const undoBtn = document.getElementById("undo") as HTMLButtonElement;
+
+// Riwayat perintah (localStorage) — muncul lewat panah ↑/↓ & saran saat mengetik.
+const RECENT_KEY = "stacker-cmd-history";
+function readRecent(): string[] {
+  try {
+    const arr = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]") as unknown;
+    return Array.isArray(arr)
+      ? arr.filter((x): x is string => typeof x === "string").slice(0, 30)
+      : [];
+  } catch {
+    return [];
+  }
+}
+let recentCommands = readRecent();
+function rememberCommand(text: string): void {
+  const t = text.trim();
+  if (!t) return;
+  recentCommands = [t, ...recentCommands.filter((x) => x !== t)].slice(0, 30);
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(recentCommands));
+  } catch {
+    // abaikan
+  }
+}
+
+// Pemakaian pertama (untuk Tentang).
+const FIRST_USE_KEY = "stacker-first-use";
+function readFirstUse(): string {
+  try {
+    const v = localStorage.getItem(FIRST_USE_KEY);
+    if (v) return v;
+    const now = new Date().toISOString();
+    localStorage.setItem(FIRST_USE_KEY, now);
+    return now;
+  } catch {
+    return new Date().toISOString();
+  }
+}
+const firstUse = readFirstUse();
+const isStandalone =
+  (typeof window.matchMedia === "function" &&
+    window.matchMedia("(display-mode: standalone)").matches) ||
+  (navigator as unknown as { standalone?: boolean }).standalone === true;
+
+function daysSince(iso: string): number {
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) ? Math.max(0, Math.floor((Date.now() - t) / 86_400_000)) : 0;
+}
+function fmtDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return iso.slice(0, 10);
+  }
+}
+
+// Getar singkat (opsional).
+const HAPTIC_KEY = "stacker-haptic";
+function readHaptic(): boolean {
+  try {
+    const v = localStorage.getItem(HAPTIC_KEY);
+    return v === null ? true : v === "1";
+  } catch {
+    return true;
+  }
+}
+let hapticOn = readHaptic();
+function haptic(pattern: number | number[] = 12): void {
+  if (!hapticOn) return;
+  try {
+    navigator.vibrate?.(pattern);
+  } catch {
+    // abaikan
+  }
+}
 
 // Onboarding: chip contoh perintah saat belum ada transaksi.
 for (const c of ["makan siang 50rb", "gaji 5jt", "kopi 18rb", "ringkasan"]) {
@@ -145,6 +226,35 @@ function showToast(msg: string): void {
   toastTimer = window.setTimeout(() => {
     toastEl.hidden = true;
   }, 3600);
+}
+
+// Saran perintah dari riwayat saat mengetik.
+function updateSuggest(): void {
+  const q = input.value.trim().toLowerCase();
+  suggestEl.replaceChildren();
+  if (!q) {
+    suggestEl.hidden = true;
+    return;
+  }
+  const matches = recentCommands
+    .filter((c) => c.toLowerCase() !== q && c.toLowerCase().includes(q))
+    .slice(0, 6);
+  if (!matches.length) {
+    suggestEl.hidden = true;
+    return;
+  }
+  for (const c of matches) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = c;
+    b.onclick = () => {
+      input.value = c;
+      input.focus();
+      suggestEl.hidden = true;
+    };
+    suggestEl.appendChild(b);
+  }
+  suggestEl.hidden = false;
 }
 
 // Privasi saldo: default TERSAMAR. Ketuk pil saldo untuk lihat; auto-samar
@@ -429,6 +539,7 @@ async function refresh(): Promise<Record<string, unknown>> {
   pinSet = !!r.pinSet;
   txCount = Number(r.txCount ?? 0);
   chipsEl.hidden = txCount > 0;
+  undoBtn.disabled = !r.canUndo;
   lastBackupAt = typeof r.lastBackupAt === "string" ? r.lastBackupAt : null;
   // Notice dari worker (mis. transaksi berulang yang baru dicatat).
   const notes = Array.isArray(r.notices) ? (r.notices as string[]) : [];
@@ -440,6 +551,15 @@ async function refresh(): Promise<Record<string, unknown>> {
 async function send(): Promise<void> {
   const text = input.value.trim();
   if (!text || !ready) return;
+  // Bersihkan layar chat (bukan hapus data).
+  if (/^(cls|clear|bersihkan(?:\s+layar)?)$/i.test(text)) {
+    rememberCommand(text);
+    input.value = "";
+    suggestEl.hidden = true;
+    chat.replaceChildren();
+    showToast("Layar dibersihkan.");
+    return;
+  }
   const isReset = /^reset\s+(transaksi|laporan|semua|kategori|akun)$/i.test(text);
   if (/^reset\s+semua$/i.test(text)) {
     if (
@@ -457,13 +577,17 @@ async function send(): Promise<void> {
     )
       return;
   }
+  rememberCommand(text);
   addBubble(text, "me");
   input.value = "";
+  suggestEl.hidden = true;
   busyEl.hidden = false;
   const r = await call({ type: "chat", text });
   busyEl.hidden = true;
   if (r.ok) {
     addBubble(r.text ?? "", "bot", r.txs, r.file, r.svg, r.pre);
+    if (Array.isArray(r.txs) && r.txs.length > 0) haptic(14);
+    if (/^Dibatalkan\b/.test(r.text ?? "")) haptic([10, 40, 10]);
     if (isReset && r.file) {
       const f = r.file as { name: string; content: string };
       saveFile(f.name, f.content);
@@ -485,8 +609,31 @@ async function send(): Promise<void> {
 }
 
 document.getElementById("send")!.onclick = send;
+let histIndex = -1;
+let histDraft = "";
 input.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") send();
+  if (e.key === "Enter") {
+    void send();
+    return;
+  }
+  if (e.key === "ArrowUp" && recentCommands.length > 0) {
+    e.preventDefault();
+    if (histIndex === -1) histDraft = input.value;
+    histIndex = Math.min(histIndex + 1, recentCommands.length - 1);
+    input.value = recentCommands[histIndex] ?? "";
+    updateSuggest();
+    return;
+  }
+  if (e.key === "ArrowDown" && histIndex !== -1) {
+    e.preventDefault();
+    histIndex -= 1;
+    input.value = histIndex < 0 ? histDraft : recentCommands[histIndex] ?? "";
+    updateSuggest();
+  }
+});
+input.addEventListener("input", () => {
+  histIndex = -1;
+  updateSuggest();
 });
 
 // Toolbar: backup, restore, undo. (AI/wallpaper/backup terenkripsi via ℹ.)
@@ -682,6 +829,7 @@ for (const p of WALL_PRESETS) {
 
 const hideSaldoEl = document.getElementById("hideSaldo") as HTMLInputElement;
 const soundNoticeEl = document.getElementById("soundNotice") as HTMLInputElement;
+const hapticNoticeEl = document.getElementById("hapticNotice") as HTMLInputElement;
 
 document.getElementById("openWall")!.onclick = () => {
   for (const m of INFO_PANES) m.hidden = true;
@@ -689,6 +837,7 @@ document.getElementById("openWall")!.onclick = () => {
   syncWallControls(currentWall);
   hideSaldoEl.checked = hideSaldo;
   soundNoticeEl.checked = soundOn;
+  hapticNoticeEl.checked = hapticOn;
   wallModal.hidden = false;
 };
 
@@ -716,6 +865,17 @@ soundNoticeEl.onchange = () => {
     playTing();
   }
   showToast(soundOn ? 'Bunyi pengingat aktif ("ting").' : "Bunyi pengingat dimatikan.");
+};
+
+hapticNoticeEl.onchange = () => {
+  hapticOn = hapticNoticeEl.checked;
+  try {
+    localStorage.setItem(HAPTIC_KEY, hapticOn ? "1" : "0");
+  } catch {
+    // abaikan
+  }
+  if (hapticOn) haptic(30);
+  showToast(hapticOn ? "Getar aktif." : "Getar dimatikan.");
 };
 
 document.getElementById("wallClose")!.onclick = () => {
@@ -1473,6 +1633,9 @@ async function wipeAllData(): Promise<void> {
       "stacker-idle",
       "stacker-hide-saldo",
       "stacker-sound",
+      "stacker-haptic",
+      "stacker-first-use",
+      "stacker-cmd-history",
     ]) {
       try {
         localStorage.removeItem(k);
@@ -1648,6 +1811,8 @@ function renderInfo(): void {
     `Hash bundle SHA-256: ${bundleHash || "menghitung…"}`,
     `Host AI: ${aiHosts}`,
     `Data: lokal di perangkat (OPFS), tanpa server`,
+    `Dipakai sejak: ${fmtDate(firstUse)} (${daysSince(firstUse)} hari)`,
+    `Mode: ${isStandalone ? "terinstall (standalone)" : "browser"}`,
   ].join("\n");
   pickDirBtn.disabled = !supportsFolderBackup();
   backupNowBtn.disabled = !folder;
@@ -1983,11 +2148,20 @@ async function renderDash(): Promise<void> {
       void renderDash();
     };
   }
+  const today = (r.today ?? {}) as { keluar?: number; masuk?: number; count?: number };
+  const todayCount = Number(today.count ?? 0);
+  const todayKeluar = Number(today.keluar ?? 0);
+  const todayMasuk = Number(today.masuk ?? 0);
   cards.append(
     saldoCard,
     card(`Masuk · ${String(r.label ?? "")}`, fmtRp(Number(r.masuk ?? 0))),
     card("Keluar", fmtRp(Number(r.keluar ?? 0))),
-    card("Net", (net < 0 ? "-" : "+") + fmtRp(Math.abs(net)), true)
+    card("Net", (net < 0 ? "-" : "+") + fmtRp(Math.abs(net)), true),
+    card(
+      `Hari ini · ${todayCount} transaksi`,
+      "-" + fmtRp(todayKeluar) + (todayMasuk > 0 ? ` · +${fmtRp(todayMasuk)}` : ""),
+      true
+    )
   );
   dashBodyEl.appendChild(cards);
 

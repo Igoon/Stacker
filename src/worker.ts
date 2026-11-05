@@ -16,6 +16,7 @@ import {
 } from "./db";
 import {
   budgetOverview,
+  canUndo,
   dashboardData,
   deleteTxWithUndo,
   handleMessage,
@@ -219,6 +220,7 @@ function state() {
   return {
     ok: true,
     version: APP_VERSION,
+    canUndo: canUndo(),
     saldo: saldo(),
     saldoRupiah: rupiahSigned(saldo()),
     aiEnabled: aiEnabled(),

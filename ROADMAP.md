@@ -14,9 +14,11 @@ Prinsip: **lokal dulu, tanpa server, chat-first**. Chat untuk *mencatat*; menu u
 - 2.14.0 Robustness (index DB, periksa integritas data, parser ambigu) + A11y
   dasar + pembeda area scroll + bunyi pengingat "ting"
 - 2.15.0 Update transparan (versi + catatan rilis) + feedback menu (toast/inline)
+- 2.16.0 cls/clear + riwayat perintah (panah/saran) + Tentang durasi pakai +
+  haptic + undo state + kartu "Hari ini"
 
 ## Berikutnya
-### v2.16.0 — Tuntaskan kelola lewat menu
+### v2.17.0 — Tuntaskan kelola lewat menu
 - Berulang UI (daftar + aktif/nonaktif + ubah).
 - Utang/Piutang UI (daftar + bayar + hapus).
 - Cari/filter UI (rentang tanggal, nominal, kategori, akun).

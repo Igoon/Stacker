@@ -7,7 +7,7 @@ export const COMMAND_WORDS: readonly string[] = [
   "anggaran", "berulang", "utang", "piutang", "hutang", "bayar", "laporan",
   "ringkasan", "report", "grafik", "chart", "dashboard", "csv", "export",
   "cari", "lihat", "riwayat", "history", "list", "ai", "versi", "version",
-  "help", "bantuan",
+  "help", "bantuan", "cls", "clear", "bersihkan",
 ];
 
 export const COMMAND_WORD_SET: ReadonlySet<string> = new Set(COMMAND_WORDS);

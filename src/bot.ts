@@ -173,6 +173,7 @@ const HELP =
   "  versi                       (versi aplikasi)\n" +
   "  reset transaksi            (hapus semua transaksi, ada backup)\n" +
   "  alias | alias tf transfer | alias hapus tf | alias reset\n" +
+  "  cls | clear | bersihkan     (bersihkan layar chat)\n" +
   "  help\n\n" +
   "Nominal: 50rb, 1,5jt, 50000, 45.001.889\n" +
   "Periode: september, 2026-08, minggu ini, minggu lalu, bulan lalu, tahun ini, hari ini, kemarin";
@@ -388,6 +389,7 @@ export function dashboardData(): {
   totalSaldo: number;
   top: { kategori: string; total: number }[];
   accounts: { nama: string; saldo: number }[];
+  today: { keluar: number; masuk: number; count: number };
   svg: string;
 } {
   const per = parsePeriod("");
@@ -406,7 +408,24 @@ export function dashboardData(): {
   const accounts = accountBalances()
     .filter((a) => (a.saldo ?? 0) !== 0)
     .map((a) => ({ nama: a.nama, saldo: a.saldo ?? 0 }));
-  return { label, masuk, keluar, net: masuk - keluar, totalSaldo: saldo(), top, accounts, svg };
+  const tFrom = parsePeriod("hari ini")?.from ?? "";
+  const txsToday = tFrom ? listAll().filter((t) => t.tanggal === tFrom) : [];
+  const today = {
+    keluar: txsToday.filter((t) => t.tipe === "keluar").reduce((a, t) => a + t.jumlah, 0),
+    masuk: txsToday.filter((t) => t.tipe === "masuk").reduce((a, t) => a + t.jumlah, 0),
+    count: txsToday.length,
+  };
+  return {
+    label,
+    masuk,
+    keluar,
+    net: masuk - keluar,
+    totalSaldo: saldo(),
+    top,
+    accounts,
+    today,
+    svg,
+  };
 }
 
 function budgetWarn(t: Tx): string | null {
@@ -477,6 +496,10 @@ const txLine = (r: Tx) =>
 // semua jenis mutasi (tambah/ubah/hapus/transfer/anggaran/akun).
 const UNDO_LIMIT = 20;
 const undoStack: string[] = [];
+
+export function canUndo(): boolean {
+  return undoStack.length > 0;
+}
 
 function pushUndo(snap: string): void {
   undoStack.push(snap);

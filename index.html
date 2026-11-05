@@ -30,7 +30,7 @@
     <div class="toolbar">
       <button id="export" aria-label="Unduh backup JSON" title="Unduh backup JSON">⬇ Backup</button>
       <button id="import" aria-label="Muat backup JSON" title="Muat backup JSON">⬆ Restore</button>
-      <button id="undo" aria-label="Batalkan aksi terakhir" title="Batalkan aksi terakhir">↶ Undo</button>
+      <button id="undo" aria-label="Batalkan aksi terakhir" title="Batalkan aksi terakhir" disabled>↶ Undo</button>
       <button id="info" aria-label="Info & pengaturan" title="Info & pengaturan">ℹ Info</button>
       <span id="busy" hidden>…</span>
     </div>
@@ -44,6 +44,7 @@
   </div>
   <div id="chat" aria-live="polite" aria-relevant="additions"></div>
   <div id="chips" class="chips" hidden></div>
+  <div id="suggest" class="suggest" hidden></div>
   <footer>
     <input id="input" placeholder="makan siang 50rb..." autocomplete="off" />
     <button id="send">&#10148;</button>
@@ -88,6 +89,7 @@
     </label>
     <label class="row-check"><input id="hideSaldo" type="checkbox" /> Samarkan saldo di header (ketuk untuk lihat)</label>
     <label class="row-check"><input id="soundNotice" type="checkbox" checked /> Bunyi "ting" saat pengingat</label>
+    <label class="row-check"><input id="hapticNotice" type="checkbox" checked /> Getar saat mencatat/undo</label>
     <div class="modal-actions">
       <button id="wallReset">Hapus wallpaper</button>
       <button id="wallClose">Tutup</button>

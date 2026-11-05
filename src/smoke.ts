@@ -802,6 +802,7 @@ await check("budgetOverview & dashboardData (untuk UI)", async () => {
   assert(b && b.spent >= 30000 && b.effective >= 100000, "budget overview terhitung");
   const d = dashboardData();
   assert(typeof d.totalSaldo === "number" && !!d.label, "dashboard data terisi");
+  assert(typeof d.today.count === "number" && typeof d.today.keluar === "number", "today terisi");
   await handleMessage("anggaran hapus UjiDash");
   await handleMessage("kategori hapus UjiDash");
 });

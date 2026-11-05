@@ -346,8 +346,11 @@ pin                           → status kunci (atur/ubah/hapus lewat ℹ)
 backup                        → unduh backup JSON
 backup kunci <kata sandi>     → backup terenkripsi (min 8 karakter)
 versi                         → versi aplikasi
+cls | clear | bersihkan       → bersihkan layar chat (bukan hapus data)
 help                          → daftar perintah
 ```
+> Di kolom input, tekan **panah ↑/↓** untuk memanggil perintah sebelumnya.
+> Saat mengetik, muncul **saran** dari riwayat perintah — ketuk untuk memakai.
 
 ---
 
@@ -391,6 +394,8 @@ Ketuk **ℹ → Tampilan (wallpaper)**.
 - **Bunyi "ting" saat pengingat** — centang untuk bunyi singkat ketika pengingat
   (anggaran/berulang/backup) muncul. Dibuat lokal via Web Audio (tanpa file/aset);
   browser baru mengizinkan bunyi setelah satu interaksi pertama.
+- **Getar saat mencatat/undo** — centang untuk haptic ringan (bila perangkat
+  mendukung `navigator.vibrate`).
 
 Wallpaper bersifat kosmetik: disimpan di penyimpanan browser (localStorage),
 tidak ikut file backup, dan tidak mempengaruhi data transaksi.
@@ -485,8 +490,9 @@ Reset data), dan **Lainnya** (Tentang). Detail penyimpanan ada di
 - **Bar "Versi baru tersedia"** — saat service worker memperbarui cache, app
   menampilkan tombol **Muat ulang** (tidak auto-reload supaya ketikan tak hilang).
 - **Info teknis** — **ℹ → Tentang** menampilkan commit SHA build, hash
-  bundle SHA-256, host AI yang boleh dihubungi, dan status "data lokal", plus
-  nama app, pembuat (Igoon / I Go On), lisensi Apache-2.0, dan tautan kode sumber.
+  bundle SHA-256, host AI yang boleh dihubungi, status "data lokal",
+  **"Dipakai sejak … (N hari)"**, mode (terinstall/browser), plus nama app,
+  pembuat (Igoon / I Go On), lisensi Apache-2.0, dan tautan kode sumber.
 
 ### Kategori, Akun, Anggaran & Ringkasan (lewat menu)
 
