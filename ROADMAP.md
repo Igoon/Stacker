@@ -21,6 +21,7 @@ Prinsip: **lokal dulu, tanpa server, chat-first**. Chat untuk *mencatat*; menu u
 - 2.17.1 Fix banner update palsu (banding versi berjalan) + sapaan hanya pengguna baru
 - 2.17.2 Update hanya saat dikonfirmasi (SW tanpa skipWaiting + navigasi cache-first)
 - 2.17.3 Fix banner update palsu (race: tunggu versi app berjalan diketahui)
+- 2.17.4 Fix version.json selalu dari jaringan (info update tampil lagi)
 
 ## Berikutnya
 ### v2.18.0 — Tuntaskan kelola lewat menu

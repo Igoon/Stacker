@@ -84,17 +84,29 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
+  // version.json (info update) → SELALU dari jaringan, jangan pernah dianggap
+  // shell. Tanpa ini, cache-first navigasi bisa mengembalikan HTML untuk JSON.
+  if (url.pathname.endsWith("/version.json") || url.pathname === "/version.json") {
+    e.respondWith(fetch(req, { cache: "no-store" }).catch(() => Response.error()));
+    return;
+  }
+
   // Navigasi (dokumen) → CACHE-FIRST dari cache SW aktif. Versi baru hanya
   // dipakai setelah SW baru diaktifkan lewat tombol "Muat ulang".
-  e.respondWith(
-    caches.open(CACHE).then(async (c) => {
-      const hit = await c.match("./", { ignoreVary: true, ignoreSearch: true });
-      if (hit) return hit;
-      try {
-        return await fetch(req);
-      } catch {
-        return (await caches.match("./", { ignoreVary: true, ignoreSearch: true })) || Response.error();
-      }
-    })
-  );
+  if (req.mode === "navigate" || req.destination === "document") {
+    e.respondWith(
+      caches.open(CACHE).then(async (c) => {
+        const hit = await c.match("./", { ignoreVary: true, ignoreSearch: true });
+        if (hit) return hit;
+        try {
+          return await fetch(req);
+        } catch {
+          return (
+            (await caches.match("./", { ignoreVary: true, ignoreSearch: true })) || Response.error()
+          );
+        }
+      })
+    );
+  }
+  // Request same-origin lain (non-aset, non-navigasi) dibiarkan lewat jaringan.
 });

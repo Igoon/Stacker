@@ -3,6 +3,11 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.17.4]
+- **Fix info update tak tampil**: `version.json` kini **selalu diambil dari
+  jaringan** (tidak lagi dikembalikan sebagai shell oleh SW). Cache-first hanya
+  untuk navigasi dokumen. Versi baru + catatan rilis tampil normal lagi.
+
 ## [2.17.3]
 - **Fix banner update palsu (race)**: banner menunggu sampai versi app yang
   berjalan diketahui (`appVersion`) sebelum memutuskan. Mencegah notifikasi
