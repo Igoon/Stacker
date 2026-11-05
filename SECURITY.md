@@ -96,7 +96,7 @@ gh attestation verify <artifact> --repo Igoon/Stacker
 ## Menghapus data
 
 Uninstall OS tidak menjamin semua jejak terhapus (cache, OPFS, IndexedDB, dan
-localStorage bisa tertinggal). Gunakan **ℹ → Keamanan → Hapus semua data…** di dalam app:
+localStorage bisa tertinggal). Gunakan **ℹ → Reset data → Hapus semua data** di dalam app:
 perintah ini menutup DB, mengosongkan OPFS/IndexedDB/localStorage, menghapus
 cache + registrasi Service Worker, lalu memuat ulang dalam keadaan bersih.
 Setelah itu barulah hapus ikon PWA.

@@ -416,6 +416,17 @@ test("chip cepat mengisi input saat belum ada transaksi", async ({ page }) => {
   await expect(page.locator("#input")).toHaveValue("gaji 5jt");
 });
 
+test("Hapus semua data ada di Reset data, bukan Keamanan", async ({ page }) => {
+  await boot(page);
+  await page.locator("#info").click();
+  await page.locator("#openSecurity").click();
+  await expect(page.locator("#wipeData")).toBeHidden();
+  await page.locator("#secBack").click();
+  await page.locator("#openReset").click();
+  await expect(page.locator("#wipeData")).toBeVisible();
+  await page.locator("#resetBack").click();
+});
+
 test("Periksa data & toggle bunyi pengingat", async ({ page }) => {
   await boot(page);
   await page.locator("#info").click();
@@ -531,7 +542,7 @@ test("hapus semua data membersihkan storage dan mereset app", async ({ page }) =
 
   page.on("dialog", (d) => void d.accept());
   await page.locator("#info").click();
-  await page.locator("#openSecurity").click();
+  await page.locator("#openReset").click();
   await page.locator("#wipeData").click();
 
   // Reload otomatis: app kembali bersih dan localStorage dibersihkan.
@@ -549,7 +560,7 @@ test("hapus semua data wajib PIN bila PIN aktif", async ({ page }) => {
 
   page.on("dialog", (d) => void d.accept());
   await page.locator("#info").click();
-  await page.locator("#openSecurity").click();
+  await page.locator("#openReset").click();
   await page.locator("#wipeData").click();
   await expect(page.locator("#pinModal")).toBeVisible();
 

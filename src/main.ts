@@ -175,23 +175,53 @@ function unlockAudio(): void {
     // Web Audio tak tersedia; abaikan.
   }
 }
+// Bel "tiiing": fundamental cerah + partial inharmonik (khas bel) + decay
+// panjang, plus transien singkat saat dipukul.
 function playTing(): void {
-  if (!soundOn || !audioCtx || audioCtx.state !== "running") return;
+  const ctx = audioCtx;
+  if (!soundOn || !ctx || ctx.state !== "running") return;
   try {
-    const t = audioCtx.currentTime;
-    [880, 1318.5].forEach((f, i) => {
-      const o = audioCtx!.createOscillator();
-      const g = audioCtx!.createGain();
+    const t0 = ctx.currentTime + 0.005;
+    const fund = 1174.66; // D6 — nyaring tapi tidak memekakkan
+    const partials: { r: number; g: number; d: number }[] = [
+      { r: 1, g: 0.22, d: 1.6 },
+      { r: 2.0, g: 0.12, d: 1.2 },
+      { r: 2.76, g: 0.08, d: 0.9 },
+      { r: 5.4, g: 0.05, d: 0.6 },
+      { r: 8.93, g: 0.03, d: 0.4 },
+      { r: 13.34, g: 0.015, d: 0.25 },
+    ];
+    const master = ctx.createGain();
+    master.gain.value = 0.5;
+    master.connect(ctx.destination);
+    for (const p of partials) {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
       o.type = "sine";
-      o.frequency.value = f;
-      const start = t + i * 0.09;
-      g.gain.setValueAtTime(0.0001, start);
-      g.gain.exponentialRampToValueAtTime(0.14, start + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, start + 0.28);
-      o.connect(g).connect(audioCtx!.destination);
-      o.start(start);
-      o.stop(start + 0.3);
-    });
+      o.frequency.value = fund * p.r;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(p.g, t0 + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + p.d);
+      o.connect(g).connect(master);
+      o.start(t0);
+      o.stop(t0 + p.d + 0.05);
+    }
+    // Transien "tik" (noise) singkat untuk serangan bel.
+    const len = Math.ceil(ctx.sampleRate * 0.03);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) {
+      data[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 3;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const hp = ctx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 3000;
+    const ng = ctx.createGain();
+    ng.gain.value = 0.06;
+    src.connect(hp).connect(ng).connect(master);
+    src.start(t0);
   } catch {
     // abaikan
   }

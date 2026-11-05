@@ -3,6 +3,12 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.14.1]
+- Suara pengingat diperbaiki menjadi **bel "tiiing"** (fundamental + partial
+  inharmonik, decay panjang, transien pukulan) — tidak lagi sekadar dua nada pendek.
+- Tombol **Hapus semua data** dipindah dari **ℹ → Keamanan & PIN** ke
+  **ℹ → Reset data** (lebih logis); dokumentasi diselaraskan.
+
 ## [2.14.0]
 - **Robustness**: index DB (tanggal/kategori/akun/transfer) untuk data besar;
   **Periksa integritas data** (ℹ → Reset data) mendeteksi transfer yatim,

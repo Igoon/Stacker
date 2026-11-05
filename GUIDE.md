@@ -78,7 +78,7 @@ beda per platform:
   browser/HP, pakai mode privat, atau hapus data situs = data kosong. Tidak ada
   sinkronisasi antar-perangkat; pakai Backup untuk pindah.
 - Uninstall OS tidak selalu menghapus seluruh storage. Untuk bersih total,
-  pakai **ℹ → Keamanan → Hapus semua data…** (lihat bagian 3).
+  pakai **ℹ → Reset data → Hapus semua data** (lihat bagian 3).
 
 > Pakai URL yang benar (case-sensitive, dengan akhiran `/`):
 > `https://igoon.github.io/Stacker/`.
@@ -96,7 +96,7 @@ baru hapus ikonnya.
 
 1. **⬇ Backup** dulu kalau data masih mau disimpan (wajib bila berencana
    pindah perangkat).
-2. Buka **ℹ → Keamanan**, lalu tombol **Hapus semua data…**.
+2. Buka **ℹ → Reset data**, lalu tombol **Hapus semua data (uninstall bersih)**.
 3. Konfirmasi. Bila PIN aktif, masukkan PIN lewat keypad.
 4. App menghapus transaksi + pengaturan, mengosongkan OPFS/IndexedDB/localStorage,
    membersihkan cache, lalu memuat ulang dalam keadaan bersih.
@@ -433,8 +433,8 @@ pin                     → status kunci
   dibuka. Saat restore, app meminta kata sandi otomatis.
 
 Catatan:
-- **Hapus semua data** (ℹ) menghapus seluruh data lokal + cache + PIN + izin
-  folder auto-backup. Lakukan ini sebelum uninstall OS (lihat bagian 3).
+- **Hapus semua data** (ℹ → Reset data) menghapus seluruh data lokal + cache +
+  PIN + izin folder auto-backup. Lakukan ini sebelum uninstall OS (lihat bagian 3).
 - File backup **tidak memuat API key AI** (aman dibagikan). Key AI yang
   tersimpan di perangkat tetap dipakai setelah restore.
 - `reset transaksi` otomatis mengunduh file `backup-pre-reset-*.json` sebelum
