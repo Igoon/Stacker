@@ -3,6 +3,19 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.14.0]
+- **Robustness**: index DB (tanggal/kategori/akun/transfer) untuk data besar;
+  **Periksa integritas data** (ℹ → Reset data) mendeteksi transfer yatim,
+  anggaran tanpa kategori, dan transaksi/berulang merujuk akun hilang.
+- **Parser**: turunkan confidence saat **ambigu** (dua kata kunci asli sama
+  panjang dari kategori berbeda) → fallback AI.
+- **A11y**: `aria-live` pada chat, pil saldo jadi tombol (keyboard + `aria-label`),
+  modal `role="dialog"` + tutup dengan `Esc`.
+- **UI**: area scroll (daftar) kini panel inset dengan bayangan tepi + scrollbar
+  jelas; modal daftar hanya men-scroll daftar, form/footer tetap diam.
+- **Bunyi pengingat**: "ting" (Web Audio, tanpa aset) saat pengingat muncul;
+  toggle di ℹ → Tampilan. Default aktif (butuh interaksi pertama untuk unlock audio).
+
 ## [2.13.0]
 - **Akun UI** (ℹ → Akun): daftar akun + form tambah (nama multi-kata, tipe, saldo
   awal); aksi per baris Ubah nama / Sesuaikan / Hapus.

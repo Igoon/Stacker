@@ -25,7 +25,7 @@
         <div class="name">Stacker</div>
         <div class="sub" id="sub">catat keuangan lewat chat</div>
       </div>
-      <div class="saldo" id="saldo">Saldo: -</div>
+      <div class="saldo" id="saldo" role="button" tabindex="0" aria-label="Saldo">Saldo: -</div>
     </div>
     <div class="toolbar">
       <button id="export" aria-label="Unduh backup JSON" title="Unduh backup JSON">⬇ Backup</button>
@@ -39,7 +39,7 @@
     <span>Versi baru tersedia.</span>
     <button id="updateReload">Muat ulang</button>
   </div>
-  <div id="chat"></div>
+  <div id="chat" aria-live="polite" aria-relevant="additions"></div>
   <div id="chips" class="chips" hidden></div>
   <footer>
     <input id="input" placeholder="makan siang 50rb..." autocomplete="off" />
@@ -84,6 +84,7 @@
       <input id="wallDim" type="range" min="0" max="80" step="5" value="45" />
     </label>
     <label class="row-check"><input id="hideSaldo" type="checkbox" /> Samarkan saldo di header (ketuk untuk lihat)</label>
+    <label class="row-check"><input id="soundNotice" type="checkbox" checked /> Bunyi "ting" saat pengingat</label>
     <div class="modal-actions">
       <button id="wallReset">Hapus wallpaper</button>
       <button id="wallClose">Tutup</button>
@@ -250,7 +251,7 @@
   </div>
 </div>
 <div id="katModal" class="modal" hidden>
-  <div class="modal-box">
+  <div class="modal-box list-box">
     <h3>Kategori</h3>
     <div id="catList" class="cat-list"></div>
     <div class="cat-form">
@@ -280,7 +281,7 @@
 </div>
 
 <div id="budgetModal" class="modal" hidden>
-  <div class="modal-box">
+  <div class="modal-box list-box">
     <h3>Anggaran</h3>
     <div id="budgetList" class="cat-list"></div>
     <div class="cat-form">
@@ -311,7 +312,7 @@
 <div id="dashModal" class="modal" hidden>
   <div class="modal-box">
     <h3>Ringkasan</h3>
-    <div id="dashBody"></div>
+    <div id="dashBody" class="dash-body-scroll"></div>
     <div class="modal-actions">
       <button id="dashBack">Kembali</button>
     </div>
@@ -319,7 +320,7 @@
 </div>
 
 <div id="accModal" class="modal" hidden>
-  <div class="modal-box">
+  <div class="modal-box list-box">
     <h3>Akun</h3>
     <div id="accList" class="cat-list"></div>
     <div class="cat-form">
@@ -356,6 +357,7 @@
       otomatis diunduh sebelum reset.
     </p>
     <div class="info-actions">
+      <button id="checkData">Periksa integritas data</button>
       <button id="resetTxBtn">Reset transaksi (saldo balik ke saldo awal)</button>
       <button id="resetCatBtn">Reset kategori + anggaran</button>
       <button id="resetAccBtn">Reset akun + transaksinya</button>

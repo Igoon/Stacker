@@ -211,14 +211,20 @@ export function parseLocal(text: string): LocalParse | null {
   let kategori = "Lainnya";
   let kategoriKetemu = false;
   let bestLen = 0;
+  let ambiguous = false;
   for (const cat of listCategories(tipe)) {
     for (const k of cat.keywords) {
       const kk = k.toLowerCase().trim();
-      if (!kk) continue;
-      if (kk.length > bestLen && kwMatch(catLow, kk)) {
+      if (!kk || kk.length < bestLen) continue;
+      if (!kwMatch(catLow, kk)) continue;
+      if (kk.length > bestLen) {
         bestLen = kk.length;
         kategori = cat.nama;
         kategoriKetemu = true;
+        ambiguous = false;
+      } else if (cat.nama !== kategori) {
+        // Dua kata kunci asli sama panjang dari kategori berbeda → ambigu.
+        ambiguous = true;
       }
     }
   }
@@ -244,6 +250,7 @@ export function parseLocal(text: string): LocalParse | null {
   let reason: string | undefined;
   if (found.length > 1) reason = "beberapa angka";
   else if (!chosen.suffix && chosen.value < 1000) reason = "angka tanpa satuan";
+  else if (ambiguous) reason = "kategori ambigu";
   else if (!kategoriKetemu && !explicitTipe) reason = "kategori tak dikenal";
 
   return { result, confidence: reason ? "low" : "high", reason, explicitTipe };

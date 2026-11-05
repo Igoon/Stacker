@@ -388,6 +388,9 @@ Ketuk **ℹ → Tampilan (wallpaper)**.
   (tampil `Saldo: ••••`). **Default aktif** demi privasi; **ketuk pil saldo**
   untuk melihat sementara, dan otomatis tersamar lagi begitu app ditinggalkan.
   Berlaku juga di **ℹ → Ringkasan**.
+- **Bunyi "ting" saat pengingat** — centang untuk bunyi singkat ketika pengingat
+  (anggaran/berulang/backup) muncul. Dibuat lokal via Web Audio (tanpa file/aset);
+  browser baru mengizinkan bunyi setelah satu interaksi pertama.
 
 Wallpaper bersifat kosmetik: disimpan di penyimpanan browser (localStorage),
 tidak ikut file backup, dan tidak mempengaruhi data transaksi.
@@ -445,6 +448,9 @@ Catatan:
 Aksi reset dilakukan lewat menu (bukan chat), supaya aman & gampang ditemukan:
 **ℹ → Reset data**.
 
+- **Periksa integritas data** — memeriksa masalah (transfer yatim, anggaran
+  tanpa kategori, transaksi/berulang merujuk akun hilang) dan melaporkannya.
+  Tidak mengubah apa pun.
 - **Reset transaksi** — hapus semua transaksi; saldo balik ke saldo awal.
 - **Reset kategori** — hapus semua kategori + anggaran (transaksi lama tetap).
 - **Reset akun** — hapus semua akun + transaksinya; akun default dibuat ulang.

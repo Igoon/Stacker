@@ -97,6 +97,15 @@ CREATE TABLE IF NOT EXISTS debts (
 );
 `);
 
+  // Index untuk kueri laporan/riwayat pada data besar.
+  db.exec(`
+CREATE INDEX IF NOT EXISTS idx_tx_tanggal ON transactions(tanggal);
+CREATE INDEX IF NOT EXISTS idx_tx_kategori ON transactions(kategori);
+CREATE INDEX IF NOT EXISTS idx_tx_account ON transactions(account_id);
+CREATE INDEX IF NOT EXISTS idx_tx_transfer ON transactions(transfer_id);
+CREATE INDEX IF NOT EXISTS idx_rec_account ON recurring(account_id);
+`);
+
   function hasColumn(table: string, col: string): boolean {
     return (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).some(
       (c) => c.name === col
@@ -355,6 +364,50 @@ export function deleteTx(id: number): number {
 
 export function deleteAllTx(): number {
   return db.prepare(`DELETE FROM transactions`).run().changes;
+}
+
+// Periksa konsistensi data (read-only). Mengembalikan daftar masalah.
+export function checkIntegrity(): string[] {
+  const issues: string[] = [];
+
+  const badTransfers = db
+    .prepare(
+      `SELECT transfer_id, COUNT(*) AS n FROM transactions
+       WHERE transfer_id IS NOT NULL GROUP BY transfer_id HAVING COUNT(*) <> 2`
+    )
+    .all() as { transfer_id: string; n: number }[];
+  for (const b of badTransfers) {
+    issues.push(`Transfer ${String(b.transfer_id).slice(0, 8)} punya ${b.n} baris (harus 2).`);
+  }
+
+  const ghostBudgets = db
+    .prepare(
+      `SELECT b.kategori AS kategori FROM budgets b
+       LEFT JOIN categories c ON lower(c.nama) = lower(b.kategori)
+       WHERE c.id IS NULL`
+    )
+    .all() as { kategori: string }[];
+  for (const b of ghostBudgets) issues.push(`Anggaran "${b.kategori}" tanpa kategori.`);
+
+  const txAcc = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM transactions t
+       LEFT JOIN accounts a ON a.id = t.account_id
+       WHERE t.account_id IS NOT NULL AND a.id IS NULL`
+    )
+    .get() as { n: number };
+  if (txAcc.n > 0) issues.push(`${txAcc.n} transaksi merujuk akun yang tak ada.`);
+
+  const recAcc = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM recurring r
+       LEFT JOIN accounts a ON a.id = r.account_id
+       WHERE r.account_id IS NOT NULL AND a.id IS NULL`
+    )
+    .get() as { n: number };
+  if (recAcc.n > 0) issues.push(`${recAcc.n} transaksi berulang merujuk akun yang tak ada.`);
+
+  return issues;
 }
 
 // Hapus semua kategori + anggarannya (tanpa seed ulang).

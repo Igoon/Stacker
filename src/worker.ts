@@ -12,6 +12,7 @@ import {
   getSetting,
   setSetting,
   listCategories,
+  checkIntegrity,
 } from "./db";
 import {
   budgetOverview,
@@ -94,6 +95,10 @@ interface ListAccMsg {
   type: "listacc";
   id: number;
 }
+interface CheckDataMsg {
+  type: "checkdata";
+  id: number;
+}
 interface DashMsg {
   type: "dashboard";
   id: number;
@@ -132,6 +137,7 @@ type InMsg =
   | ListCatMsg
   | ListBudgetMsg
   | ListAccMsg
+  | CheckDataMsg
   | DashMsg
   | MarkBackupMsg;
 
@@ -281,6 +287,9 @@ async function onMessage(msg: InMsg): Promise<void> {
       break;
     case "listacc":
       reply(msg.id, { ok: true, accounts: accountBalances() });
+      break;
+    case "checkdata":
+      reply(msg.id, { ok: true, issues: checkIntegrity() });
       break;
     case "dashboard":
       reply(msg.id, { ok: true, ...dashboardData() });

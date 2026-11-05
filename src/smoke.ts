@@ -306,6 +306,13 @@ await check("akun tidak memicu kategori salah", async () => {
   assert.equal(dbmod.getTx(tx!.id)!.account_id, shopee!.id, "akun terdeteksi ShopeePay");
 });
 
+await check("parser: ambigu (dua kata kunci tie) turunkan confidence", async () => {
+  const p = parseLocal("beli kopi 20rb");
+  assert(p, "terparse");
+  assert.equal(p!.confidence, "low", "dua kata kunci asli tie → low");
+  assert.equal(p!.reason, "kategori ambigu");
+});
+
 await check("kata perintah tak jadi transaksi", async () => {
   const before = count();
   const r = await handleMessage("hapus apa");
@@ -797,6 +804,14 @@ await check("budgetOverview & dashboardData (untuk UI)", async () => {
   assert(typeof d.totalSaldo === "number" && !!d.label, "dashboard data terisi");
   await handleMessage("anggaran hapus UjiDash");
   await handleMessage("kategori hapus UjiDash");
+});
+
+await check("checkIntegrity mendeteksi anggaran yatim", async () => {
+  dbmod.setBudget("HantuX", 100_000);
+  const issues = dbmod.checkIntegrity();
+  assert(issues.some((x) => x.includes("HantuX")), "anggaran tanpa kategori terdeteksi");
+  dbmod.deleteBudget("HantuX");
+  assert(!dbmod.checkIntegrity().some((x) => x.includes("HantuX")), "hilang setelah dihapus");
 });
 
 await check("reset akun/kategori/semua + backup", async () => {

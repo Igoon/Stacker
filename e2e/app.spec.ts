@@ -416,6 +416,25 @@ test("chip cepat mengisi input saat belum ada transaksi", async ({ page }) => {
   await expect(page.locator("#input")).toHaveValue("gaji 5jt");
 });
 
+test("Periksa data & toggle bunyi pengingat", async ({ page }) => {
+  await boot(page);
+  await page.locator("#info").click();
+  await page.locator("#openReset").click();
+  await page.locator("#checkData").click();
+  await expect(
+    page.locator("#chat .bubble").filter({ hasText: "tidak ada masalah" })
+  ).toBeVisible();
+  await page.locator("#resetBack").click();
+
+  await page.locator("#openWall").click();
+  await expect(page.locator("#soundNotice")).toBeChecked();
+  await page.locator("#soundNotice").uncheck();
+  await expect(
+    page.locator("#chat .bubble").filter({ hasText: "Bunyi pengingat dimatikan" })
+  ).toBeVisible();
+  await page.locator("#wallClose").click();
+});
+
 test("CSP aktif & panel keamanan menampilkan build + hash", async ({ page }) => {
   await boot(page);
 

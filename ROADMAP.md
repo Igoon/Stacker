@@ -11,14 +11,10 @@ Prinsip: **lokal dulu, tanpa server, chat-first**. Chat untuk *mencatat*; menu u
 - 2.11.1 Fix parser (akun vs kata kunci kategori)
 - 2.12.0 Samarkan saldo (default tersamar)
 - 2.13.0 Akun UI, menu berkelompok, onboarding chip, pengingat in-app
+- 2.14.0 Robustness (index DB, periksa integritas data, parser ambigu) + A11y
+  dasar + pembeda area scroll + bunyi pengingat "ting"
 
 ## Berikutnya
-### v2.14.0 — Robustness & A11y
-- Cek integritas data (transfer yatim, kategori kosong, saldo tak konsisten).
-- Index DB (`tanggal`, `kategori`, `account_id`) untuk data besar.
-- Parser: turunkan confidence saat ambigu (dua kata kunci asli) → fallback AI.
-- A11y pass: `aria-label`, urutan fokus & modal, kontras WCAG AA, uji screen reader.
-
 ### v2.15.0 — Tuntaskan kelola lewat menu
 - Berulang UI (daftar + aktif/nonaktif + ubah).
 - Utang/Piutang UI (daftar + bayar + hapus).

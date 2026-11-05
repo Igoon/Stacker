@@ -125,15 +125,80 @@ let hideSaldo = readHideSaldo();
 let saldoRevealed = false;
 let lastSaldoRupiah = "-";
 
-function renderSaldo(): void {
-  saldoEl.textContent = "Saldo: " + (hideSaldo && !saldoRevealed ? "••••" : lastSaldoRupiah);
-  saldoEl.title = hideSaldo ? (saldoRevealed ? "Ketuk untuk samarkan" : "Ketuk untuk lihat saldo") : "";
-}
-saldoEl.addEventListener("click", () => {
+function toggleSaldo(): void {
   if (!hideSaldo) return;
   saldoRevealed = !saldoRevealed;
   renderSaldo();
+}
+function renderSaldo(): void {
+  saldoEl.textContent = "Saldo: " + (hideSaldo && !saldoRevealed ? "••••" : lastSaldoRupiah);
+  saldoEl.title = hideSaldo ? (saldoRevealed ? "Ketuk untuk samarkan" : "Ketuk untuk lihat saldo") : "";
+  saldoEl.setAttribute(
+    "aria-label",
+    !hideSaldo
+      ? `Saldo ${lastSaldoRupiah}`
+      : saldoRevealed
+        ? "Saldo terlihat, ketuk untuk samarkan"
+        : "Saldo tersamar, ketuk untuk lihat"
+  );
+}
+saldoEl.addEventListener("click", toggleSaldo);
+saldoEl.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    toggleSaldo();
+  }
 });
+
+// Bunyi pengingat singkat (Web Audio, tanpa aset & tanpa jaringan).
+const SOUND_KEY = "stacker-sound";
+function readSound(): boolean {
+  try {
+    const v = localStorage.getItem(SOUND_KEY);
+    return v === null ? true : v === "1";
+  } catch {
+    return true;
+  }
+}
+let soundOn = readSound();
+let audioCtx: AudioContext | null = null;
+function unlockAudio(): void {
+  try {
+    if (!audioCtx) {
+      const Ctx =
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (Ctx) audioCtx = new Ctx();
+    }
+    if (audioCtx && audioCtx.state === "suspended") void audioCtx.resume();
+  } catch {
+    // Web Audio tak tersedia; abaikan.
+  }
+}
+function playTing(): void {
+  if (!soundOn || !audioCtx || audioCtx.state !== "running") return;
+  try {
+    const t = audioCtx.currentTime;
+    [880, 1318.5].forEach((f, i) => {
+      const o = audioCtx!.createOscillator();
+      const g = audioCtx!.createGain();
+      o.type = "sine";
+      o.frequency.value = f;
+      const start = t + i * 0.09;
+      g.gain.setValueAtTime(0.0001, start);
+      g.gain.exponentialRampToValueAtTime(0.14, start + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, start + 0.28);
+      o.connect(g).connect(audioCtx!.destination);
+      o.start(start);
+      o.stop(start + 0.3);
+    });
+  } catch {
+    // abaikan
+  }
+}
+for (const ev of ["pointerdown", "keydown", "touchstart"] as const) {
+  window.addEventListener(ev, unlockAudio, { passive: true });
+}
 
 function setSub(text: string): void {
   subEl.textContent = text;
@@ -301,6 +366,7 @@ async function refresh(): Promise<Record<string, unknown>> {
   // Notice dari worker (mis. transaksi berulang yang baru dicatat).
   const notes = Array.isArray(r.notices) ? (r.notices as string[]) : [];
   for (const n of notes) addBubble(n, "bot");
+  if (notes.length > 0) playTing();
   return r;
 }
 
@@ -548,12 +614,14 @@ for (const p of WALL_PRESETS) {
 }
 
 const hideSaldoEl = document.getElementById("hideSaldo") as HTMLInputElement;
+const soundNoticeEl = document.getElementById("soundNotice") as HTMLInputElement;
 
 document.getElementById("openWall")!.onclick = () => {
   for (const m of INFO_PANES) m.hidden = true;
   currentWall = readWall();
   syncWallControls(currentWall);
   hideSaldoEl.checked = hideSaldo;
+  soundNoticeEl.checked = soundOn;
   wallModal.hidden = false;
 };
 
@@ -567,6 +635,20 @@ hideSaldoEl.onchange = () => {
   }
   renderSaldo();
   addBubble(hideSaldo ? "Saldo disamarkan di header." : "Saldo ditampilkan di header.", "bot");
+};
+
+soundNoticeEl.onchange = () => {
+  soundOn = soundNoticeEl.checked;
+  try {
+    localStorage.setItem(SOUND_KEY, soundOn ? "1" : "0");
+  } catch {
+    // abaikan
+  }
+  if (soundOn) {
+    unlockAudio();
+    playTing();
+  }
+  addBubble(soundOn ? 'Bunyi pengingat aktif ("ting").' : "Bunyi pengingat dimatikan.", "bot");
 };
 
 document.getElementById("wallClose")!.onclick = () => {
@@ -1248,6 +1330,19 @@ const INFO_PANES = [
   dashModal,
   accModal,
 ];
+// Semantik dialog + tutup dengan Esc.
+for (const m of document.querySelectorAll<HTMLElement>(".modal")) {
+  m.setAttribute("role", "dialog");
+  m.setAttribute("aria-modal", "true");
+}
+window.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  const open = Array.from(document.querySelectorAll<HTMLElement>(".modal")).filter((m) => !m.hidden);
+  const top = open[open.length - 1];
+  if (!top) return;
+  if (top.id === "pinModal") closePinModal(true);
+  else top.hidden = true;
+});
 const pickDirBtn = document.getElementById("pickDir") as HTMLButtonElement;
 const backupNowBtn = document.getElementById("backupNow") as HTMLButtonElement;
 const clearDirBtn = document.getElementById("clearDir") as HTMLButtonElement;
@@ -1310,6 +1405,7 @@ async function wipeAllData(): Promise<void> {
       "stacker-retain",
       "stacker-idle",
       "stacker-hide-saldo",
+      "stacker-sound",
     ]) {
       try {
         localStorage.removeItem(k);
@@ -1559,6 +1655,15 @@ document.getElementById("resetTxBtn")!.onclick = () => void runReset("transaksi"
 document.getElementById("resetCatBtn")!.onclick = () => void runReset("kategori");
 document.getElementById("resetAccBtn")!.onclick = () => void runReset("akun");
 document.getElementById("resetAllBtn")!.onclick = () => void runReset("semua");
+document.getElementById("checkData")!.onclick = async () => {
+  const r = await call({ type: "checkdata" });
+  const issues = (Array.isArray(r.issues) ? r.issues : []) as string[];
+  if (!issues.length) {
+    addBubble("Periksa data selesai: tidak ada masalah ✓", "bot");
+  } else {
+    addBubble(`Periksa data: ${issues.length} masalah\n- ${issues.join("\n- ")}`, "bot");
+  }
+};
 
 // ---------- Manajemen kategori (UI) ----------
 interface CatRow {
