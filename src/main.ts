@@ -128,6 +128,35 @@ const historyBtn = document.getElementById("history") as HTMLButtonElement;
 const histModal = document.getElementById("histModal")!;
 const histList = document.getElementById("histList")!;
 
+// App shortcut (manifest ?action=catat|ringkasan|cari).
+let launchAction: string | null = null;
+try {
+  launchAction = new URLSearchParams(location.search).get("action");
+} catch {
+  launchAction = null;
+}
+if (launchAction) {
+  try {
+    history.replaceState({}, "", location.pathname + location.hash);
+  } catch {
+    // abaikan
+  }
+}
+function runLaunchAction(): void {
+  const a = launchAction;
+  launchAction = null;
+  if (!a) return;
+  if (a === "ringkasan") {
+    showInfoPane(dashModal);
+    void renderDash();
+  } else if (a === "cari") {
+    input.value = "cari ";
+    input.focus();
+  } else {
+    input.focus();
+  }
+}
+
 // Riwayat perintah (localStorage) — muncul lewat panah ↑/↓ & saran saat mengetik.
 const RECENT_KEY = "stacker-cmd-history";
 function readRecent(): string[] {
@@ -152,20 +181,17 @@ function rememberCommand(text: string): void {
   }
 }
 
-// Pemakaian pertama (untuk Tentang).
-const FIRST_USE_KEY = "stacker-first-use";
-function readFirstUse(): string {
+// Tanggal pasang/dipakai pertama — disimpan di DB settings (first_use_at).
+// Nilai lama (localStorage) dimigrasikan sekali saat app siap.
+const LEGACY_FIRST_USE_KEY = "stacker-first-use";
+let firstUseAt = "";
+function legacyFirstUse(): string | null {
   try {
-    const v = localStorage.getItem(FIRST_USE_KEY);
-    if (v) return v;
-    const now = new Date().toISOString();
-    localStorage.setItem(FIRST_USE_KEY, now);
-    return now;
+    return localStorage.getItem(LEGACY_FIRST_USE_KEY);
   } catch {
-    return new Date().toISOString();
+    return null;
   }
 }
-const firstUse = readFirstUse();
 const isStandalone =
   (typeof window.matchMedia === "function" &&
     window.matchMedia("(display-mode: standalone)").matches) ||
@@ -291,6 +317,36 @@ historyBtn.onclick = () => {
 document.getElementById("histClose")!.onclick = () => {
   histModal.hidden = true;
 };
+
+// Ajakan pasang app (Android/desktop). Muncul hanya bila browser menawarkan.
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<unknown>;
+};
+let deferredInstall: InstallPromptEvent | null = null;
+const installAppBtn = document.getElementById("installApp") as HTMLButtonElement;
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstall = e as InstallPromptEvent;
+  installAppBtn.hidden = false;
+});
+installAppBtn.onclick = async () => {
+  const ev = deferredInstall;
+  deferredInstall = null;
+  installAppBtn.hidden = true;
+  if (!ev) return;
+  try {
+    await ev.prompt();
+    await ev.userChoice;
+  } catch {
+    // abaikan
+  }
+};
+window.addEventListener("appinstalled", () => {
+  deferredInstall = null;
+  installAppBtn.hidden = true;
+  showToast("App terpasang.");
+});
 
 // Privasi saldo: default TERSAMAR. Ketuk pil saldo untuk lihat; auto-samar
 // lagi saat app ditinggalkan.
@@ -575,6 +631,18 @@ async function refresh(): Promise<Record<string, unknown>> {
   txCount = Number(r.txCount ?? 0);
   chipsEl.hidden = txCount > 0;
   undoBtn.disabled = !r.canUndo;
+  if (typeof r.firstUseAt === "string" && r.firstUseAt) firstUseAt = r.firstUseAt;
+  const navBadge = navigator as Navigator & {
+    setAppBadge?: (n: number) => Promise<void>;
+    clearAppBadge?: () => Promise<void>;
+  };
+  try {
+    const alerts = Number(r.alerts ?? 0);
+    if (alerts > 0) void navBadge.setAppBadge?.(alerts);
+    else void navBadge.clearAppBadge?.();
+  } catch {
+    // Badging API tak didukung; abaikan.
+  }
   lastBackupAt = typeof r.lastBackupAt === "string" ? r.lastBackupAt : null;
   // Notice dari worker (mis. transaksi berulang yang baru dicatat).
   const notes = Array.isArray(r.notices) ? (r.notices as string[]) : [];
@@ -1320,6 +1388,7 @@ function unlockUi(): void {
   void refresh().then((s) => {
     showStartupHint(s);
     handleSharedText();
+    runLaunchAction();
     void autoBackup();
   });
 }
@@ -1707,12 +1776,24 @@ wipeDataBtn.onclick = async () => {
 };
 
 async function nowReady(): Promise<void> {
+  // Migrasi tanggal pasang lama (localStorage) → DB (sekali). Bila belum ada,
+  // isi dengan waktu sekarang. Worker hanya menyimpan bila belum ada.
+  const legacy = legacyFirstUse();
+  await call({ type: "setfirstuse", at: legacy || new Date().toISOString() });
+  if (legacy) {
+    try {
+      localStorage.removeItem(LEGACY_FIRST_USE_KEY);
+    } catch {
+      // abaikan
+    }
+  }
   const s = await refresh();
   if (s.pinSet) {
     lockNow();
   } else {
     showStartupHint(s);
     handleSharedText();
+    runLaunchAction();
   }
   await initStorage();
 }
@@ -1846,7 +1927,7 @@ function renderInfo(): void {
     `Hash bundle SHA-256: ${bundleHash || "menghitung…"}`,
     `Host AI: ${aiHosts}`,
     `Data: lokal di perangkat (OPFS), tanpa server`,
-    `Dipakai sejak: ${fmtDate(firstUse)} (${daysSince(firstUse)} hari)`,
+    `Dipakai sejak: ${firstUseAt ? `${fmtDate(firstUseAt)} (${daysSince(firstUseAt)} hari)` : "-"}`,
     `Mode: ${isStandalone ? "terinstall (standalone)" : "browser"}`,
   ].join("\n");
   pickDirBtn.disabled = !supportsFolderBackup();

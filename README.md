@@ -104,9 +104,11 @@ ter-deploy kalau logika rusak.
   menampilkan hasil inline.
 - **`cls`/`clear`** membersihkan layar chat; **riwayat perintah** via tombol **↺**
   (layar sentuh), panah ↑/↓ (keyboard), dan saran chip saat mengetik.
-- **Tentang** menampilkan durasi pakai ("Dipakai sejak … (N hari)") + mode
-  terinstall; **getar** opsional saat mencatat/undo; **Undo** nonaktif bila kosong;
-  Ringkasan punya kartu **"Hari ini"**.
+- **Tentang** menampilkan durasi pakai ("Dipakai sejak … (N hari)", disimpan di
+  DB dan tak ikut backup/restore) + mode terinstall; **getar** opsional saat
+  mencatat/undo; **Undo** nonaktif bila kosong; Ringkasan punya kartu **"Hari ini"**.
+- **Integrasi OS**: **App Shortcuts** (tekan lama ikon → Catat/Ringkasan/Cari),
+  **badge** ikon untuk alert anggaran/berulang, dan **install prompt**.
 - **CSP ketat** (script self, connect hanya Gemini + localhost) + panel **ℹ**
   berisi commit SHA, hash bundle SHA-256, host AI, dan **Tentang** (pembuat,
   lisensi Apache-2.0, kode sumber). Threat model di
@@ -162,5 +164,5 @@ memverifikasi build (commit SHA + hash bundle di panel **ℹ**,
 
 ## Versi
 
-`v2.16.1` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
+`v2.17.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
 Nilai versi di-hardcode di `src/version.ts` (browser tak bisa baca `package.json`).

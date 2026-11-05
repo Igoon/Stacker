@@ -445,6 +445,18 @@ await check("anggaran case-insensitive: tak bikin baris ganda", async () => {
   await handleMessage("anggaran hapus perabot");
 });
 
+await check("first_use_at tak ikut backup & bertahan restore", async () => {
+  dbmod.setSetting("first_use_at", "2026-01-02T03:04:05.000Z");
+  const bkp = dbmod.exportAll();
+  assert(!bkp.includes("first_use_at"), "tanggal pasang tak ikut backup");
+  dbmod.importAll(bkp);
+  assert.equal(
+    dbmod.getSetting("first_use_at"),
+    "2026-01-02T03:04:05.000Z",
+    "tanggal pasang bertahan setelah restore"
+  );
+});
+
 await check("export tak memuat api key AI", async () => {
   dbmod.setSetting("ai_key", "SECRET-KEY-123");
   const json = dbmod.exportAll();

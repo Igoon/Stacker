@@ -512,6 +512,16 @@ Reset data), dan **Lainnya** (Tentang). Detail penyimpanan ada di
 Saat belum ada transaksi, muncul **chip contoh** di atas kolom chat ("makan
 siang 50rb", "gaji 5jt", …) — ketuk untuk mengisi kolom.
 
+### Integrasi OS (bila didukung)
+
+- **App Shortcuts** — tekan lama ikon PWA → **Catat cepat / Ringkasan / Cari**.
+- **Badge ikon** — angka muncul saat ada anggaran tembus atau transaksi berulang
+  jatuh tempo (hilang saat tak ada alert).
+- **Pasang aplikasi** — bila browser menawarkan, muncul baris di
+  **ℹ → Pengaturan**.
+- Semua bersifat lokal; bila API tak didukung, fitur otomatis tidak muncul
+  (tidak menggangu). Getar tidak tersedia di iOS Safari.
+
 ### Verifikasi keamanan (30 detik)
 
 1. DevTools → **Network** → muat ulang: semua request harus same-origin

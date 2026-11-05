@@ -439,6 +439,16 @@ test("saran perintah dari riwayat saat mengetik", async ({ page }) => {
   await expect(page.locator("#input")).toHaveValue("grafik");
 });
 
+test("app shortcut: ?action=ringkasan & cari", async ({ page }) => {
+  await page.goto("/?action=ringkasan");
+  await expect(page.locator("#sub")).toHaveText(/^v\d/, { timeout: 60_000 });
+  await expect(page.locator("#dashModal")).toBeVisible();
+
+  await page.goto("/?action=cari");
+  await expect(page.locator("#sub")).toHaveText(/^v\d/, { timeout: 60_000 });
+  await expect(page.locator("#input")).toHaveValue("cari ");
+});
+
 test("tombol Riwayat perintah (layar sentuh)", async ({ page }) => {
   await boot(page);
   await chat(page, "grafik");

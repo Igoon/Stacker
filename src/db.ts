@@ -1032,7 +1032,15 @@ export function debtTotals(): { utang: number; piutang: number } {
 }
 
 // Key settings yang TIDAK ikut export: kredensial + penanda snapshot internal.
-const SETTING_EXPORT_SKIP = new Set(["ai_key", "pin_hash", "pin_salt", "pin_iter"]);
+// first_use_at = kapan app dipasang/dipakai pertama (lokal perangkat). Jangan
+// ikut backup supaya tak terbawa/tertimpa ke perangkat lain saat restore.
+const SETTING_EXPORT_SKIP = new Set([
+  "ai_key",
+  "pin_hash",
+  "pin_salt",
+  "pin_iter",
+  "first_use_at",
+]);
 const settingExportable = (key: string): boolean =>
   !SETTING_EXPORT_SKIP.has(key) && !key.startsWith("backup_") && key !== "_backup_keys";
 
@@ -1066,6 +1074,7 @@ export function importAll(json: string): void {
   // yang sudah ada supaya restore tidak mematikan AI pengguna. PIN juga lokal:
   // restore dari perangkat lain tak boleh membuka/menghapus kunci perangkat ini.
   const localAiKey = getSetting("ai_key");
+  const localFirstUse = getSetting("first_use_at");
   const localPin = {
     hash: getSetting("pin_hash"),
     salt: getSetting("pin_salt"),
@@ -1159,6 +1168,8 @@ export function importAll(json: string): void {
       insSetting.run(s.key, s.value ?? null);
     }
     if (localAiKey) insSetting.run("ai_key", localAiKey);
+    // Tanggal pasang tetap milik perangkat ini (tidak ditimpa isi backup).
+    if (localFirstUse) insSetting.run("first_use_at", localFirstUse);
     if (localPin.hash && localPin.salt) {
       insSetting.run("pin_hash", localPin.hash);
       insSetting.run("pin_salt", localPin.salt);

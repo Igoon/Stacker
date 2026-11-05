@@ -13,6 +13,7 @@ import {
   setSetting,
   listCategories,
   checkIntegrity,
+  recurringDue,
 } from "./db";
 import {
   budgetOverview,
@@ -100,6 +101,11 @@ interface CheckDataMsg {
   type: "checkdata";
   id: number;
 }
+interface SetFirstUseMsg {
+  type: "setfirstuse";
+  id: number;
+  at: string;
+}
 interface DashMsg {
   type: "dashboard";
   id: number;
@@ -139,6 +145,7 @@ type InMsg =
   | ListBudgetMsg
   | ListAccMsg
   | CheckDataMsg
+  | SetFirstUseMsg
   | DashMsg
   | MarkBackupMsg;
 
@@ -221,6 +228,8 @@ function state() {
     ok: true,
     version: APP_VERSION,
     canUndo: canUndo(),
+    firstUseAt: getSetting("first_use_at"),
+    alerts: budgetOverview().filter((b) => b.pct >= 100).length + (recurringDue() ? 1 : 0),
     saldo: saldo(),
     saldoRupiah: rupiahSigned(saldo()),
     aiEnabled: aiEnabled(),
@@ -293,6 +302,12 @@ async function onMessage(msg: InMsg): Promise<void> {
     case "checkdata":
       reply(msg.id, { ok: true, issues: checkIntegrity() });
       break;
+    case "setfirstuse": {
+      // Set hanya bila belum ada (idempotent; migrasi dari localStorage).
+      if (!getSetting("first_use_at") && msg.at) setSetting("first_use_at", msg.at);
+      reply(msg.id, { ok: true, firstUseAt: getSetting("first_use_at") });
+      break;
+    }
     case "dashboard":
       reply(msg.id, { ok: true, ...dashboardData() });
       break;

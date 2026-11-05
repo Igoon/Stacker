@@ -3,6 +3,17 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.17.0]
+- **App Shortcuts** (manifest): tekan-lama ikon PWA → **Catat cepat / Ringkasan /
+  Cari** (`?action=`), berlaku Android & desktop.
+- **Badging API**: ikon menampilkan badge angka bila anggaran tembus / transaksi
+  berulang jatuh tempo (fallback diam bila tak didukung).
+- **Install prompt**: baris "Pasang aplikasi" di ℹ → Pengaturan saat browser
+  menawarkan; toast "App terpasang" setelah dipasang.
+- **"Dipakai sejak" disimpan di DB** (`settings.first_use_at`): tahan update,
+  **tidak ikut backup**, dan **tidak tertimpa restore**; nilai localStorage lama
+  dimigrasikan otomatis.
+
 ## [2.16.1]
 - **Tombol Riwayat (↺)** di samping kolom input (ramah layar sentuh): membuka
   daftar perintah sebelumnya, ketuk untuk memakai. Panah ↑/↓ tetap tersedia
