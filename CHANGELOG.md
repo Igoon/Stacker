@@ -3,6 +3,11 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.16.1]
+- **Tombol Riwayat (↺)** di samping kolom input (ramah layar sentuh): membuka
+  daftar perintah sebelumnya, ketuk untuk memakai. Panah ↑/↓ tetap tersedia
+  untuk keyboard/desktop.
+
 ## [2.16.0]
 - **`cls` / `clear` / `bersihkan`** — membersihkan layar chat (bukan hapus data).
 - **Riwayat perintah**: panah ↑/↓ di kolom input untuk memanggil perintah

@@ -124,6 +124,9 @@ const busyEl = document.getElementById("busy")!;
 const chipsEl = document.getElementById("chips")!;
 const suggestEl = document.getElementById("suggest")!;
 const undoBtn = document.getElementById("undo") as HTMLButtonElement;
+const historyBtn = document.getElementById("history") as HTMLButtonElement;
+const histModal = document.getElementById("histModal")!;
+const histList = document.getElementById("histList")!;
 
 // Riwayat perintah (localStorage) — muncul lewat panah ↑/↓ & saran saat mengetik.
 const RECENT_KEY = "stacker-cmd-history";
@@ -256,6 +259,38 @@ function updateSuggest(): void {
   }
   suggestEl.hidden = false;
 }
+
+// Riwayat perintah untuk layar sentuh (tanpa tombol panah).
+function renderHistory(): void {
+  histList.replaceChildren();
+  if (!recentCommands.length) {
+    const p = document.createElement("p");
+    p.className = "info-note";
+    p.textContent = "Belum ada riwayat perintah.";
+    histList.appendChild(p);
+    return;
+  }
+  for (const c of recentCommands) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "hist-item";
+    b.textContent = c;
+    b.onclick = () => {
+      input.value = c;
+      histModal.hidden = true;
+      input.focus();
+      suggestEl.hidden = true;
+    };
+    histList.appendChild(b);
+  }
+}
+historyBtn.onclick = () => {
+  renderHistory();
+  histModal.hidden = false;
+};
+document.getElementById("histClose")!.onclick = () => {
+  histModal.hidden = true;
+};
 
 // Privasi saldo: default TERSAMAR. Ketuk pil saldo untuk lihat; auto-samar
 // lagi saat app ditinggalkan.

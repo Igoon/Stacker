@@ -102,8 +102,8 @@ ter-deploy kalau logika rusak.
   (`version.json`) sebelum "Muat ulang".
 - **Feedback menu**: aksi di menu memberi **toast** di atas modal; "Periksa data"
   menampilkan hasil inline.
-- **`cls`/`clear`** membersihkan layar chat; **riwayat perintah** via panah ↑/↓
-  dan saran chip saat mengetik.
+- **`cls`/`clear`** membersihkan layar chat; **riwayat perintah** via tombol **↺**
+  (layar sentuh), panah ↑/↓ (keyboard), dan saran chip saat mengetik.
 - **Tentang** menampilkan durasi pakai ("Dipakai sejak … (N hari)") + mode
   terinstall; **getar** opsional saat mencatat/undo; **Undo** nonaktif bila kosong;
   Ringkasan punya kartu **"Hari ini"**.
@@ -162,5 +162,5 @@ memverifikasi build (commit SHA + hash bundle di panel **ℹ**,
 
 ## Versi
 
-`v2.16.0` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
+`v2.16.1` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
 Nilai versi di-hardcode di `src/version.ts` (browser tak bisa baca `package.json`).

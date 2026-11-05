@@ -439,6 +439,16 @@ test("saran perintah dari riwayat saat mengetik", async ({ page }) => {
   await expect(page.locator("#input")).toHaveValue("grafik");
 });
 
+test("tombol Riwayat perintah (layar sentuh)", async ({ page }) => {
+  await boot(page);
+  await chat(page, "grafik");
+  await page.locator("#history").click();
+  await expect(page.locator("#histModal")).toBeVisible();
+  await page.locator("#histList .hist-item", { hasText: "grafik" }).click();
+  await expect(page.locator("#histModal")).toBeHidden();
+  await expect(page.locator("#input")).toHaveValue("grafik");
+});
+
 test("Tentang: dipakai sejak & mode; haptic toggle; undo state", async ({ page }) => {
   await boot(page);
   await expect(page.locator("#undo")).toBeDisabled();

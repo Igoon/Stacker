@@ -349,8 +349,9 @@ versi                         → versi aplikasi
 cls | clear | bersihkan       → bersihkan layar chat (bukan hapus data)
 help                          → daftar perintah
 ```
-> Di kolom input, tekan **panah ↑/↓** untuk memanggil perintah sebelumnya.
-> Saat mengetik, muncul **saran** dari riwayat perintah — ketuk untuk memakai.
+> Di HP, ketuk tombol **↺ (Riwayat)** di samping kolom input untuk melihat dan
+> memakai perintah sebelumnya; saat mengetik juga muncul **saran chip**. Di
+> keyboard/desktop, **panah ↑/↓** memanggil perintah sebelumnya.
 
 ---
 

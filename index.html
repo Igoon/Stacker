@@ -46,6 +46,7 @@
   <div id="chips" class="chips" hidden></div>
   <div id="suggest" class="suggest" hidden></div>
   <footer>
+    <button id="history" class="ghost" aria-label="Riwayat perintah" title="Riwayat perintah">↺</button>
     <input id="input" placeholder="makan siang 50rb..." autocomplete="off" />
     <button id="send">&#10148;</button>
   </footer>
@@ -379,6 +380,16 @@
     </div>
   </div>
 </div>
+<div id="histModal" class="modal" hidden>
+  <div class="modal-box list-box">
+    <h3>Riwayat perintah</h3>
+    <div id="histList" class="cat-list"></div>
+    <div class="modal-actions">
+      <button id="histClose">Tutup</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 <script type="module" src="/src/main.ts"></script>
 </body>

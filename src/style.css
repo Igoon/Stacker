@@ -217,6 +217,27 @@ footer button {
   font-size: 18px;
   cursor: pointer;
 }
+footer button.ghost {
+  background: #2a3942;
+  color: #d1f4cc;
+  flex: 0 0 auto;
+}
+.hist-item {
+  text-align: left;
+  border: 1px solid #2a3942;
+  background: #17232a;
+  color: #e9edef;
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hist-item:hover {
+  background: #2a3942;
+}
 .modal {
   position: fixed;
   inset: 0;
