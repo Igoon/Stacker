@@ -98,8 +98,9 @@ ter-deploy kalau logika rusak.
 - **Reset data lewat menu** (ℹ → Reset data): transaksi/kategori/akun/semua —
   konfirmasi + auto-backup; `semua` reset pabrik (butuh PIN / ketik `RESET`).
 - **Alias perintah** (`alias tf transfer`, target multi-kata, hapus/reset, tampil di `alias`/`help`).
-- **Update transparan**: banner menampilkan **versi baru + catatan rilis**
-  (`version.json`) sebelum "Muat ulang".
+- **Update transparan & terkendali**: banner menampilkan **versi baru + catatan
+  rilis** (`version.json`); versi baru baru aktif setelah **Muat ulang** (SW
+  menunggu, navigasi cache-first) — tidak berganti diam-diam.
 - **Feedback menu**: aksi di menu memberi **toast** di atas modal; "Periksa data"
   menampilkan hasil inline.
 - **`cls`/`clear`** membersihkan layar chat; **riwayat perintah** via tombol **↺**
@@ -164,5 +165,5 @@ memverifikasi build (commit SHA + hash bundle di panel **ℹ**,
 
 ## Versi
 
-`v2.17.1` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
+`v2.17.2` (MAJOR relatif terhadap jalur desktop, sesuai kebijakan SemVer).
 Nilai versi di-hardcode di `src/version.ts` (browser tak bisa baca `package.json`).

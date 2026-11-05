@@ -19,9 +19,13 @@ const PRECACHE = [
 const ASSET_DEST = new Set(["script", "style", "worker", "image", "font", "manifest"]);
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting())
-  );
+  // JANGAN skipWaiting: versi baru menunggu sampai user menekan "Muat ulang".
+  // Ini mencegah app berganti versi diam-diam saat dibuka ulang.
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)));
+});
+
+self.addEventListener("message", (e) => {
+  if (e.data && e.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (e) => {
@@ -80,10 +84,17 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  // Navigasi (dokumen) → network-first, fallback ke shell.
+  // Navigasi (dokumen) → CACHE-FIRST dari cache SW aktif. Versi baru hanya
+  // dipakai setelah SW baru diaktifkan lewat tombol "Muat ulang".
   e.respondWith(
-    fetch(req)
-      .then((res) => res)
-      .catch(() => caches.match("./", { ignoreVary: true, ignoreSearch: true }))
+    caches.open(CACHE).then(async (c) => {
+      const hit = await c.match("./", { ignoreVary: true, ignoreSearch: true });
+      if (hit) return hit;
+      try {
+        return await fetch(req);
+      } catch {
+        return (await caches.match("./", { ignoreVary: true, ignoreSearch: true })) || Response.error();
+      }
+    })
   );
 });

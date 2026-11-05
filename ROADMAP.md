@@ -19,6 +19,7 @@ Prinsip: **lokal dulu, tanpa server, chat-first**. Chat untuk *mencatat*; menu u
 - 2.17.0 Integrasi OS: App Shortcuts, Badging API, Install prompt; "Dipakai
   sejak" pindah ke DB (tahan update, tak ikut backup/restore)
 - 2.17.1 Fix banner update palsu (banding versi berjalan) + sapaan hanya pengguna baru
+- 2.17.2 Update hanya saat dikonfirmasi (SW tanpa skipWaiting + navigasi cache-first)
 
 ## Berikutnya
 ### v2.18.0 — Tuntaskan kelola lewat menu

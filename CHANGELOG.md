@@ -3,6 +3,12 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.17.2]
+- **Update hanya saat dikonfirmasi**: service worker tidak lagi `skipWaiting`;
+  versi baru menunggu sampai tombol **Muat ulang**. Navigasi diubah ke
+  **cache-first** supaya app tidak berganti versi diam-diam saat dibuka ulang.
+  Banner menampilkan "Versi baru X — kamu di vY".
+
 ## [2.17.1]
 - **Banner update tidak muncul palsu**: dibandingkan dulu dengan versi yang
   sedang berjalan; bila sudah sama → tidak ditampilkan. Teks kini jelas:

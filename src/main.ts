@@ -27,6 +27,9 @@ interface Reply {
 
 const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
 
+// True saat user menekan "Muat ulang": SW baru diaktifkan lalu halaman reload.
+let swReloading = false;
+
 // Service worker: cache app shell. Kalau SW baru mengambil alih, tampilkan bar
 // "Muat ulang" — jangan reload otomatis supaya input user tak hilang.
 if ("serviceWorker" in navigator) {
@@ -71,6 +74,10 @@ if ("serviceWorker" in navigator) {
     bar.hidden = false;
   };
   navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (swReloading) {
+      window.location.reload();
+      return;
+    }
     if (!hadController) return;
     void showUpdateBar();
   });
@@ -83,6 +90,17 @@ if ("serviceWorker" in navigator) {
         window.setInterval(check, 60 * 60 * 1000);
         document.addEventListener("visibilitychange", () => {
           if (!document.hidden) check();
+        });
+        // SW baru sudah menunggu (belum aktif) → tawarkan Muat ulang.
+        if (reg.waiting && navigator.serviceWorker.controller) void showUpdateBar();
+        reg.addEventListener("updatefound", () => {
+          const nw = reg.installing;
+          if (!nw) return;
+          nw.addEventListener("statechange", () => {
+            if (nw.state === "installed" && navigator.serviceWorker.controller) {
+              void showUpdateBar();
+            }
+          });
         });
       })
       .catch((e) => console.warn("[sw] gagal registrasi:", e));
@@ -2463,7 +2481,21 @@ document.getElementById("accSave")!.onclick = async () => {
   await refreshAccList();
 };
 
-document.getElementById("updateReload")!.onclick = () => location.reload();
+document.getElementById("updateReload")!.onclick = async () => {
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    if (reg?.waiting) {
+      // Aktifkan SW baru, lalu reload saat controllerchange.
+      swReloading = true;
+      reg.waiting.postMessage({ type: "SKIP_WAITING" });
+      window.setTimeout(() => window.location.reload(), 2500);
+      return;
+    }
+  } catch {
+    // fallback reload biasa
+  }
+  window.location.reload();
+};
 
 pickDirBtn.onclick = async () => {
   if (!supportsFolderBackup()) {
