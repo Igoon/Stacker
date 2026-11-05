@@ -29,6 +29,10 @@ const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "modu
 
 // True saat user menekan "Muat ulang": SW baru diaktifkan lalu halaman reload.
 let swReloading = false;
+// Cegah banner update tampil sebelum versi app yang berjalan diketahui
+// (menghindari "update" palsu saat app sudah di versi terbaru).
+let pendingUpdateCheck = false;
+let checkUpdateWhenReady: (() => void) | null = null;
 
 // Service worker: cache app shell. Kalau SW baru mengambil alih, tampilkan bar
 // "Muat ulang" — jangan reload otomatis supaya input user tak hilang.
@@ -37,6 +41,12 @@ if ("serviceWorker" in navigator) {
   // Tampilkan versi baru + catatan rilis (dari version.json hasil build) supaya
   // user tahu apa yang di-update, bukan sekadar "versi baru".
   const showUpdateBar = async (): Promise<void> => {
+    // Tunggu sampai versi app yang berjalan diketahui; kalau dipanggil lebih
+    // awal, tandai pending dan ulangi setelah worker "ready".
+    if (!appVersion) {
+      pendingUpdateCheck = true;
+      return;
+    }
     const bar = document.getElementById("update");
     if (!bar) return;
     const title = document.getElementById("updateTitle");
@@ -72,6 +82,14 @@ if ("serviceWorker" in navigator) {
         : `Versi baru tersedia${appVersion ? ` (kamu di v${appVersion})` : ""}`;
     }
     bar.hidden = false;
+  };
+  // Dipanggil setelah worker siap (appVersion diketahui) untuk memutuskan
+  // apakah banner update perlu ditampilkan.
+  checkUpdateWhenReady = () => {
+    if (pendingUpdateCheck) {
+      pendingUpdateCheck = false;
+      void showUpdateBar();
+    }
   };
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (swReloading) {
@@ -126,6 +144,7 @@ worker.onmessage = (ev: MessageEvent<{ id: number } & Record<string, unknown>>) 
       ready = true;
       appVersion = String(m.version ?? "");
       setSub(`v${m.version}`);
+      checkUpdateWhenReady?.();
       void nowReady();
     } else if (m.type === "error") {
       setSub("gagal inisialisasi DB");

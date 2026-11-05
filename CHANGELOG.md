@@ -3,6 +3,12 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.17.3]
+- **Fix banner update palsu (race)**: banner menunggu sampai versi app yang
+  berjalan diketahui (`appVersion`) sebelum memutuskan. Mencegah notifikasi
+  "versi baru" muncul saat app sudah di versi itu (mis. SW dari versi sama masih
+  menunggu setelah app pindah versi).
+
 ## [2.17.2]
 - **Update hanya saat dikonfirmasi**: service worker tidak lagi `skipWaiting`;
   versi baru menunggu sampai tombol **Muat ulang**. Navigasi diubah ke
