@@ -3,6 +3,12 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.17.5]
+- **Fix atribut `hidden`**: elemen ber-`display` sendiri (mis. `.menu-row`,
+  label modal) kini benar-benar tersembunyi. Efeknya: menu **"Pasang aplikasi"**
+  tidak tampil bila sudah terpasang/tak didukung, dan baris **"Kunci otomatis"**
+  hanya muncul saat PIN aktif.
+
 ## [2.17.4]
 - **Fix info update tak tampil**: `version.json` kini **selalu diambil dari
   jaringan** (tidak lagi dikembalikan sebagai shell oleh SW). Cache-first hanya

@@ -436,9 +436,10 @@ test("chip cepat mengisi input saat belum ada transaksi", async ({ page }) => {
 test("cls membersihkan layar + riwayat perintah (panah atas)", async ({ page }) => {
   await boot(page);
   await chat(page, "kopi 10rb");
-  await expect(page.locator("#chat .bubble").first()).toBeVisible();
+  await expect(page.locator("#chat .tx")).toHaveCount(1);
 
   await chat(page, "cls");
+  await expect(page.locator("#toast")).toContainText("Layar dibersihkan");
   await expect(page.locator("#chat .bubble")).toHaveCount(0);
 
   await page.locator("#input").press("ArrowUp");
@@ -502,6 +503,15 @@ test("Ringkasan menampilkan kartu Hari ini", async ({ page }) => {
   await page.locator("#openDash").click();
   await expect(page.locator("#dashBody")).toContainText("Hari ini");
   await page.locator("#dashBack").click();
+});
+
+test("atribut hidden benar-benar menyembunyikan (baris idle tanpa PIN)", async ({ page }) => {
+  await boot(page);
+  await page.locator("#info").click();
+  await page.locator("#openSecurity").click();
+  // Tanpa PIN, baris "Kunci otomatis" harus tersembunyi (meski label ber-display flex).
+  await expect(page.locator("#idleRow")).toBeHidden();
+  await page.locator("#secBack").click();
 });
 
 test("Hapus semua data ada di Reset data, bukan Keamanan", async ({ page }) => {

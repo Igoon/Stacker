@@ -375,10 +375,20 @@ type InstallPromptEvent = Event & {
 };
 let deferredInstall: InstallPromptEvent | null = null;
 const installAppBtn = document.getElementById("installApp") as HTMLButtonElement;
+// Bila sudah terpasang (standalone), menu "Pasang aplikasi" tidak ditampilkan.
+if (isStandalone) installAppBtn.hidden = true;
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
+  if (isStandalone) return;
   deferredInstall = e as InstallPromptEvent;
   installAppBtn.hidden = false;
+});
+// Jika kelak menjadi standalone, sembunyikan lagi.
+window.matchMedia?.("(display-mode: standalone)").addEventListener?.("change", (ev) => {
+  if (ev.matches) {
+    deferredInstall = null;
+    installAppBtn.hidden = true;
+  }
 });
 installAppBtn.onclick = async () => {
   const ev = deferredInstall;

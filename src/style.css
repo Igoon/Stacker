@@ -1,6 +1,11 @@
 * {
   box-sizing: border-box;
 }
+/* Pastikan atribut `hidden` selalu menyembunyikan, walau elemen punya
+   display sendiri (mis. .menu-row/label). */
+[hidden] {
+  display: none !important;
+}
 body {
   margin: 0;
   font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
