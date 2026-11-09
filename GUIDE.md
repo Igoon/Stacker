@@ -73,7 +73,7 @@ beda per platform:
 - **iPhone/iPad (Safari):** aplikasi Home Screen bisa punya storage **terpisah**
   dari tab Safari. Data di tab Safari belum tentu muncul di ikon terinstall.
   Sebaiknya **install dulu, baru masukkan data**, atau pindahkan lewat
-  **⬇ Backup** lalu **⬆ Restore**.
+| Auto-backup tidak jalan otomatis | Buka **Info â†’ Backup & penyimpanan** â†’ **Pilih folder auto-backup** sekali (izin folder bisa dicabut browser). Tombol **Backup ke folder sekarang** memaksa tulis. |
 - Data terikat pada **browser + profil + perangkat** yang sama. Ganti
   browser/HP, pakai mode privat, atau hapus data situs = data kosong. Tidak ada
   sinkronisasi antar-perangkat; pakai Backup untuk pindah.
@@ -94,7 +94,7 @@ baru hapus ikonnya.
 
 ### Hapus semua data (disarankan)
 
-1. **⬇ Backup** dulu kalau data masih mau disimpan (wajib bila berencana
+1. **Info → Backup & penyimpanan** → **Backup JSON** dulu kalau data masih mau disimpan (wajib bila berencana
    pindah perangkat).
 2. Buka **ℹ → Reset data**, lalu tombol **Hapus semua data (uninstall bersih)**.
 3. Konfirmasi. Bila PIN aktif, masukkan PIN lewat keypad.
@@ -118,7 +118,7 @@ Setelah itu barulah hapus aplikasinya:
 1. Di jendela aplikasi, klik menu **⋮** (atau **⋯** di Edge).
 2. Pilih **Uninstall Stacker** / **Hapus**.
 
-> **Penting:** Tindakan ini permanen. Pastikan sudah **⬇ Backup** kalau data
+> **Penting:** Tindakan ini permanen. Pastikan sudah **Backup JSON** (Info → Backup & penyimpanan) kalau data
 > mau dipindah/disimpan.
 
 ---
@@ -163,7 +163,7 @@ Setelah itu barulah hapus aplikasinya:
    grafik komposisi
    csv
    ```
-8. Backup rutin: tombol **⬇ Backup** → file JSON.
+8. Backup rutin: **Info → Backup & penyimpanan** → **Backup JSON** (file JSON).
 9. Atur tampilan (opsional): **ℹ → Tema &amp; tampilan** → wallpaper preset atau foto sendiri.
 10. Keluar: tidak ada logout. Tutup app/tab. Data aman di perangkat (OPFS).
 
@@ -429,17 +429,17 @@ pin                     → status kunci
   (PBKDF2-SHA256, 120.000 iterasi + salt) disimpan lokal dan **tidak ikut
   file backup**.
 - Lupa PIN? Data tetap ada di perangkat tapi tak bisa dibuka dari app ini.
-  Pulihkan dengan **⬆ Restore** file backup di perangkat lain (atau setelah
+  Pulihkan dengan **Info → Backup & penyimpanan → Restore dari file JSON** di perangkat lain (atau setelah
   instal ulang PWA).
 
 ### Backup & restore
 
-- **⬇ Backup** — unduh seluruh data jadi file JSON.
+- **Backup JSON (lengkap)** - unduh seluruh data jadi file JSON (Info → Backup & penyimpanan).
 - **🔐** — backup terenkripsi; masukkan kata sandi (min. 8 karakter).
-- **⬆ Restore** — unggah file JSON untuk kembalikan/pindah data. App menampilkan
+- **Restore dari file JSON** - unggah file JSON untuk kembalikan/pindah data. App menampilkan
   ringkasan isi file lalu minta konfirmasi; data sebelum restore bisa
   dikembalikan dengan `undo`.
-- **↶ Undo** — tombol pintas undo (sama dengan mengetik `undo`).
+- **Undo / Redo** - tombol pintas undo/redo (sama dengan mengetik `undo` / `redo`).
 - `backup kunci <sandi>` di chat — backup **terenkripsi** (AES-GCM 256 +
   PBKDF2, minimal 8 karakter). Simpan kata sandinya; tanpa itu file tak bisa
   dibuka. Saat restore, app meminta kata sandi otomatis.
@@ -450,7 +450,7 @@ Catatan:
 - File backup **tidak memuat API key AI** (aman dibagikan). Key AI yang
   tersimpan di perangkat tetap dipakai setelah restore.
 - `reset transaksi` otomatis mengunduh file `backup-pre-reset-*.json` sebelum
-  menghapus. Simpan file itu — bisa di-restore lewat tombol **⬆ Restore**.
+  menghapus. Simpan file itu - bisa di-restore lewat **Info → Backup & penyimpanan → Restore dari file JSON**.
 - Hapus akun tidak menghapus transaksi: transaksinya dipindah ke akun **Cash**
   supaya total saldo tetap sama dengan jumlah saldo akun.
 - Transaksi berulang (`berulang ...`) ikut tersimpan di file backup.
@@ -569,8 +569,8 @@ Lakukan backup rutin, terutama di iOS (storage bisa kena *eviction*).
 | iOS tak muncul "Add to Home Screen" | Pakai Safari, bukan Chrome. |
 | Data hilang setelah lama | Restore dari file backup. |
 | Muncul bar "Versi baru tersedia" | Ketuk **Muat ulang** untuk memakai versi terbaru (data tidak hilang). |
-| Tombol auto-backup folder tak ada | File System Access API hanya Chrome/Edge/Android. Di iOS/Safari pakai **⬇ Backup**. |
-| Auto-backup tidak jalan otomatis | Buka **ℹ → Backup & penyimpanan** → **Pilih folder auto-backup** sekali (izin folder bisa dicabut browser). Tombol **Backup ke folder sekarang** memaksa tulis. |
+| Tombol auto-backup folder tak ada | File System Access API hanya Chrome/Edge/Android. Di iOS/Safari pakai **Backup JSON** (Info â†’ Backup & penyimpanan). |
+| Auto-backup tidak jalan otomatis | Buka **Info â†’ Backup & penyimpanan** â†’ **Pilih folder auto-backup** sekali (izin folder bisa dicabut browser). Tombol **Backup ke folder sekarang** memaksa tulis. |
 | AI tidak aktif | Provider Gemini butuh key. Provider OpenAI butuh base URL. |
 | AI OpenAI remote (Groq/OpenRouter) gagal | CSP hanya mengizinkan Gemini + `localhost`/`127.0.0.1`. Pakai Ollama/LM Studio lokal. |
 

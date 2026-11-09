@@ -859,7 +859,7 @@ input.addEventListener("input", () => {
   updateSuggest();
 });
 
-// Toolbar: backup, restore, undo. (AI/wallpaper/backup terenkripsi via ℹ.)
+// Aksi backup/restore JSON ada di Info -> Backup & penyimpanan.
 document.getElementById("export")!.onclick = async () => {
   const r = await call({ type: "export" });
   saveFile(`stacker-backup-${todayStr()}.json`, r.json as string);

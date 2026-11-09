@@ -72,9 +72,9 @@ test("pengingat backup tidak diulang tiap kirim", async ({ page }) => {
   await boot(page);
   await chat(page, "kopi 15rb");
   await chat(page, "teh 5rb");
-  await expect(
-    page.locator("#chat .bubble").filter({ hasText: "Belum pernah backup" })
-  ).toHaveCount(1);
+  const notice = page.locator("#chat .bubble").filter({ hasText: "Belum pernah backup" });
+  await expect(notice).toHaveCount(1);
+  await expect(notice).toContainText("Backup & penyimpanan");
 });
 
 test("grafik SVG & laporan banding tampil di chat", async ({ page }) => {
@@ -240,10 +240,15 @@ test("hapus via perintah menyinkronkan bubble", async ({ page }) => {
   await expect(page.locator("#chat .tx")).toHaveCount(0);
 });
 
-test("ekspor backup JSON lewat tombol", async ({ page }) => {
+test("ekspor backup JSON lewat menu penyimpanan", async ({ page }) => {
   await boot(page);
+  await expect(page.locator(".toolbar #export")).toHaveCount(0);
+  await expect(page.locator(".toolbar #import")).toHaveCount(0);
   await chat(page, "kopi 15rb");
   await expect(page.locator("#chat .tx").last()).toContainText("Makanan");
+
+  await page.locator("#info").click();
+  await page.locator("#openStorage").click();
 
   const dl = page.waitForEvent("download");
   await page.locator("#export").click();
@@ -258,11 +263,15 @@ test("restore minta konfirmasi dan bisa di-undo", async ({ page }) => {
   await boot(page);
   await chat(page, "kopi 15rb");
 
+  await page.locator("#info").click();
+  await page.locator("#openStorage").click();
+
   const dl = page.waitForEvent("download");
   await page.locator("#export").click();
   const path = await (await dl).path();
   expect(path).toBeTruthy();
 
+  await page.locator("#storeBack").click();
   await chat(page, "teh 5rb");
 
   page.once("dialog", (d) => d.accept());

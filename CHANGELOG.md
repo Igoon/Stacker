@@ -3,6 +3,10 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.18.1]
+- **UI**: tombol Backup/Restore JSON dipindah dari toolbar ke menu
+  **Info → Backup & penyimpanan** (toolbar kini hanya Undo, Redo, Info).
+
 ## [2.18.0]
 - **Redo**: pasangan `undo` (maks 20 langkah), perintah `redo`/`ulangi`, tombol
   toolbar, shortcut Ctrl+Y / Ctrl+Shift+Z. Aksi baru mengosongkan redo.

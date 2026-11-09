@@ -210,14 +210,14 @@ function state() {
   if (n > 0 && !backupNoticeShown) {
     if (!lastBackup) {
       notices.push(
-        "Belum pernah backup. Ketuk ⬇ Backup (atau ketik `backup`) supaya data aman."
+        "Belum pernah backup. Buka Info → Backup & penyimpanan (atau ketik `backup`) supaya data aman."
       );
       backupNoticeShown = true;
     } else {
       const ts = new Date(lastBackup + "T00:00:00").getTime();
       const days = Math.floor((Date.now() - ts) / 86_400_000);
       if (Number.isFinite(days) && days >= 14) {
-        notices.push(`Backup terakhir ${days} hari lalu. Ketuk ⬇ Backup atau ketik \`backup\`.`);
+        notices.push(`Backup terakhir ${days} hari lalu. Buka Info → Backup & penyimpanan atau ketik \`backup\`.`);
         backupNoticeShown = true;
       }
     }

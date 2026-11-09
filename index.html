@@ -28,8 +28,6 @@
       <div class="saldo" id="saldo" role="button" tabindex="0" aria-label="Saldo">Saldo: -</div>
     </div>
     <div class="toolbar">
-      <button id="export" aria-label="Unduh backup JSON" title="Unduh backup JSON">⬇ Backup</button>
-      <button id="import" aria-label="Muat backup JSON" title="Muat backup JSON">⬆ Restore</button>
       <button id="undo" aria-label="Batalkan aksi terakhir" title="Batalkan aksi terakhir" disabled>↶ Undo</button>
       <button id="redo" aria-label="Ulangi aksi yang dibatalkan" title="Ulangi aksi yang dibatalkan" disabled>↷ Redo</button>
       <button id="info" aria-label="Info & pengaturan" title="Info & pengaturan">ℹ Info</button>
@@ -218,11 +216,14 @@
       </select>
     </label>
     <div class="info-actions">
-      <button id="exportEnc">🔐 Backup terenkripsi (kata sandi)</button>
+      <button id="export">Backup JSON (lengkap)</button>
+      <button id="import">Restore dari file JSON</button>
+      <button id="exportEnc">Backup terenkripsi (kata sandi)</button>
       <button id="pickDir">Pilih folder auto-backup</button>
       <button id="backupNow">Backup ke folder sekarang</button>
       <button id="clearDir">Matikan auto-backup</button>
     </div>
+    <p class="info-note">Restore akan mengganti seluruh data di perangkat ini (bisa dibatalkan dengan <code>undo</code>).</p>
     <p class="info-note">
       Auto-backup hanya menulis ke folder yang kamu pilih (Chrome/Edge/Android).
       Data tidak dikirim ke mana pun. Di iPhone/iPad, pakai tombol ⬇ Backup.
