@@ -159,7 +159,7 @@
       <button id="openBudget" class="menu-row"><span>Anggaran</span><span class="chev">›</span></button>
       <div class="menu-head">Pengaturan</div>
       <button id="openSecurity" class="menu-row"><span>Keamanan &amp; PIN</span><span class="chev">›</span></button>
-      <button id="openStorage" class="menu-row"><span>Backup &amp; penyimpanan</span><span class="chev">›</span></button>
+      <button id="openStorage" class="menu-row"><span>Backup &amp; penyimpanan</span><span id="storageWarn" class="menu-warn" hidden>Perlu izin</span><span class="chev">›</span></button>
       <button id="openWall" class="menu-row"><span>Tema &amp; tampilan</span><span class="chev">›</span></button>
       <button id="openAI" class="menu-row"><span>AI (opsional)</span><span class="chev">›</span></button>
       <button id="openReset" class="menu-row"><span>Reset data</span><span class="chev">›</span></button>
@@ -225,8 +225,8 @@
     </div>
     <p class="info-note">Restore akan mengganti seluruh data di perangkat ini (bisa dibatalkan dengan <code>undo</code>).</p>
     <p class="info-note">
-      Auto-backup hanya menulis ke folder yang kamu pilih (Chrome/Edge/Android).
-      Data tidak dikirim ke mana pun. Di iPhone/iPad, pakai tombol ⬇ Backup.
+      Auto-backup menulis ke folder pilihan (Chrome/Edge/Android), tanpa mengirim data. Bila browser meminta izin lagi, klik "Izinkan folder tersimpan" (folder tidak perlu dipilih ulang).
+      Di iPhone/iPad, gunakan Backup JSON (file) karena folder auto-backup tidak didukung.
     </p>
     <div class="modal-actions">
       <button id="storeBack">Kembali</button>

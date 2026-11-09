@@ -17,6 +17,8 @@ import {
 } from "./themes";
 import type { Tx } from "./db";
 import {
+  folderAction,
+  folderButtonLabel,
   folderPermission,
   forgetFolder,
   getFolder,
@@ -732,6 +734,18 @@ async function refresh(): Promise<Record<string, unknown>> {
   chipsEl.hidden = txCount > 0;
   undoBtn.disabled = !r.canUndo;
   redoBtn.disabled = !r.canRedo;
+  const undoCount = Number(r.undoCount ?? 0);
+  const redoCount = Number(r.redoCount ?? 0);
+  const undoName = typeof r.undoLabel === "string" ? r.undoLabel : "";
+  const redoName = typeof r.redoLabel === "string" ? r.redoLabel : "";
+  undoBtn.title = undoCount
+    ? `Batalkan: ${undoName} (${undoCount} langkah)`
+    : "Tidak ada aksi untuk dibatalkan";
+  redoBtn.title = redoCount
+    ? `Ulangi: ${redoName} (${redoCount} langkah)`
+    : "Tidak ada aksi untuk diulang";
+  undoBtn.setAttribute("aria-label", undoBtn.title);
+  redoBtn.setAttribute("aria-label", redoBtn.title);
   if (typeof r.firstUseAt === "string" && r.firstUseAt) firstUseAt = r.firstUseAt;
   const navBadge = navigator as Navigator & {
     setAppBadge?: (n: number) => Promise<void>;
@@ -1064,7 +1078,11 @@ function syncWallControls(w: Wall): void {
   wallDim.value = String(Math.round(dim * 100));
   wallDimVal.textContent = `${Math.round(dim * 100)}%`;
   const themeLabel = document.getElementById("wallThemeLabel");
-  if (themeLabel) themeLabel.textContent = `Tema aktif: ${themeById(currentTheme).label}`;
+  if (themeLabel) {
+    themeLabel.textContent = `Tema aktif: ${themeById(currentTheme).label}${
+      w.kind === "image" ? " - wallpaper kustom" : ""
+    }`;
+  }
 }
 
 for (const p of WALL_PRESETS) {
@@ -1078,9 +1096,11 @@ for (const p of WALL_PRESETS) {
   btn.style.background = p.id === "default" ? "#0b141a" : p.css;
   btn.onclick = () => {
     if (isThemeId(p.id)) applyTheme(p.id);
-    currentWall = { kind: "default" };
-    applyWall(currentWall);
-    saveWall(currentWall);
+    if (currentWall.kind !== "image") {
+      currentWall = { kind: "default" };
+      applyWall(currentWall);
+      saveWall(currentWall);
+    }
     syncWallControls(currentWall);
   };
   wallSwatches.appendChild(btn);
@@ -1982,7 +2002,7 @@ async function autoBackup(force = false): Promise<void> {
     if (!backupPermWarned) {
       backupPermWarned = true;
       addBubble(
-        "Auto-backup butuh izin folder lagi. Buka ℹ → Backup & penyimpanan → Pilih folder sekali lagi.",
+        "Auto-backup butuh izin folder lagi (browser meminta ulang). Buka ℹ → Backup & penyimpanan → Izinkan folder tersimpan.",
         "bot"
       );
     }
@@ -2072,9 +2092,12 @@ function renderInfo(): void {
     `Backup terakhir: ${lastBackupAt ?? "belum pernah"}`,
     `Auto-backup: ${
       folder
-        ? folder.name + (folderNeedsPermission ? " (izin perlu diperbarui)" : "")
+        ? folder.name + (folderNeedsPermission ? " - izin perlu diperbarui" : " - aktif")
         : "nonaktif"
     }`,
+    folder
+      ? "Izin folder bisa diminta ulang browser setelah app ditutup; folder tidak perlu dipilih ulang."
+      : "Auto-backup folder: pilih folder sekali (Chrome/Edge/Android).",
     `Retensi backup: ${readRetain()} file terbaru`,
     storageText ? "\n" + storageText : "",
   ]
@@ -2092,6 +2115,15 @@ function renderInfo(): void {
   pickDirBtn.disabled = !supportsFolderBackup();
   backupNowBtn.disabled = !folder;
   clearDirBtn.disabled = !folder;
+  pickDirBtn.textContent = folderButtonLabel(!!folder, folderNeedsPermission);
+  pickDirBtn.title =
+    folderAction(!!folder, folderNeedsPermission) === "pick"
+      ? "Pilih folder untuk auto-backup"
+      : folderAction(!!folder, folderNeedsPermission) === "grant"
+        ? "Minta izin akses folder (folder tetap sama)"
+        : "Ganti folder auto-backup";
+  const storageWarn = document.getElementById("storageWarn");
+  if (storageWarn) storageWarn.hidden = !(folder && folderNeedsPermission);
   renderPinButtons();
 }
 
@@ -2621,7 +2653,21 @@ document.getElementById("updateReload")!.onclick = async () => {
 
 pickDirBtn.onclick = async () => {
   if (!supportsFolderBackup()) {
-    showToast("Browser ini tak mendukung auto-backup folder. Pakai tombol ⬇ Backup.");
+    showToast("Browser ini tak mendukung auto-backup folder. Pakai Backup JSON di Info â†’ Backup & penyimpanan.");
+    return;
+  }
+  if (folder && folderNeedsPermission) {
+    const ok = await folderPermission(folder, true);
+    if (!ok) {
+      folderNeedsPermission = true;
+      renderInfo();
+      showToast("Izin folder ditolak. Ulangi, atau Matikan auto-backup untuk memilih folder lain.");
+      return;
+    }
+    folderNeedsPermission = false;
+    backupPermWarned = false;
+    await autoBackup(true);
+    renderInfo();
     return;
   }
   try {
@@ -2650,7 +2696,7 @@ backupNowBtn.onclick = async () => {
   const ok = await folderPermission(folder, true);
   if (!ok) {
     folderNeedsPermission = true;
-    showToast("Izin folder ditolak. Pilih folder lagi lewat ℹ → Backup & penyimpanan.");
+    showToast("Izin folder ditolak. Coba lagi lewat ℹ → Backup & penyimpanan.");
     return;
   }
   folderNeedsPermission = false;

@@ -496,10 +496,18 @@ const txLine = (r: Tx) =>
 // Undo berbasis snapshot penuh: sebelum tiap perintah, simpan hasil exportAll;
 // kalau data berubah, snapshot lama masuk stack. Sederhana, tahan terhadap
 // semua jenis mutasi (tambah/ubah/hapus/transfer/anggaran/akun).
+interface SnapshotEntry {
+  snap: string;
+  label: string;
+  at: number;
+}
+
 const UNDO_LIMIT = 20;
 const REDO_LIMIT = 20;
-const undoStack: string[] = [];
-const redoStack: string[] = [];
+// Batas kasar memori per stack (panjang string; snapshot JSON ASCII).
+const SNAPSHOT_BYTES_LIMIT = 4 * 1024 * 1024;
+const undoStack: SnapshotEntry[] = [];
+const redoStack: SnapshotEntry[] = [];
 
 export function canUndo(): boolean {
   return undoStack.length > 0;
@@ -509,42 +517,113 @@ export function canRedo(): boolean {
   return redoStack.length > 0;
 }
 
-function pushUndo(snap: string): void {
-  pushUndoKeepRedo(snap);
+export function undoLabel(): string | null {
+  return undoStack.length ? undoStack[undoStack.length - 1].label : null;
+}
+
+export function redoLabel(): string | null {
+  return redoStack.length ? redoStack[redoStack.length - 1].label : null;
+}
+
+export function undoCount(): number {
+  return undoStack.length;
+}
+
+export function redoCount(): number {
+  return redoStack.length;
+}
+
+function stackBytes(stack: SnapshotEntry[]): number {
+  let total = 0;
+  for (const entry of stack) total += entry.snap.length;
+  return total;
+}
+
+function trimStack(stack: SnapshotEntry[], limit: number): void {
+  while (stack.length > limit) stack.shift();
+  // Sisakan minimal satu snapshot walau satu entri melebihi budget.
+  while (stack.length > 1 && stackBytes(stack) > SNAPSHOT_BYTES_LIMIT) stack.shift();
+}
+
+function pushUndo(snap: string, label: string): void {
+  pushUndoKeepRedo(snap, label);
   redoStack.length = 0;
 }
 
-function pushUndoKeepRedo(snap: string): void {
-  undoStack.push(snap);
-  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+function pushUndoKeepRedo(snap: string, label: string): void {
+  undoStack.push({ snap, label, at: Date.now() });
+  trimStack(undoStack, UNDO_LIMIT);
 }
 
-function pushRedo(snap: string): void {
-  redoStack.push(snap);
-  if (redoStack.length > REDO_LIMIT) redoStack.shift();
+function pushRedo(snap: string, label: string): void {
+  redoStack.push({ snap, label, at: Date.now() });
+  trimStack(redoStack, REDO_LIMIT);
+}
+
+// Cache snapshot agar perintah baca tidak perlu export berulang.
+let cachedSnapshot: string | null = null;
+let cachedSnapshotAt: number | null = null;
+
+function currentState(): string {
+  const changes = totalChanges();
+  if (cachedSnapshot === null || cachedSnapshotAt !== changes) {
+    cachedSnapshot = exportJson();
+    cachedSnapshotAt = changes;
+  }
+  return cachedSnapshot;
+}
+
+function rememberSnapshot(snap: string): void {
+  cachedSnapshot = snap;
+  cachedSnapshotAt = totalChanges();
+}
+
+function actionLabel(text: string): string {
+  const label = text.replace(/\s+/g, " ").trim();
+  if (!label) return "perintah";
+  return label.length > 48 ? `${label.slice(0, 47)}…` : label;
+}
+
+// Kembalikan snapshot untuk undo/redo, tetapi pertahankan metadata lokal
+// (timestamp backup terakhir) agar pengingat backup tidak “kembali”.
+function restoreSnapshot(snap: string): void {
+  const localBackupAt = getSetting("last_backup_at");
+  importJson(snap);
+  setSetting("last_backup_at", localBackupAt);
+  rememberSnapshot(exportJson());
 }
 
 // Dipakai tombol Hapus di UI: snapshot dulu supaya `undo` bisa membatalkan.
 export function deleteTxWithUndo(id: number): { removed: number; ids: number[] } {
-  const before = exportJson();
+  const before = currentState();
   const res = deleteTxWithIds(id);
-  if (res.removed > 0) pushUndo(before);
+  if (res.removed > 0) {
+    pushUndo(before, `hapus transaksi #${id}`);
+    rememberSnapshot(exportJson());
+  }
   return res;
 }
 
 // Restore dari UI juga harus bisa di-undo (import mengganti seluruh DB).
 export function importJsonWithUndo(json: string): void {
-  const before = exportJson();
+  const before = currentState();
   importJson(json);
-  if (exportJson() !== before) pushUndo(before);
+  const after = exportJson();
+  if (after !== before) {
+    pushUndo(before, "restore backup");
+    rememberSnapshot(after);
+  }
 }
 
 // Transaksi berulang yang jatuh tempo juga masuk undo stack.
 export function runRecurringWithUndo(): { created: number; entries: string[] } {
   if (!recurringDue()) return { created: 0, entries: [] };
-  const before = exportJson();
+  const before = currentState();
   const res = runRecurring();
-  if (res.created > 0) pushUndo(before);
+  if (res.created > 0) {
+    pushUndo(before, "transaksi berulang otomatis");
+    rememberSnapshot(exportJson());
+  }
   return res;
 }
 
@@ -552,31 +631,46 @@ export async function handleMessage(input: string): Promise<Reply> {
   const text = expandAlias(input.trim());
 
   if (/^(undo|batalkan|batal)$/i.test(text)) {
-    const snap = undoStack.pop();
-    if (!snap) return { text: "Tidak ada perubahan untuk dibatalkan." };
+    const entry = undoStack.pop();
+    if (!entry) return { text: "Tidak ada perubahan untuk dibatalkan." };
     const current = exportJson();
-    if (current !== snap) pushRedo(current);
-    importJson(snap);
+    try {
+      restoreSnapshot(entry.snap);
+    } catch (e) {
+      undoStack.push(entry);
+      return { text: "Gagal membatalkan: " + (e as Error).message };
+    }
+    pushRedo(current, entry.label);
     return {
       text: `Dibatalkan. Data kembali ke kondisi sebelum perintah terakhir.${undoStack.length ? ` (bisa undo ${undoStack.length}× lagi)` : ""}`,
     };
   }
 
   if (/^(redo|ulangi)$/i.test(text)) {
-    const snap = redoStack.pop();
-    if (!snap) return { text: "Tidak ada aksi untuk diulang." };
-    pushUndoKeepRedo(exportJson());
-    importJson(snap);
+    const entry = redoStack.pop();
+    if (!entry) return { text: "Tidak ada aksi untuk diulang." };
+    const current = exportJson();
+    try {
+      restoreSnapshot(entry.snap);
+    } catch (e) {
+      redoStack.push(entry);
+      return { text: "Gagal mengulang: " + (e as Error).message };
+    }
+    pushUndoKeepRedo(current, entry.label);
     return {
       text: `Dijalankan ulang. Data kembali ke kondisi setelah aksi yang dibatalkan.${redoStack.length ? ` (bisa redo ${redoStack.length}x lagi)` : ""}`,
     };
   }
 
-  const before = exportJson();
+  const before = currentState();
   const beforeChanges = totalChanges();
   const r = await handleMessageInner(text);
-  // Pre-check murah: perintah baca tak perlu export ulang untuk undo.
-  if (totalChanges() !== beforeChanges && exportJson() !== before) pushUndo(before);
+  // Perintah baca tidak mengubah totalChanges: tidak perlu export snapshot.
+  if (totalChanges() !== beforeChanges) {
+    const after = exportJson();
+    if (after !== before) pushUndo(before, actionLabel(text));
+    rememberSnapshot(after);
+  }
   return r;
 }
 

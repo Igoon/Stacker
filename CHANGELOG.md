@@ -3,6 +3,17 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.18.2]
+- **Auto-backup folder**: bila izin folder perlu diperbarui, tombol memakai
+  handle folder tersimpan (**Izinkan folder tersimpan**) sehingga tidak membuka
+  pemilih folder lagi; label tombol menyesuaikan (pilih/izinkan/ganti) dan ada
+  indikator **Perlu izin** di menu penyimpanan. Teks bantuan backup/restore
+  diperjelas.
+- **Wallpaper kustom** tidak lagi hilang saat mengganti tema.
+- **Undo/Redo**: snapshot dibatasi berdasarkan ukuran memori dan label aksi
+  (tooltip tombol); perintah baca tidak lagi membuat snapshot; timestamp backup
+  lokal tidak ikut ter-undo; kegagalan restore tidak menghilangkan langkah.
+
 ## [2.18.1]
 - **UI**: tombol Backup/Restore JSON dipindah dari toolbar ke menu
   **Info → Backup & penyimpanan** (toolbar kini hanya Undo, Redo, Info).

@@ -23,7 +23,11 @@ import {
   deleteTxWithUndo,
   handleMessage,
   importJsonWithUndo,
+  redoCount,
+  redoLabel,
   runRecurringWithUndo,
+  undoCount,
+  undoLabel,
 } from "./bot";
 import { aiEnabled, aiStats, getAiConfig, setAiConfig } from "./ai";
 import { exportJson } from "./backup";
@@ -230,6 +234,10 @@ function state() {
     version: APP_VERSION,
     canUndo: canUndo(),
     canRedo: canRedo(),
+    undoLabel: undoLabel(),
+    redoLabel: redoLabel(),
+    undoCount: undoCount(),
+    redoCount: redoCount(),
     firstUseAt: getSetting("first_use_at"),
     alerts: budgetOverview().filter((b) => b.pct >= 100).length + (recurringDue() ? 1 : 0),
     saldo: saldo(),

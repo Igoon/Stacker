@@ -491,6 +491,9 @@ Reset data), dan **Lainnya** (Tentang). Detail penyimpanan ada di
   ke internet. File ditulis plaintext JSON — kalau perlu terenkripsi, pakai
   `backup kunci <sandi>` manual. Retensi file backup diatur di
   **ℹ → Backup & penyimpanan** (10–100 file terbaru).
+- **Izin folder** - browser bisa meminta izin ulang setelah app ditutup; folder
+  tetap tersimpan. Gunakan **Izinkan folder tersimpan** (bukan memilih folder
+  baru). Untuk mengganti folder: **Matikan auto-backup** lalu pilih lagi.
 - **Pengingat** — saat dibuka, chat menampilkan notice untuk: belum pernah
   backup / backup ≥ 14 hari, **anggaran hampir (≥80%) atau tembus**, dan
   **transaksi berulang** yang baru dicatat.

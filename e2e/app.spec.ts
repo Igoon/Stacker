@@ -325,9 +325,18 @@ test("modal info ringkas + sub-modal (storage & tentang)", async ({ page }) => {
 
   await page.locator("#openStorage").click();
   await expect(page.locator("#storeModal")).toBeVisible();
+  await expect(page.locator("#storageWarn")).toBeHidden();
   await expect(page.locator("#storeLines")).toContainText("Backup terakhir:");
   await expect(page.locator("#storeLines")).toContainText("Pemakaian storage:");
   await expect(page.locator("#retain")).toHaveValue("30");
+  await expect(page.locator("#pickDir")).toHaveText("Pilih folder auto-backup");
+  await expect(page.locator("#backupNow")).toBeDisabled();
+  await expect(page.locator("#storeModal .info-note").last()).toContainText(
+    "Izinkan folder tersimpan"
+  );
+  await expect(page.locator("#storeModal .info-note").last()).toContainText(
+    "Backup JSON"
+  );
 
   await page.locator("#storeBack").click();
   await expect(page.locator("#infoModal")).toBeVisible();
@@ -360,10 +369,12 @@ test("tombol Undo & Redo mengubah saldo", async ({ page }) => {
   await boot(page);
   await chat(page, "kopi 5rb");
   await expect(page.locator("#saldo")).toContainText("-Rp5.000");
+  await expect(page.locator("#undo")).toHaveAttribute("title", /kopi 5rb/);
 
   await page.locator("#undo").click();
   await expect(page.locator("#saldo")).toContainText("Rp0");
   await expect(page.locator("#redo")).toBeEnabled();
+  await expect(page.locator("#redo")).toHaveAttribute("title", /kopi 5rb/);
 
   await page.locator("#redo").click();
   await expect(page.locator("#saldo")).toContainText("-Rp5.000");
@@ -398,6 +409,39 @@ test("tema mengubah token UI & bertahan setelah reload", async ({ page }) => {
   await expect
     .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
     .toBe("forest");
+});
+
+test("ganti tema tidak menghapus wallpaper kustom", async ({ page }) => {
+  await boot(page);
+  await page.locator("#info").click();
+  await page.locator("#openWall").click();
+
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2n0kAAAAASUVORK5CYII=",
+    "base64"
+  );
+  await page.locator("#wallFile").setInputFiles({
+    name: "wall.png",
+    mimeType: "image/png",
+    buffer: png,
+  });
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem("stacker-wallpaper")))
+    .toContain('"kind":"image"');
+
+  await page.locator('#wallSwatches .swatch[data-preset="ocean"]').click();
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
+    .toBe("ocean");
+  await expect(page.locator("#wallThemeLabel")).toContainText("wallpaper kustom");
+
+  expect(await page.evaluate(() => localStorage.getItem("stacker-wallpaper"))).toContain(
+    '"kind":"image"'
+  );
+  const bg = await page.evaluate(
+    () => (document.getElementById("chat") as HTMLElement).style.backgroundImage
+  );
+  expect(bg).toContain("url(");
 });
 
 test("saldo tersamar default & ketuk untuk lihat", async ({ page }) => {

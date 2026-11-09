@@ -12,12 +12,13 @@ const mini = createMiniDb(sqlite3, oo1db as never);
 const { initDb } = await import("./db");
 initDb(mini);
 
-const { handleMessage, deleteTxWithUndo, importJsonWithUndo, aiEnabled, budgetOverview, dashboardData } =
+const { handleMessage, deleteTxWithUndo, importJsonWithUndo, aiEnabled, budgetOverview, dashboardData, undoLabel, redoLabel } =
   await import("./bot");
 const dbmod = await import("./db");
 const { parseLocal } = await import("./parser");
 const { addHistoryEntry } = await import("./history");
 const { THEMES, themeVars } = await import("./themes");
+const { folderAction, folderButtonLabel, folderPermission } = await import("./folder");
 const { setPin, checkPin, changePin, removePin, hasPin } = await import("./pin");
 const { PARSER_CASES } = await import("./parser-cases");
 const { hashPin, safeEqual, encryptJson, decryptJson, isEncrypted, PIN_ITER } = await import(
@@ -557,6 +558,28 @@ await check("redo dibatalkan oleh aksi baru", async () => {
   assert(r.text.includes("Tidak ada aksi"), "redo kosong setelah aksi baru");
 });
 
+await check("label undo/redo & perintah baca tidak menghapus redo", async () => {
+  const before = count();
+  await handleMessage("kopi label 6rb");
+  assert.equal(undoLabel(), "kopi label 6rb", "label aksi terakhir");
+  await handleMessage("undo");
+  assert.equal(redoLabel(), "kopi label 6rb", "label redo tersedia");
+  await handleMessage("riwayat 5");
+  assert.equal(redoLabel(), "kopi label 6rb", "perintah baca mempertahankan redo");
+  await handleMessage("teh label 7rb");
+  assert.equal(redoLabel(), null, "aksi baru mengosongkan redo");
+  assert.equal(count(), before + 1);
+});
+
+await check("undo mempertahankan timestamp backup lokal", async () => {
+  dbmod.setSetting("last_backup_at", "2099-01-01");
+  await handleMessage("kopi meta 9rb");
+  dbmod.setSetting("last_backup_at", "2099-02-02");
+  const u = await handleMessage("undo");
+  assert(u.text.includes("Dibatalkan"), "pesan undo");
+  assert.equal(dbmod.getSetting("last_backup_at"), "2099-02-02");
+});
+
 await check("riwayat perintah unik, dinormalisasi, dan dibatasi", async () => {
   let list: string[] = [];
   list = addHistoryEntry(list, "cls");
@@ -960,6 +983,32 @@ await check("tema: token lengkap & kontras WCAG AA", async () => {
       assert(ratio >= 4.5, `${theme.id} ${label} ${ratio.toFixed(2)} < 4.5`);
     }
   }
+});
+
+await check("folder: izin & label tombol", async () => {
+  let requested = 0;
+  const handle = {
+    name: "Backup",
+    kind: "directory",
+    queryPermission: async () => "prompt",
+    requestPermission: async () => {
+      requested++;
+      return "granted";
+    },
+    getFileHandle: async () => ({
+      createWritable: async () => ({ write: async () => {}, close: async () => {} }),
+    }),
+  } as never;
+
+  assert.equal(await folderPermission(handle, false), false);
+  assert.equal(requested, 0, "query saja tidak boleh meminta izin");
+  assert.equal(await folderPermission(handle, true), true);
+  assert.equal(requested, 1, "requestPermission dipanggil sekali");
+
+  assert.equal(folderButtonLabel(false, false), "Pilih folder auto-backup");
+  assert.equal(folderButtonLabel(true, true), "Izinkan folder tersimpan");
+  assert.equal(folderButtonLabel(true, false), "Ganti folder…");
+  assert.equal(folderAction(false, true), "pick");
 });
 
 console.log(`\n${pass} ok, ${fail} fail`);

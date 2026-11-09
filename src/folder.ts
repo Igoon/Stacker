@@ -62,6 +62,24 @@ export function supportsFolderBackup(): boolean {
   return typeof (window as unknown as { showDirectoryPicker?: unknown }).showDirectoryPicker === "function";
 }
 
+export type FolderAction = "pick" | "grant" | "change";
+
+export function folderAction(hasFolder: boolean, needsPermission: boolean): FolderAction {
+  if (!hasFolder) return "pick";
+  return needsPermission ? "grant" : "change";
+}
+
+export function folderButtonLabel(hasFolder: boolean, needsPermission: boolean): string {
+  switch (folderAction(hasFolder, needsPermission)) {
+    case "pick":
+      return "Pilih folder auto-backup";
+    case "grant":
+      return "Izinkan folder tersimpan";
+    default:
+      return "Ganti folder…";
+  }
+}
+
 export async function pickFolder(): Promise<FolderHandle> {
   const picker = (window as unknown as {
     showDirectoryPicker: (opts?: object) => Promise<FolderHandle>;
