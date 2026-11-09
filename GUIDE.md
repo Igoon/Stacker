@@ -164,7 +164,7 @@ Setelah itu barulah hapus aplikasinya:
    csv
    ```
 8. Backup rutin: tombol **⬇ Backup** → file JSON.
-9. Atur tampilan (opsional): **ℹ → Tampilan** → wallpaper preset atau foto sendiri.
+9. Atur tampilan (opsional): **ℹ → Tema &amp; tampilan** → wallpaper preset atau foto sendiri.
 10. Keluar: tidak ada logout. Tutup app/tab. Data aman di perangkat (OPFS).
 
 ### Contoh transaksi
@@ -338,6 +338,9 @@ reset transaksi                → hapus semua transaksi (saldo balik ke saldo a
 > Reset lain (kategori / akun / semua) ada di menu **ℹ → Reset data**.
 > `reset transaksi` juga bisa dibatalkan dengan `undo`.
 
+> Perintah `redo` / `ulangi` mengulang aksi yang baru dibatalkan (maks 20).
+> Tombol **Undo** dan **Redo** juga tersedia di toolbar.
+
 ### AI & lain
 ```
 ai                            → statistik pemakaian AI
@@ -377,9 +380,12 @@ Contoh base URL Ollama lokal: `http://localhost:11434/v1`, model `llama3.2`.
 
 ---
 
-## 7. Wallpaper Chat
+## 7. Tema & Tampilan
 
-Ketuk **ℹ → Tampilan (wallpaper)**.
+Tema mengubah warna seluruh UI (header, bubble, tombol, modal, tabel, chart).
+Wallpaper mengikuti tema; gambar sendiri hanya mengganti latar chat.
+
+Ketuk **ℹ → Tema & tampilan**.
 
 - **Preset** — pilih salah satu kotak warna (Default, Teal, Hutan, Laut, Plum,
   Pasir, Malam, Rose). Langsung diterapkan.
@@ -387,7 +393,7 @@ Ketuk **ℹ → Tampilan (wallpaper)**.
   (maks 1280 px, JPEG) dan **disimpan di perangkat saja**, tidak dikirim ke
   mana pun.
 - **Kegelapan lapisan** — geser slider supaya teks tetap kebaca di atas foto.
-- **Hapus wallpaper** — balik ke tampilan default.
+- **Kembalikan wallpaper tema** — balik ke tampilan default.
 - **Samarkan saldo di header** — centang untuk menyembunyikan total saldo
   (tampil `Saldo: ••••`). **Default aktif** demi privasi; **ketuk pil saldo**
   untuk melihat sementara, dan otomatis tersamar lagi begitu app ditinggalkan.
@@ -398,7 +404,7 @@ Ketuk **ℹ → Tampilan (wallpaper)**.
 - **Getar saat mencatat/undo** — centang untuk haptic ringan (bila perangkat
   mendukung `navigator.vibrate`).
 
-Wallpaper bersifat kosmetik: disimpan di penyimpanan browser (localStorage),
+Tema dan wallpaper bersifat kosmetik: disimpan di penyimpanan browser (localStorage),
 tidak ikut file backup, dan tidak mempengaruhi data transaksi.
 
 ---
@@ -471,7 +477,7 @@ transaksi/kategori/akun` bisa dibatalkan dengan `undo`; `Reset semua` tidak.
 ### Penyimpanan permanen & auto-backup
 
 Modal **ℹ** kini ringkas dengan grup: **Keuangan** (Ringkasan, Kategori, Akun,
-Anggaran), **Pengaturan** (Keamanan & PIN, Backup & penyimpanan, Tampilan, AI,
+Anggaran), **Pengaturan** (Keamanan & PIN, Backup & penyimpanan, Tema & tampilan, AI,
 Reset data), dan **Lainnya** (Tentang). Detail penyimpanan ada di
 **ℹ → Backup & penyimpanan**; info teknis build ada di **ℹ → Tentang**.
 

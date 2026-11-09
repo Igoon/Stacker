@@ -16,6 +16,8 @@ const { handleMessage, deleteTxWithUndo, importJsonWithUndo, aiEnabled, budgetOv
   await import("./bot");
 const dbmod = await import("./db");
 const { parseLocal } = await import("./parser");
+const { addHistoryEntry } = await import("./history");
+const { THEMES, themeVars } = await import("./themes");
 const { setPin, checkPin, changePin, removePin, hasPin } = await import("./pin");
 const { PARSER_CASES } = await import("./parser-cases");
 const { hashPin, safeEqual, encryptJson, decryptJson, isEncrypted, PIN_ITER } = await import(
@@ -535,6 +537,40 @@ await check("undo mengembalikan aksi terakhir", async () => {
   assert.equal(count(), before, "jumlah tx kembali");
 });
 
+await check("redo mengulang aksi setelah undo", async () => {
+  const before = count();
+  await handleMessage("kopi redo 7rb");
+  assert.equal(count(), before + 1, "transaksi masuk");
+  const u = await handleMessage("undo");
+  assert(u.text.includes("Dibatalkan"), "pesan undo");
+  assert.equal(count(), before, "undo mengembalikan");
+  const r = await handleMessage("redo");
+  assert(r.text.includes("Dijalankan ulang"), "pesan redo");
+  assert.equal(count(), before + 1, "redo menerapkan ulang");
+});
+
+await check("redo dibatalkan oleh aksi baru", async () => {
+  await handleMessage("kopi redo2 8rb");
+  await handleMessage("undo");
+  await handleMessage("teh redo3 9rb");
+  const r = await handleMessage("redo");
+  assert(r.text.includes("Tidak ada aksi"), "redo kosong setelah aksi baru");
+});
+
+await check("riwayat perintah unik, dinormalisasi, dan dibatasi", async () => {
+  let list: string[] = [];
+  list = addHistoryEntry(list, "cls");
+  list = addHistoryEntry(list, "  cls  ");
+  list = addHistoryEntry(list, "CLS");
+  assert.deepEqual(list, ["CLS"], "duplikat (case-insensitive) disatukan");
+  list = addHistoryEntry(list, "riwayat");
+  assert.deepEqual(list, ["riwayat", "CLS"], "entri terbaru di atas");
+  list = addHistoryEntry(list, "undo");
+  assert.deepEqual(list, ["riwayat", "CLS"], "perintah meta tidak dicatat");
+  for (let i = 0; i < 35; i++) list = addHistoryEntry(list, `cmd ${i}`, 30);
+  assert.equal(list.length, 30, "batas riwayat");
+});
+
 await check("berulang: catat otomatis, idempotent, hapus", async () => {
   const before = count();
   const r = await handleMessage("berulang listrik 350rb tiap 1");
@@ -852,6 +888,78 @@ await check("reset akun/kategori/semua + backup", async () => {
   assert.equal(dbmod.listAccounts().length, 8, "akun default kembali");
   assert.equal(count(), 0, "transaksi kosong");
   assert.equal(dbmod.getSetting("cmd_aliases"), null, "settings direset");
+});
+
+function relativeLuminance(hex: string): number {
+  const raw = hex.replace("#", "");
+  const full =
+    raw.length === 3
+      ? raw
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : raw;
+  const rgb = [0, 2, 4].map((i) => {
+    const c = parseInt(full.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+}
+
+function contrastRatio(a: string, b: string): number {
+  const la = relativeLuminance(a);
+  const lb = relativeLuminance(b);
+  const hi = Math.max(la, lb);
+  const lo = Math.min(la, lb);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+await check("tema: token lengkap & kontras WCAG AA", async () => {
+  const required = [
+    "--bg",
+    "--app-bg",
+    "--surface",
+    "--surface-2",
+    "--surface-3",
+    "--surface-4",
+    "--border",
+    "--text",
+    "--muted",
+    "--accent",
+    "--accent-2",
+    "--bubble-out",
+    "--bubble-out-text",
+    "--on-accent",
+    "--danger",
+    "--danger-text",
+    "--danger-bg",
+    "--danger-bg-hover",
+    "--warning",
+    "--code-bg",
+    "--editor-bg",
+    "--wallpaper",
+    "--chart-1",
+    "--chart-8",
+  ];
+  const ids = new Set<string>();
+  for (const theme of THEMES) {
+    assert(!ids.has(theme.id), "id tema unik: " + theme.id);
+    ids.add(theme.id);
+    const vars = themeVars(theme);
+    for (const key of required) assert(vars[key], `${theme.id}: token ${key} kosong`);
+
+    const pairs: Array<[string, string, string]> = [
+      ["--text", "--bg", "text/bg"],
+      ["--muted", "--bg", "muted/bg"],
+      ["--on-accent", "--accent", "on-accent/accent"],
+      ["--bubble-out-text", "--bubble-out", "bubble-out"],
+      ["--danger-text", "--bg", "danger-text/bg"],
+    ];
+    for (const [fg, bg, label] of pairs) {
+      const ratio = contrastRatio(vars[fg], vars[bg]);
+      assert(ratio >= 4.5, `${theme.id} ${label} ${ratio.toFixed(2)} < 4.5`);
+    }
+  }
 });
 
 console.log(`\n${pass} ok, ${fail} fail`);

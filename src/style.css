@@ -1,6 +1,42 @@
 * {
   box-sizing: border-box;
 }
+
+/* Token warna default (tema di-override via JS: src/themes.ts). */
+:root {
+  color-scheme: dark;
+  --bg: #111b21;
+  --app-bg: #0b141a;
+  --surface: #1f2c33;
+  --surface-2: #202c33;
+  --surface-3: #2a3942;
+  --surface-4: #3b4a54;
+  --border: #2a3942;
+  --text: #e9edef;
+  --muted: #8696a0;
+  --accent: #00a884;
+  --accent-2: #53bdeb;
+  --bubble-out: #005c4b;
+  --bubble-out-text: #d1f4cc;
+  --on-accent: #111b21;
+  --danger: #f15c6d;
+  --danger-text: #ffd7d7;
+  --danger-bg: #6e2020;
+  --danger-bg-hover: #8a2626;
+  --warning: #ffbc3b;
+  --code-bg: #16222a;
+  --editor-bg: #17232a;
+  --chart-1: #00a884;
+  --chart-2: #53bdeb;
+  --chart-3: #f15c6d;
+  --chart-4: #ffbc3b;
+  --chart-5: #a78bfa;
+  --chart-6: #34d399;
+  --chart-7: #fb923c;
+  --chart-8: #e879f9;
+  --wallpaper: none;
+}
+
 /* Pastikan atribut `hidden` selalu menyembunyikan, walau elemen punya
    display sendiri (mis. .menu-row/label). */
 [hidden] {
@@ -9,7 +45,7 @@
 body {
   margin: 0;
   font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-  background: #111b21;
+  background: var(--bg);
   height: 100vh;
   height: 100dvh;
   display: flex;
@@ -22,11 +58,11 @@ body {
   height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: #0b141a;
+  background: var(--app-bg);
 }
 header {
-  background: #1f2c33;
-  color: #e9edef;
+  background: var(--surface);
+  color: var(--text);
   padding: 10px 16px;
   padding-top: calc(10px + env(safe-area-inset-top));
 }
@@ -40,12 +76,12 @@ header .name {
 }
 header .sub {
   font-size: 12px;
-  color: #8696a0;
+  color: var(--muted);
 }
 header .saldo {
   font-size: 13px;
-  background: #005c4b;
-  color: #d1f4cc;
+  background: var(--bubble-out);
+  color: var(--bubble-out-text);
   padding: 4px 10px;
   border-radius: 12px;
   cursor: pointer;
@@ -61,8 +97,8 @@ header .saldo {
 }
 .toolbar button {
   font-size: 12.5px;
-  color: #d1f4cc;
-  background: #2a3942;
+  color: var(--bubble-out-text);
+  background: var(--surface-3);
   border: 0;
   border-radius: 12px;
   padding: 7px 12px;
@@ -70,7 +106,7 @@ header .saldo {
   cursor: pointer;
 }
 .toolbar button:hover {
-  background: #3b4a54;
+  background: var(--surface-4);
 }
 .toolbar button:disabled {
   opacity: 0.45;
@@ -79,7 +115,7 @@ header .saldo {
 #busy {
   margin-left: 6px;
   font-size: 12px;
-  color: #8696a0;
+  color: var(--muted);
 }
 #chat {
   flex: 1;
@@ -88,6 +124,10 @@ header .saldo {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  background-image: var(--wallpaper);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
 }
 .row {
   display: flex;
@@ -115,29 +155,29 @@ header .saldo {
   max-width: 92%;
 }
 .me .bubble {
-  background: #005c4b;
-  color: #e9edef;
+  background: var(--bubble-out);
+  color: var(--text);
   border-top-right-radius: 2px;
 }
 .bot .bubble {
-  background: #1f2c33;
-  color: #e9edef;
+  background: var(--surface);
+  color: var(--text);
   border-top-left-radius: 2px;
 }
 .tx {
   margin-top: 6px;
-  border-top: 1px solid #2a3942;
+  border-top: 1px solid var(--border);
   padding-top: 6px;
   font-size: 13px;
-  color: #8696a0;
+  color: var(--muted);
 }
 .tx b {
-  color: #e9edef;
+  color: var(--text);
 }
 .tx button {
   margin-top: 6px;
-  background: #2a3942;
-  color: #e9edef;
+  background: var(--surface-3);
+  color: var(--text);
   border: 0;
   border-radius: 6px;
   padding: 4px 10px;
@@ -145,13 +185,13 @@ header .saldo {
   cursor: pointer;
 }
 .tx button:hover {
-  background: #3b4a54;
+  background: var(--surface-4);
 }
 .dl {
   display: inline-block;
   margin-top: 6px;
   font-size: 13px;
-  color: #53bdeb;
+  color: var(--accent-2);
   text-decoration: none;
   word-break: break-all;
 }
@@ -174,9 +214,9 @@ header .saldo {
   display: none;
 }
 .suggest button {
-  border: 1px solid #2a3942;
-  background: #16222a;
-  color: #e9edef;
+  border: 1px solid var(--border);
+  background: var(--code-bg);
+  color: var(--text);
   border-radius: 8px;
   padding: 5px 10px;
   font-size: 12px;
@@ -187,9 +227,9 @@ header .saldo {
   white-space: nowrap;
 }
 .chips button {
-  border: 1px solid #2a3942;
-  background: #1f2c33;
-  color: #d1f4cc;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--bubble-out-text);
   border-radius: 999px;
   padding: 5px 12px;
   font-size: 12px;
@@ -200,38 +240,38 @@ footer {
   gap: 8px;
   padding: 10px;
   padding-bottom: calc(10px + env(safe-area-inset-bottom));
-  background: #1f2c33;
+  background: var(--surface);
 }
 footer input {
   flex: 1;
   border: 0;
   border-radius: 20px;
   padding: 10px 16px;
-  background: #2a3942;
-  color: #e9edef;
+  background: var(--surface-3);
+  color: var(--text);
   font-size: 14.5px;
   outline: none;
 }
 footer button {
-  background: #00a884;
+  background: var(--accent);
   border: 0;
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  color: #111b21;
+  color: var(--on-accent);
   font-size: 18px;
   cursor: pointer;
 }
 footer button.ghost {
-  background: #2a3942;
-  color: #d1f4cc;
+  background: var(--surface-3);
+  color: var(--bubble-out-text);
   flex: 0 0 auto;
 }
 .hist-item {
   text-align: left;
-  border: 1px solid #2a3942;
-  background: #17232a;
-  color: #e9edef;
+  border: 1px solid var(--border);
+  background: var(--editor-bg);
+  color: var(--text);
   border-radius: 8px;
   padding: 9px 10px;
   font-size: 13px;
@@ -241,7 +281,7 @@ footer button.ghost {
   white-space: nowrap;
 }
 .hist-item:hover {
-  background: #2a3942;
+  background: var(--surface-3);
 }
 .modal {
   position: fixed;
@@ -260,11 +300,11 @@ footer button.ghost {
 .modal-box {
   width: 100%;
   max-width: 360px;
-  background: #1f2c33;
+  background: var(--surface);
   border-radius: 12px;
   padding: 16px;
   margin: auto;
-  color: #e9edef;
+  color: var(--text);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -278,15 +318,15 @@ footer button.ghost {
   flex-direction: column;
   gap: 4px;
   font-size: 12px;
-  color: #8696a0;
+  color: var(--muted);
 }
 .modal-box input,
 .modal-box select {
   border: 0;
   border-radius: 8px;
   padding: 9px 10px;
-  background: #2a3942;
-  color: #e9edef;
+  background: var(--surface-3);
+  color: var(--text);
   font-size: 14px;
   outline: none;
 }
@@ -301,12 +341,20 @@ footer button.ghost {
   padding: 8px 16px;
   font-size: 13px;
   cursor: pointer;
-  color: #e9edef;
-  background: #2a3942;
+  color: var(--text);
+  background: var(--surface-3);
 }
 .modal-actions button:last-child {
-  background: #00a884;
-  color: #111b21;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.modal-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.swatch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .swatches {
   display: grid;
@@ -319,8 +367,8 @@ footer button.ghost {
   border-radius: 8px;
   border: 2px solid transparent;
   cursor: pointer;
-  background: #0b141a;
-  color: #e9edef;
+  background: var(--app-bg);
+  color: var(--text);
   font-size: 10px;
   display: flex;
   align-items: flex-end;
@@ -328,7 +376,7 @@ footer button.ghost {
   padding-bottom: 3px;
 }
 .swatch[aria-pressed="true"] {
-  border-color: #00a884;
+  border-color: var(--accent);
 }
 #wallDim {
   padding: 0;
@@ -340,7 +388,7 @@ footer button.ghost {
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: #0b141a;
+  background: var(--app-bg);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -360,26 +408,26 @@ footer button.ghost {
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  color: #e9edef;
+  color: var(--text);
 }
 .lock-logo {
   font-size: 24px;
   font-weight: 700;
   letter-spacing: 0.5px;
-  color: #00a884;
+  color: var(--accent);
 }
 .lock-hint {
   margin: 0;
   font-size: 13px;
-  color: #8696a0;
+  color: var(--muted);
 }
 .lock-box input {
   width: 100%;
   border: 0;
   border-radius: 10px;
   padding: 12px;
-  background: #1f2c33;
-  color: #e9edef;
+  background: var(--surface);
+  color: var(--text);
   font-size: 22px;
   letter-spacing: 6px;
   text-align: center;
@@ -390,8 +438,8 @@ footer button.ghost {
   border: 0;
   border-radius: 10px;
   padding: 11px;
-  background: #00a884;
-  color: #111b21;
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -399,7 +447,7 @@ footer button.ghost {
 .lock-msg {
   min-height: 18px;
   font-size: 12px;
-  color: #f15c6d;
+  color: var(--danger);
   text-align: center;
 }
 
@@ -410,8 +458,8 @@ footer button.ghost {
   justify-content: space-between;
   gap: 8px;
   padding: 8px 14px;
-  background: #005c4b;
-  color: #d1f4cc;
+  background: var(--bubble-out);
+  color: var(--bubble-out-text);
   font-size: 13px;
 }
 .updatebar[hidden] {
@@ -421,8 +469,8 @@ footer button.ghost {
   border: 0;
   border-radius: 6px;
   padding: 5px 12px;
-  background: #00a884;
-  color: #111b21;
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -451,8 +499,8 @@ footer button.ghost {
   transform: translateX(-50%);
   z-index: 60;
   max-width: min(92vw, 420px);
-  background: #005c4b;
-  color: #d1f4cc;
+  background: var(--bubble-out);
+  color: var(--bubble-out-text);
   padding: 10px 14px;
   border-radius: 10px;
   font-size: 13px;
@@ -469,7 +517,7 @@ footer button.ghost {
 .info-lines {
   font-size: 13px;
   line-height: 1.55;
-  color: #e9edef;
+  color: var(--text);
   white-space: pre-line;
   word-break: break-word;
 }
@@ -482,36 +530,36 @@ footer button.ghost {
   border: 0;
   border-radius: 8px;
   padding: 9px 12px;
-  background: #2a3942;
-  color: #e9edef;
+  background: var(--surface-3);
+  color: var(--text);
   font-size: 13px;
   text-align: left;
   cursor: pointer;
 }
 .info-actions button:hover {
-  background: #3b4a54;
+  background: var(--surface-4);
 }
 .info-actions button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 .info-actions button.danger {
-  background: #6e2020;
-  color: #ffd7d7;
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 .info-actions button.danger:hover {
-  background: #8a2626;
+  background: var(--danger-bg-hover);
 }
 .info-note {
   margin: 0;
   font-size: 11.5px;
   line-height: 1.5;
-  color: #8696a0;
+  color: var(--muted);
 }
 .info-summary {
   margin: 0;
   font-size: 13px;
-  color: #8696a0;
+  color: var(--muted);
 }
 .menu-list {
   display: flex;
@@ -523,7 +571,7 @@ footer button.ghost {
   font-size: 11px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #8696a0;
+  color: var(--muted);
 }
 .menu-list > .menu-row:first-child + .menu-head,
 .menu-head:first-child {
@@ -537,26 +585,26 @@ footer button.ghost {
   border: 0;
   border-radius: 10px;
   padding: 13px 14px;
-  background: #202c33;
-  color: #e9edef;
+  background: var(--surface-2);
+  color: var(--text);
   font-size: 14.5px;
   text-align: left;
   cursor: pointer;
 }
 .menu-row:hover {
-  background: #2a3942;
+  background: var(--surface-3);
 }
 .menu-row .chev {
-  color: #8696a0;
+  color: var(--muted);
   font-size: 18px;
   line-height: 1;
 }
 .modal-actions button.danger {
-  background: #6e2020;
-  color: #ffd7d7;
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 .modal-actions button.danger:hover {
-  background: #8a2626;
+  background: var(--danger-bg-hover);
 }
 /* Area yang bisa discroll dibedakan: panel inset + bayangan tepi (muncul
    hanya saat konten melebihi tinggi) + scrollbar jelas. Area fixed (form/
@@ -569,12 +617,12 @@ footer button.ghost {
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 6px;
-  border: 1px solid #2a3942;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background-color: #17232a;
+  background-color: var(--editor-bg);
   background-image:
-    linear-gradient(#17232a 30%, rgba(23, 35, 42, 0)) center top,
-    linear-gradient(rgba(23, 35, 42, 0), #17232a 70%) center bottom,
+    linear-gradient(var(--editor-bg) 30%, transparent) center top,
+    linear-gradient(transparent, var(--editor-bg) 70%) center bottom,
     radial-gradient(farthest-side at 50% 0, rgba(0, 0, 0, 0.5), transparent) center top,
     radial-gradient(farthest-side at 50% 100%, rgba(0, 0, 0, 0.5), transparent) center bottom;
   background-repeat: no-repeat;
@@ -589,7 +637,7 @@ footer button.ghost {
   width: 8px;
 }
 .cat-list::-webkit-scrollbar-thumb {
-  background: #3b4a54;
+  background: var(--surface-4);
   border-radius: 8px;
 }
 .cat-list::-webkit-scrollbar-track {
@@ -616,11 +664,11 @@ footer button.ghost {
   width: 8px;
 }
 .dash-body-scroll::-webkit-scrollbar-thumb {
-  background: #3b4a54;
+  background: var(--surface-4);
   border-radius: 8px;
 }
 .cat-item {
-  border: 1px solid #2a3942;
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 10px;
 }
@@ -638,13 +686,13 @@ footer button.ghost {
   font-size: 10.5px;
   padding: 1px 7px;
   border-radius: 999px;
-  background: #2a3942;
-  color: #8696a0;
+  background: var(--surface-3);
+  color: var(--muted);
 }
 .cat-item .cat-kw {
   margin-top: 3px;
   font-size: 11.5px;
-  color: #8696a0;
+  color: var(--muted);
   word-break: break-word;
 }
 .cat-item .cat-actions {
@@ -658,8 +706,8 @@ footer button.ghost {
   padding: 4px 10px;
   font-size: 12px;
   cursor: pointer;
-  background: #2a3942;
-  color: #e9edef;
+  background: var(--surface-3);
+  color: var(--text);
 }
 .cat-form {
   display: flex;
@@ -669,20 +717,20 @@ footer button.ghost {
 .bar {
   height: 8px;
   border-radius: 999px;
-  background: #2a3942;
+  background: var(--surface-3);
   overflow: hidden;
   margin-top: 6px;
 }
 .bar > span {
   display: block;
   height: 100%;
-  background: #00a884;
+  background: var(--accent);
 }
 .bar.warn > span {
-  background: #ffbc3b;
+  background: var(--warning);
 }
 .bar.over > span {
-  background: #f15c6d;
+  background: var(--danger);
 }
 .modal-box label.row-check {
   flex-direction: row;
@@ -695,13 +743,13 @@ footer button.ghost {
   gap: 8px;
 }
 .dash-card {
-  background: #202c33;
+  background: var(--surface-2);
   border-radius: 10px;
   padding: 10px 12px;
 }
 .dash-card .k {
   font-size: 11px;
-  color: #8696a0;
+  color: var(--muted);
 }
 .dash-card .v {
   font-size: 16px;
@@ -714,11 +762,11 @@ footer button.ghost {
 .dash-title {
   margin: 12px 0 4px;
   font-size: 12.5px;
-  color: #8696a0;
+  color: var(--muted);
 }
 .dash-list {
   font-size: 12.5px;
-  color: #e9edef;
+  color: var(--text);
 }
 .dash-list .dr {
   display: flex;
@@ -730,32 +778,32 @@ footer button.ghost {
   margin: 0 0 10px;
   font-size: 12.5px;
   line-height: 1.5;
-  color: #8696a0;
+  color: var(--muted);
 }
 .hint code {
-  color: #e9edef;
+  color: var(--text);
 }
 
 /* ---------- Tentang app di modal info ---------- */
 .about {
   margin-top: 12px;
   padding-top: 10px;
-  border-top: 1px solid #2a3942;
+  border-top: 1px solid var(--border);
   font-size: 11.5px;
   line-height: 1.5;
-  color: #8696a0;
+  color: var(--muted);
 }
 .about-title {
   margin-bottom: 4px;
   font-size: 12.5px;
   font-weight: 600;
-  color: #e9edef;
+  color: var(--text);
 }
 .about p {
   margin: 0 0 5px;
 }
 .about a {
-  color: #53bdeb;
+  color: var(--accent-2);
 }
 .about-note {
   margin-bottom: 0 !important;
@@ -764,7 +812,7 @@ footer button.ghost {
 /* ---------- Grafik SVG di bubble ---------- */
 .chart {
   margin-top: 8px;
-  color: #e9edef;
+  color: var(--text);
 }
 .chart svg {
   display: block;
@@ -786,11 +834,11 @@ footer button.ghost {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  border: 2px solid #8696a0;
+  border: 2px solid var(--muted);
 }
 .pin-dot.on {
-  background: #00a884;
-  border-color: #00a884;
+  background: var(--accent);
+  border-color: var(--accent);
 }
 .keypad {
   display: grid;
@@ -799,8 +847,8 @@ footer button.ghost {
   width: 100%;
 }
 .keypad button {
-  background: #2a3942;
-  color: #e9edef;
+  background: var(--surface-3);
+  color: var(--text);
   border: 0;
   border-radius: 12px;
   padding: 14px 0;
@@ -812,11 +860,11 @@ footer button.ghost {
   touch-action: manipulation;
 }
 .keypad button:active {
-  background: #3b4a54;
+  background: var(--surface-4);
 }
 .keypad button[data-key="ok"] {
-  background: #00a884;
-  color: #111b21;
+  background: var(--accent);
+  color: var(--on-accent);
 }
 .keypad button[data-key="back"] {
   font-size: 18px;

@@ -17,6 +17,7 @@ import {
 } from "./db";
 import {
   budgetOverview,
+  canRedo,
   canUndo,
   dashboardData,
   deleteTxWithUndo,
@@ -228,6 +229,7 @@ function state() {
     ok: true,
     version: APP_VERSION,
     canUndo: canUndo(),
+    canRedo: canRedo(),
     firstUseAt: getSetting("first_use_at"),
     alerts: budgetOverview().filter((b) => b.pct >= 100).length + (recurringDue() ? 1 : 0),
     saldo: saldo(),

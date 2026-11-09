@@ -1,6 +1,20 @@
 // main.ts — UI chat di main thread. Semua logika + DB berjalan di worker.
 import "./style.css";
 import { startsWithCommand } from "./commands";
+import {
+  addHistoryEntry,
+  HISTORY_LIMIT,
+  normalizeHistoryEntry,
+  shouldRememberCommand,
+} from "./history";
+import {
+  DEFAULT_THEME,
+  isThemeId,
+  THEMES,
+  themeById,
+  themeVars,
+  type ThemeId,
+} from "./themes";
 import type { Tx } from "./db";
 import {
   folderPermission,
@@ -174,6 +188,7 @@ const busyEl = document.getElementById("busy")!;
 const chipsEl = document.getElementById("chips")!;
 const suggestEl = document.getElementById("suggest")!;
 const undoBtn = document.getElementById("undo") as HTMLButtonElement;
+const redoBtn = document.getElementById("redo") as HTMLButtonElement;
 const historyBtn = document.getElementById("history") as HTMLButtonElement;
 const histModal = document.getElementById("histModal")!;
 const histList = document.getElementById("histList")!;
@@ -213,7 +228,11 @@ function readRecent(): string[] {
   try {
     const arr = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]") as unknown;
     return Array.isArray(arr)
-      ? arr.filter((x): x is string => typeof x === "string").slice(0, 30)
+      ? arr
+          .filter((x): x is string => typeof x === "string")
+          .map(normalizeHistoryEntry)
+          .filter((x) => x !== "")
+          .slice(0, HISTORY_LIMIT)
       : [];
   } catch {
     return [];
@@ -221,9 +240,8 @@ function readRecent(): string[] {
 }
 let recentCommands = readRecent();
 function rememberCommand(text: string): void {
-  const t = text.trim();
-  if (!t) return;
-  recentCommands = [t, ...recentCommands.filter((x) => x !== t)].slice(0, 30);
+  if (!shouldRememberCommand(text)) return;
+  recentCommands = addHistoryEntry(recentCommands, text);
   try {
     localStorage.setItem(RECENT_KEY, JSON.stringify(recentCommands));
   } catch {
@@ -339,6 +357,8 @@ function updateSuggest(): void {
 // Riwayat perintah untuk layar sentuh (tanpa tombol panah).
 function renderHistory(): void {
   histList.replaceChildren();
+  const clearBtn = document.getElementById("histClear") as HTMLButtonElement | null;
+  if (clearBtn) clearBtn.disabled = recentCommands.length === 0;
   if (!recentCommands.length) {
     const p = document.createElement("p");
     p.className = "info-note";
@@ -351,6 +371,7 @@ function renderHistory(): void {
     b.type = "button";
     b.className = "hist-item";
     b.textContent = c;
+    b.title = c;
     b.onclick = () => {
       input.value = c;
       histModal.hidden = true;
@@ -366,6 +387,17 @@ historyBtn.onclick = () => {
 };
 document.getElementById("histClose")!.onclick = () => {
   histModal.hidden = true;
+};
+
+document.getElementById("histClear")!.onclick = () => {
+  if (!window.confirm("Hapus semua riwayat perintah?")) return;
+  recentCommands = [];
+  try {
+    localStorage.removeItem(RECENT_KEY);
+  } catch {
+    // abaikan
+  }
+  renderHistory();
 };
 
 // Ajakan pasang app (Android/desktop). Muncul hanya bila browser menawarkan.
@@ -670,6 +702,7 @@ function addBubble(
 
 // Chat ephemeral: jangan render riwayat, cukup hint sekali di awal.
 let hintShown = false;
+let chatGeneration = 0;
 function showStartupHint(s: Record<string, unknown>): void {
   if (hintShown) return;
   hintShown = true;
@@ -690,6 +723,7 @@ function showStartupHint(s: Record<string, unknown>): void {
 }
 
 async function refresh(): Promise<Record<string, unknown>> {
+  const gen = chatGeneration;
   const r = await call({ type: "state" });
   lastSaldoRupiah = String(r.saldoRupiah ?? "-");
   renderSaldo();
@@ -697,6 +731,7 @@ async function refresh(): Promise<Record<string, unknown>> {
   txCount = Number(r.txCount ?? 0);
   chipsEl.hidden = txCount > 0;
   undoBtn.disabled = !r.canUndo;
+  redoBtn.disabled = !r.canRedo;
   if (typeof r.firstUseAt === "string" && r.firstUseAt) firstUseAt = r.firstUseAt;
   const navBadge = navigator as Navigator & {
     setAppBadge?: (n: number) => Promise<void>;
@@ -711,9 +746,12 @@ async function refresh(): Promise<Record<string, unknown>> {
   }
   lastBackupAt = typeof r.lastBackupAt === "string" ? r.lastBackupAt : null;
   // Notice dari worker (mis. transaksi berulang yang baru dicatat).
+  // Jangan tambahkan bila layar sudah dibersihkan saat request masih berjalan.
   const notes = Array.isArray(r.notices) ? (r.notices as string[]) : [];
-  for (const n of notes) addBubble(n, "bot");
-  if (notes.length > 0) playTing();
+  if (gen === chatGeneration) {
+    for (const n of notes) addBubble(n, "bot");
+    if (notes.length > 0) playTing();
+  }
   return r;
 }
 
@@ -725,6 +763,7 @@ async function send(): Promise<void> {
     rememberCommand(text);
     input.value = "";
     suggestEl.hidden = true;
+    chatGeneration++;
     chat.replaceChildren();
     showToast("Layar dibersihkan.");
     return;
@@ -751,8 +790,14 @@ async function send(): Promise<void> {
   input.value = "";
   suggestEl.hidden = true;
   busyEl.hidden = false;
+  const gen = chatGeneration;
   const r = await call({ type: "chat", text });
   busyEl.hidden = true;
+  if (gen !== chatGeneration) {
+    // Layar dibersihkan saat perintah masih diproses: jangan munculkan bubble.
+    void refresh();
+    return;
+  }
   if (r.ok) {
     addBubble(r.text ?? "", "bot", r.txs, r.file, r.svg, r.pre);
     if (Array.isArray(r.txs) && r.txs.length > 0) haptic(14);
@@ -782,6 +827,15 @@ let histIndex = -1;
 let histDraft = "";
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
+    void send();
+    return;
+  }
+  if (
+    (e.ctrlKey || e.metaKey) &&
+    (e.key.toLowerCase() === "y" || (e.shiftKey && e.key.toLowerCase() === "z"))
+  ) {
+    e.preventDefault();
+    input.value = "redo";
     void send();
     return;
   }
@@ -819,6 +873,11 @@ document.getElementById("exportEnc")!.onclick = () => {
 
 document.getElementById("undo")!.onclick = () => {
   input.value = "undo";
+  void send();
+};
+
+document.getElementById("redo")!.onclick = () => {
+  input.value = "redo";
   void send();
 };
 
@@ -897,18 +956,49 @@ interface WallPreset {
   css: string;
 }
 
-const WALL_PRESETS: WallPreset[] = [
-  { id: "default", label: "Default", css: "" },
-  { id: "teal", label: "Teal", css: "linear-gradient(160deg,#0b141a,#12403d)" },
-  { id: "forest", label: "Hutan", css: "linear-gradient(160deg,#07160f,#145c3a)" },
-  { id: "ocean", label: "Laut", css: "linear-gradient(160deg,#061421,#124a6b)" },
-  { id: "plum", label: "Plum", css: "linear-gradient(160deg,#140b1a,#4a1a5c)" },
-  { id: "sand", label: "Pasir", css: "linear-gradient(160deg,#1a1410,#5c4326)" },
-  { id: "night", label: "Malam", css: "linear-gradient(160deg,#000000,#1f2c33)" },
-  { id: "rose", label: "Rose", css: "linear-gradient(160deg,#1a0b12,#6b2440)" },
-];
+const WALL_PRESETS: WallPreset[] = THEMES.map((theme) => ({
+  id: theme.id,
+  label: theme.label,
+  css: theme.wallpaper === "none" ? "" : theme.wallpaper,
+}));
 
 const WALL_KEY = "stacker-wallpaper";
+const THEME_KEY = "stacker-theme";
+let currentTheme: ThemeId = readTheme();
+
+function readTheme(): ThemeId {
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (isThemeId(saved)) return saved;
+  } catch {
+    // localStorage diblokir; lanjut ke migrasi wallpaper.
+  }
+  try {
+    const raw = localStorage.getItem(WALL_KEY);
+    const w = JSON.parse(raw ?? "null") as { kind?: string; id?: string } | null;
+    if (w?.kind === "preset" && isThemeId(w.id)) return w.id;
+  } catch {
+    // data rusak -> default
+  }
+  return DEFAULT_THEME;
+}
+
+function applyTheme(id: ThemeId): void {
+  const theme = themeById(id);
+  const root = document.documentElement;
+  for (const [name, value] of Object.entries(themeVars(theme))) {
+    root.style.setProperty(name, value);
+  }
+  root.dataset.theme = theme.id;
+  currentTheme = theme.id;
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", theme.metaColor);
+  try {
+    localStorage.setItem(THEME_KEY, theme.id);
+  } catch {
+    // abaikan
+  }
+}
 
 type Wall =
   | { kind: "default" }
@@ -952,18 +1042,13 @@ function applyWall(w: Wall): void {
   s.backgroundRepeat = "no-repeat";
   s.backgroundPosition = "center";
   if (w.kind === "image") {
-    s.backgroundColor = "#0b141a";
+    s.backgroundColor = "var(--app-bg)";
     s.backgroundImage = `linear-gradient(rgba(0,0,0,${w.dim}), rgba(0,0,0,${w.dim})), url("${w.image}")`;
     s.backgroundSize = "cover, cover";
     return;
   }
+  // Mode tema/default: biarkan CSS memakai --wallpaper dari tema aktif.
   s.backgroundColor = "";
-  if (w.kind === "preset") {
-    const p = WALL_PRESETS.find((x) => x.id === w.id);
-    s.backgroundImage = p?.css || "";
-    s.backgroundSize = "";
-    return;
-  }
   s.backgroundImage = "";
   s.backgroundSize = "";
 }
@@ -971,13 +1056,15 @@ function applyWall(w: Wall): void {
 let currentWall: Wall = readWall();
 
 function syncWallControls(w: Wall): void {
-  const activeId = w.kind === "preset" ? w.id : w.kind === "default" ? "default" : "";
+  const activeId = currentTheme;
   for (const btn of Array.from(wallSwatches.querySelectorAll<HTMLButtonElement>(".swatch"))) {
     btn.setAttribute("aria-pressed", String(btn.dataset.preset === activeId));
   }
   const dim = w.kind === "image" ? w.dim : 45;
   wallDim.value = String(Math.round(dim * 100));
   wallDimVal.textContent = `${Math.round(dim * 100)}%`;
+  const themeLabel = document.getElementById("wallThemeLabel");
+  if (themeLabel) themeLabel.textContent = `Tema aktif: ${themeById(currentTheme).label}`;
 }
 
 for (const p of WALL_PRESETS) {
@@ -986,9 +1073,12 @@ for (const p of WALL_PRESETS) {
   btn.type = "button";
   btn.dataset.preset = p.id;
   btn.textContent = p.label;
-  if (p.css) btn.style.background = p.css;
+  btn.title = `Tema ${p.label}`;
+  btn.setAttribute("aria-label", `Tema ${p.label}`);
+  btn.style.background = p.id === "default" ? "#0b141a" : p.css;
   btn.onclick = () => {
-    currentWall = p.id === "default" ? { kind: "default" } : { kind: "preset", id: p.id };
+    if (isThemeId(p.id)) applyTheme(p.id);
+    currentWall = { kind: "default" };
     applyWall(currentWall);
     saveWall(currentWall);
     syncWallControls(currentWall);
@@ -1089,7 +1179,8 @@ async function fileToWallImage(file: File): Promise<string> {
     const ctx = cv.getContext("2d");
     if (!ctx) throw new Error("canvas tidak tersedia");
     // Latar gelap supaya PNG transparan tak jadi putih menyala.
-    ctx.fillStyle = "#0b141a";
+    ctx.fillStyle =
+      getComputedStyle(document.documentElement).getPropertyValue("--app-bg").trim() || "#0b141a";
     ctx.fillRect(0, 0, w, h);
     ctx.drawImage(img, 0, 0, w, h);
     return cv.toDataURL("image/jpeg", 0.8);
@@ -1122,6 +1213,7 @@ wallFile.addEventListener("change", async () => {
   }
 });
 
+applyTheme(currentTheme);
 applyWall(currentWall);
 syncWallControls(currentWall);
 
@@ -1798,6 +1890,7 @@ async function wipeAllData(): Promise<void> {
     });
     for (const k of [
       "stacker-wallpaper",
+      "stacker-theme",
       "stacker-lock",
       "stacker-retain",
       "stacker-idle",

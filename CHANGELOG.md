@@ -3,6 +3,16 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.18.0]
+- **Redo**: pasangan `undo` (maks 20 langkah), perintah `redo`/`ulangi`, tombol
+  toolbar, shortcut Ctrl+Y / Ctrl+Shift+Z. Aksi baru mengosongkan redo.
+- **Riwayat perintah**: unik (case-insensitive), spasinya dinormalisasi, batas 30,
+  perintah undo/redo tidak dicatat, plus tombol **Hapus riwayat**.
+- **Tema warna**: 8 tema penuh (Default, Teal, Hutan, Laut, Plum, Pasir, Malam,
+  Rose) memengaruhi header, bubble, tombol, modal, menu, keypad, chart, dan PWA
+  `theme-color`; wallpaper ikut tema, gambar sendiri tetap didukung.
+- **Fix**: `cls` tidak lagi diisi ulang oleh notifikasi/refresh yang telat.
+
 ## [2.17.5]
 - **Fix atribut `hidden`**: elemen ber-`display` sendiri (mis. `.menu-row`,
   label modal) kini benar-benar tersembunyi. Efeknya: menu **"Pasang aplikasi"**

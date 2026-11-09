@@ -31,6 +31,7 @@
       <button id="export" aria-label="Unduh backup JSON" title="Unduh backup JSON">⬇ Backup</button>
       <button id="import" aria-label="Muat backup JSON" title="Muat backup JSON">⬆ Restore</button>
       <button id="undo" aria-label="Batalkan aksi terakhir" title="Batalkan aksi terakhir" disabled>↶ Undo</button>
+      <button id="redo" aria-label="Ulangi aksi yang dibatalkan" title="Ulangi aksi yang dibatalkan" disabled>↷ Redo</button>
       <button id="info" aria-label="Info & pengaturan" title="Info & pengaturan">ℹ Info</button>
       <span id="busy" hidden>…</span>
     </div>
@@ -78,10 +79,12 @@
 
 <div id="wallModal" class="modal" hidden>
   <div class="modal-box">
-    <h3>Wallpaper chat</h3>
-    <label>Preset
+    <h3>Tema &amp; tampilan</h3>
+    <label>Tema
       <div class="swatches" id="wallSwatches"></div>
     </label>
+    <p id="wallThemeLabel" class="info-note">Tema aktif: Default</p>
+    <p class="info-note">Tema mengubah warna seluruh UI. Gambar sendiri hanya mengubah latar chat.</p>
     <label>Gambar sendiri (disimpan lokal, tak dikirim ke mana pun)
       <input id="wallFile" type="file" accept="image/*" />
     </label>
@@ -92,7 +95,7 @@
     <label class="row-check"><input id="soundNotice" type="checkbox" checked /> Bunyi "ting" saat pengingat</label>
     <label class="row-check"><input id="hapticNotice" type="checkbox" checked /> Getar saat mencatat/undo</label>
     <div class="modal-actions">
-      <button id="wallReset">Hapus wallpaper</button>
+      <button id="wallReset">Kembalikan wallpaper tema</button>
       <button id="wallClose">Tutup</button>
     </div>
   </div>
@@ -159,7 +162,7 @@
       <div class="menu-head">Pengaturan</div>
       <button id="openSecurity" class="menu-row"><span>Keamanan &amp; PIN</span><span class="chev">›</span></button>
       <button id="openStorage" class="menu-row"><span>Backup &amp; penyimpanan</span><span class="chev">›</span></button>
-      <button id="openWall" class="menu-row"><span>Tampilan (wallpaper)</span><span class="chev">›</span></button>
+      <button id="openWall" class="menu-row"><span>Tema &amp; tampilan</span><span class="chev">›</span></button>
       <button id="openAI" class="menu-row"><span>AI (opsional)</span><span class="chev">›</span></button>
       <button id="openReset" class="menu-row"><span>Reset data</span><span class="chev">›</span></button>
       <button id="installApp" class="menu-row" hidden><span>Pasang aplikasi</span><span class="chev">›</span></button>
@@ -386,6 +389,7 @@
     <h3>Riwayat perintah</h3>
     <div id="histList" class="cat-list"></div>
     <div class="modal-actions">
+      <button id="histClear">Hapus riwayat</button>
       <button id="histClose">Tutup</button>
     </div>
   </div>

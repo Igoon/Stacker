@@ -161,6 +161,7 @@ const HELP =
   "  hapus 3\n" +
   "  hapus 24 25                 (beberapa sekaligus, boleh #24)\n" +
   "  undo                        (batalkan aksi terakhir)\n" +
+  "  redo | ulangi               (ulangi aksi yang dibatalkan)\n" +
   "  berulang listrik 350rb tiap 5   (auto tiap bulan)\n" +
   "  berulang | berulang hapus 1 | berulang nonaktif 1 | berulang aktif 1\n" +
   "  berulang ubah 1 400rb tiap 10\n" +
@@ -191,6 +192,7 @@ const ALIAS_RESERVED = new Set([
   ...ALIAS_TARGETS,
   // reset sengaja tidak boleh jadi alias: perintah ini butuh konfirmasi UI.
   "reset",
+  "redo", "ulangi",
   "history", "list", "daftar", "bantuan", "report", "chart", "dashboard", "export",
   "hutang", "batal", "batalkan", "info", "version", "sesuaikan", "betulkan",
   "masuk", "keluar", "pengeluaran", "pemasukan", "terima", "dapat",
@@ -495,15 +497,31 @@ const txLine = (r: Tx) =>
 // kalau data berubah, snapshot lama masuk stack. Sederhana, tahan terhadap
 // semua jenis mutasi (tambah/ubah/hapus/transfer/anggaran/akun).
 const UNDO_LIMIT = 20;
+const REDO_LIMIT = 20;
 const undoStack: string[] = [];
+const redoStack: string[] = [];
 
 export function canUndo(): boolean {
   return undoStack.length > 0;
 }
 
+export function canRedo(): boolean {
+  return redoStack.length > 0;
+}
+
 function pushUndo(snap: string): void {
+  pushUndoKeepRedo(snap);
+  redoStack.length = 0;
+}
+
+function pushUndoKeepRedo(snap: string): void {
   undoStack.push(snap);
   if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+}
+
+function pushRedo(snap: string): void {
+  redoStack.push(snap);
+  if (redoStack.length > REDO_LIMIT) redoStack.shift();
 }
 
 // Dipakai tombol Hapus di UI: snapshot dulu supaya `undo` bisa membatalkan.
@@ -536,9 +554,21 @@ export async function handleMessage(input: string): Promise<Reply> {
   if (/^(undo|batalkan|batal)$/i.test(text)) {
     const snap = undoStack.pop();
     if (!snap) return { text: "Tidak ada perubahan untuk dibatalkan." };
+    const current = exportJson();
+    if (current !== snap) pushRedo(current);
     importJson(snap);
     return {
       text: `Dibatalkan. Data kembali ke kondisi sebelum perintah terakhir.${undoStack.length ? ` (bisa undo ${undoStack.length}× lagi)` : ""}`,
+    };
+  }
+
+  if (/^(redo|ulangi)$/i.test(text)) {
+    const snap = redoStack.pop();
+    if (!snap) return { text: "Tidak ada aksi untuk diulang." };
+    pushUndoKeepRedo(exportJson());
+    importJson(snap);
+    return {
+      text: `Dijalankan ulang. Data kembali ke kondisi setelah aksi yang dibatalkan.${redoStack.length ? ` (bisa redo ${redoStack.length}x lagi)` : ""}`,
     };
   }
 

@@ -347,6 +347,50 @@ test("modal info ringkas + sub-modal (storage & tentang)", async ({ page }) => {
   await expect(page.locator("#infoModal")).toBeHidden();
 });
 
+test("tombol Undo & Redo mengubah saldo", async ({ page }) => {
+  await boot(page);
+  await chat(page, "kopi 5rb");
+  await expect(page.locator("#saldo")).toContainText("-Rp5.000");
+
+  await page.locator("#undo").click();
+  await expect(page.locator("#saldo")).toContainText("Rp0");
+  await expect(page.locator("#redo")).toBeEnabled();
+
+  await page.locator("#redo").click();
+  await expect(page.locator("#saldo")).toContainText("-Rp5.000");
+  await expect(page.locator("#redo")).toBeDisabled();
+});
+
+test("tema mengubah token UI & bertahan setelah reload", async ({ page }) => {
+  await boot(page);
+  await page.locator("#info").click();
+  await page.locator("#openWall").click();
+  await expect(page.locator("#wallModal")).toBeVisible();
+
+  await page.locator('#wallSwatches .swatch[data-preset="forest"]').click();
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
+    .toBe("forest");
+
+  const accent = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()
+  );
+  expect(accent).toBe("#34d399");
+  await expect(page.locator("#wallThemeLabel")).toContainText("Hutan");
+  const headerBg = await page.evaluate(
+    () => getComputedStyle(document.querySelector("header")!).backgroundColor
+  );
+  expect(headerBg).toBe("rgb(18, 40, 28)");
+  expect(await page.evaluate(() => localStorage.getItem("stacker-theme"))).toBe("forest");
+
+  await page.locator("#wallClose").click();
+  await page.reload();
+  await expect(page.locator("#sub")).toHaveText(/^v\d/, { timeout: 60_000 });
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
+    .toBe("forest");
+});
+
 test("saldo tersamar default & ketuk untuk lihat", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("#sub")).toHaveText(/^v\d/, { timeout: 60_000 });

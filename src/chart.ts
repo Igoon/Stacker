@@ -142,15 +142,16 @@ export function buildGrafik(g: GrafikInput): string {
 export const buildDailyRange = daysBetween;
 
 // ---------- Grafik SVG (inline, tanpa library & tanpa data keluar) ----------
+// Warna mengikuti tema aktif (CSS variables di src/style.css).
 const PALETTE = [
-  "#00a884",
-  "#53bdeb",
-  "#f15c6d",
-  "#ffbc3b",
-  "#a78bfa",
-  "#34d399",
-  "#fb923c",
-  "#e879f9",
+  "var(--chart-1,#00a884)",
+  "var(--chart-2,#53bdeb)",
+  "var(--chart-3,#f15c6d)",
+  "var(--chart-4,#ffbc3b)",
+  "var(--chart-5,#a78bfa)",
+  "var(--chart-6,#34d399)",
+  "var(--chart-7,#fb923c)",
+  "var(--chart-8,#e879f9)",
 ];
 
 const escXml = (s: string) =>
