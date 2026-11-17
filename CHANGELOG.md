@@ -3,6 +3,12 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.30.1]
+- **Kartu transaksi dirapikan**: hilangkan **duplikasi akun** (akun tak lagi
+  diulang di judul "Tercatat"), tambah **ikon awalan kategori**, dan susun baris
+  ala bank (ikon · kategori · nominal; lalu akun · #id). Rapi di tema gelap &
+  terang.
+
 ## [2.30.0]
 - **Kartu transaksi di chat**: tiap transaksi kini tampil sebagai **kartu** rapi
   (nominal, badge kategori, akun · #id, tombol hapus) — lebih mudah dibaca.

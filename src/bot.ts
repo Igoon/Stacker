@@ -2107,11 +2107,10 @@ async function handleMessageInner(input: string): Promise<Reply> {
     })
   );
   const total = txs.reduce((a, t) => a + (t.tipe === "masuk" ? t.jumlah : -t.jumlah), 0);
-  const akunLabel = account ? ` · ${account.nama}` : "";
   const head =
     txs.length > 1
-      ? `${txs.length} transaksi tercatat${akunLabel} (total ${total >= 0 ? "+" : "-"}${rupiah(total)}).`
-      : `Tercatat${akunLabel}.`;
+      ? `${txs.length} transaksi tercatat (total ${total >= 0 ? "+" : "-"}${rupiah(total)}).`
+      : "Tercatat.";
   const warns = txs.map(budgetWarn).filter((w): w is string => !!w);
   const sugNote = suggested ? `(kategori "${suggested}" ditebak dari riwayat — ubah bila salah)` : "";
   const body = [usedAI ? `${head}\n(diproses AI)` : head, sugNote, ...warns].filter(Boolean).join("\n");
