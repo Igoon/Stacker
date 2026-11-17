@@ -37,6 +37,7 @@ Prinsip: **lokal dulu, tanpa server, chat-first**. Chat untuk *mencatat*; menu u
 - 2.24.0 Deteksi langganan otomatis (pola bulanan nominal sama → saran berulang)
 - 2.25.0 Ringkasan++ (net worth, utang/piutang, proyeksi net, tren 6 bulan)
 - 2.26.0 Samarkan nominal transaksi di chat (opt-in)
+- 2.26.1 Periksa pembaruan manual + surface SW waiting saat foreground
 
 ## Berikutnya
 - (Inti selesai.) Kandidat dari "Nanti": Goal/sinking fund, Import CSV bank,

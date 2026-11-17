@@ -3,6 +3,12 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.26.1]
+- **Periksa pembaruan (manual)**: menu baru **Info › Periksa pembaruan** untuk
+  memaksa cek Service Worker lalu mengaktifkan + memuat ulang versi terbaru.
+  Membantu PWA yang terinstall di HP ketika banner update tidak muncul. SW yang
+  "menunggu" juga ditawarkan tiap app kembali ke depan (foreground).
+
 ## [2.26.0]
 - **Samarkan nominal di chat**: opsi baru di **Info › Tema & tampilan** untuk
   menyamarkan semua nominal rupiah di bubble chat (jadi `Rp••••`) — praktis saat

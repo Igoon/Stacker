@@ -126,9 +126,12 @@ if ("serviceWorker" in navigator) {
       })
       .then((reg) => {
         // Cek update segera, lalu berkala; juga saat kembali ke foreground.
-        const check = () => void reg.update().catch(() => undefined);
+        const check = () => {
+          void reg.update().catch(() => undefined);
+          if (reg.waiting && navigator.serviceWorker.controller) void showUpdateBar();
+        };
         check();
-        window.setInterval(check, 60 * 60 * 1000);
+        window.setInterval(check, 30 * 60 * 1000);
         document.addEventListener("visibilitychange", () => {
           if (!document.hidden) check();
         });
@@ -146,6 +149,69 @@ if ("serviceWorker" in navigator) {
       })
       .catch((e) => console.warn("[sw] gagal registrasi:", e));
   });
+}
+
+// Perbarui paksa (tombol "Periksa pembaruan"): cek SW baru, bila ada aktifkan +
+// muat ulang. Berguna saat banner update tak muncul pada PWA yang terinstall.
+function waitInstalled(reg: ServiceWorkerRegistration): Promise<ServiceWorker | null> {
+  return new Promise((resolve) => {
+    if (reg.waiting) return resolve(reg.waiting);
+    const watch = (w: ServiceWorker | null): void => {
+      if (!w) {
+        resolve(null);
+        return;
+      }
+      w.addEventListener("statechange", function h() {
+        if (w.state === "installed") {
+          w.removeEventListener("statechange", h);
+          resolve(w);
+        } else if (w.state === "redundant") {
+          w.removeEventListener("statechange", h);
+          resolve(null);
+        }
+      });
+    };
+    if (reg.installing) {
+      watch(reg.installing);
+      return;
+    }
+    const onFound = () => {
+      reg.removeEventListener("updatefound", onFound);
+      watch(reg.installing);
+    };
+    reg.addEventListener("updatefound", onFound);
+    window.setTimeout(() => {
+      reg.removeEventListener("updatefound", onFound);
+      resolve(reg.waiting ?? null);
+    }, 8000);
+  });
+}
+
+async function forceUpdate(): Promise<void> {
+  if (!("serviceWorker" in navigator)) {
+    window.location.reload();
+    return;
+  }
+  showToast("Memeriksa pembaruan…");
+  const reg = await navigator.serviceWorker.getRegistration();
+  if (!reg) {
+    window.location.reload();
+    return;
+  }
+  try {
+    await reg.update();
+  } catch {
+    showToast("Tak bisa memeriksa (offline?).");
+    return;
+  }
+  const w = await waitInstalled(reg);
+  if (w) {
+    swReloading = true;
+    w.postMessage({ type: "SKIP_WAITING" });
+    window.setTimeout(() => window.location.reload(), 2000);
+  } else {
+    showToast("Sudah versi terbaru.");
+  }
 }
 
 let ready = false;
@@ -3183,6 +3249,8 @@ document.getElementById("updateReload")!.onclick = async () => {
   }
   window.location.reload();
 };
+
+document.getElementById("checkUpdate")!.onclick = () => void forceUpdate();
 
 pickDirBtn.onclick = async () => {
   if (!supportsFolderBackup()) {
