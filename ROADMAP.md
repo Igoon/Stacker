@@ -39,9 +39,11 @@ Prinsip: **lokal dulu, tanpa server, chat-first**. Chat untuk *mencatat*; menu u
 - 2.26.0 Samarkan nominal transaksi di chat (opt-in)
 - 2.26.1 Periksa pembaruan manual + surface SW waiting saat foreground
 - 2.27.0 Target & sinking fund (progres, saran/bulan, tempo; isi/ambil/hapus)
+- 2.28.0 Panduan alokasi 50/30/20 (perintah `alokasi` + bagian Ringkasan)
 
 ## Berikutnya
-- Template 50/30/20 (preset batas anggaran per kelompok needs/wants/savings).
+- Kandidat dari "Nanti": Import CSV bank + auto-kategorisasi, WebAuthn,
+  i18n + tema terang, multi-mata uang.
 
 ## Nanti
 - Import CSV bank + auto-kategorisasi.

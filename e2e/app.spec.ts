@@ -767,6 +767,17 @@ test("Ringkasan++: net worth, proyeksi, tren 6 bulan", async ({ page }) => {
   await page.locator("#dashBack").click();
 });
 
+test("Ringkasan: alokasi 50/30/20 tampil", async ({ page }) => {
+  await boot(page);
+  await chat(page, "gaji 10jt");
+  await chat(page, "makan 3jt");
+  await page.locator("#info").click();
+  await page.locator("#openDash").click();
+  await expect(page.locator("#dashBody")).toContainText("Alokasi 50/30/20");
+  await expect(page.locator("#dashBody")).toContainText("Kebutuhan (50%)");
+  await page.locator("#dashBack").click();
+});
+
 test("atribut hidden benar-benar menyembunyikan (baris idle tanpa PIN)", async ({ page }) => {
   await boot(page);
   await page.locator("#info").click();

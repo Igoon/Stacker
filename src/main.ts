@@ -2663,6 +2663,46 @@ async function renderDash(): Promise<void> {
   );
   dashBodyEl.appendChild(cards);
 
+  const alloc = (r.alloc ?? {}) as {
+    income?: number;
+    needs?: number;
+    wants?: number;
+    savings?: number;
+    targetNeeds?: number;
+    targetWants?: number;
+    targetSavings?: number;
+  };
+  const allocIncome = Number(alloc.income ?? 0);
+  if (allocIncome > 0) {
+    const title = document.createElement("div");
+    title.className = "dash-title";
+    title.textContent = "Alokasi 50/30/20";
+    const list = document.createElement("div");
+    list.className = "dash-list";
+    const rows3: [string, number, number][] = [
+      ["Kebutuhan (50%)", Number(alloc.needs ?? 0), Number(alloc.targetNeeds ?? 0)],
+      ["Keinginan (30%)", Number(alloc.wants ?? 0), Number(alloc.targetWants ?? 0)],
+      ["Tabungan (20%)", Number(alloc.savings ?? 0), Number(alloc.targetSavings ?? 0)],
+    ];
+    for (const [label, v, t] of rows3) {
+      const row = document.createElement("div");
+      row.className = "dr";
+      const a = document.createElement("span");
+      a.textContent = label;
+      const b = document.createElement("span");
+      const pctOf = allocIncome > 0 ? Math.round((v / allocIncome) * 100) : 0;
+      b.textContent = `${fmtRp(v)} (${pctOf}%)`;
+      row.append(a, b);
+      const bar = document.createElement("div");
+      bar.className = "bar" + (t > 0 && v > t ? " over" : "");
+      const fill = document.createElement("span");
+      fill.style.width = (t > 0 ? Math.min(100, Math.max(0, (v / t) * 100)) : 0) + "%";
+      bar.appendChild(fill);
+      list.append(row, bar);
+    }
+    dashBodyEl.append(title, list);
+  }
+
   const top = (Array.isArray(r.top) ? r.top : []) as { kategori: string; total: number }[];
   if (top.length) {
     const t = document.createElement("div");

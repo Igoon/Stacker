@@ -175,6 +175,7 @@ const HELP =
   "  bayar utang budi 50rb | utang hapus 3 | piutang hapus 4\n" +
   "  target Liburan 5jt [tempo 2027-06-01]   (target / sinking fund)\n" +
   "  target | target isi Liburan 500rb | target ambil Liburan 100rb | target hapus Liburan\n" +
+  "  alokasi                     (panduan 50/30/20 bulan ini)\n" +
   "  pin                         (status kunci; atur lewat ℹ → Keamanan)\n" +
   "  backup | backup kunci <sandi>   (JSON / terenkripsi)\n" +
   "  ai | ai reset               (pemakaian AI)\n" +
@@ -390,6 +391,57 @@ export function budgetOverview(): BudgetRow[] {
 }
 
 // Ringkasan dashboard (bulan berjalan) untuk UI.
+const ALLOC_NEEDS = new Set([
+  "makanan", "transportasi", "transport", "tagihan", "kesehatan",
+  "pendidikan", "rumah", "tempat tinggal", "asuransi", "kebutuhan",
+]);
+const ALLOC_SAVINGS = new Set([
+  "tabungan", "investasi", "dana darurat", "sedekah", "donasi", "saving", "savings",
+]);
+
+export interface Alloc {
+  income: number;
+  needs: number;
+  wants: number;
+  savings: number;
+  targetNeeds: number;
+  targetWants: number;
+  targetSavings: number;
+}
+
+// Klasifikasi kategori ke kelompok 50/30/20 (berdasar nama kategori umum).
+function catGroup(nama: string): "needs" | "wants" | "savings" {
+  const n = nama.toLowerCase().trim();
+  if (ALLOC_SAVINGS.has(n)) return "savings";
+  if (ALLOC_NEEDS.has(n)) return "needs";
+  return "wants";
+}
+
+// Panduan 50/30/20 dari pemasukan bulan berjalan (transfer dikecualikan).
+export function computeAlloc(): Alloc {
+  const per = parsePeriod("");
+  const rows = per ? ringkasRange(per.from, per.to) : [];
+  const income = rows.filter((r) => r.tipe === "masuk").reduce((a, b) => a + b.total, 0);
+  let needs = 0;
+  let wants = 0;
+  for (const r of rows) {
+    if (r.tipe !== "keluar") continue;
+    const g = catGroup(r.kategori);
+    if (g === "needs") needs += r.total;
+    else if (g === "wants") wants += r.total;
+  }
+  const savings = income - needs - wants;
+  return {
+    income,
+    needs,
+    wants,
+    savings,
+    targetNeeds: Math.round(income * 0.5),
+    targetWants: Math.round(income * 0.3),
+    targetSavings: Math.round(income * 0.2),
+  };
+}
+
 export function dashboardData(): {
   label: string;
   masuk: number;
@@ -407,6 +459,7 @@ export function dashboardData(): {
   trend: { label: string; masuk: number; keluar: number }[];
   svg: string;
   trendSvg: string;
+  alloc: Alloc;
 } {
   const per = parsePeriod("");
   const label = per?.label ?? "bulan ini";
@@ -477,6 +530,7 @@ export function dashboardData(): {
     trend,
     svg,
     trendSvg,
+    alloc: computeAlloc(),
   };
 }
 
@@ -1929,6 +1983,25 @@ async function handleMessageInner(input: string): Promise<Reply> {
       text:
         `${arah === "utang" ? "Utang" : "Piutang"} #${d.id}: ${rupiah(d.jumlah)} ${arah === "utang" ? "ke" : "dari"} ${d.nama} dicatat.` +
         "\n(ledger utang/piutang terpisah — tidak mengubah saldo akun)",
+    };
+  }
+
+  if (low === "alokasi" || low === "50/30/20" || low === "503020") {
+    const a = computeAlloc();
+    if (a.income <= 0) {
+      return { text: "Belum ada pemasukan bulan ini. Catat dulu, mis. `gaji 5jt`." };
+    }
+    const pctOf = (v: number) => Math.round((v / a.income) * 100);
+    const row = (label: string, v: number, target: number) =>
+      `  ${label} ${rupiah(v)} (${pctOf(v)}%) · target ${rupiah(target)}`;
+    return {
+      text:
+        `Alokasi 50/30/20 (bulan ini)\nPemasukan: ${rupiah(a.income)}\n\n` +
+        row("Kebutuhan", a.needs, a.targetNeeds) + "\n" +
+        row("Keinginan", a.wants, a.targetWants) + "\n" +
+        row("Tabungan ", a.savings, a.targetSavings) + "\n\n" +
+        "Panduan: kebutuhan ≤50%, keinginan ≤30%, tabungan ≥20%.",
+      pre: true,
     };
   }
 

@@ -3,6 +3,14 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.28.0]
+- **Panduan 50/30/20**: perintah `alokasi` + bagian **Alokasi 50/30/20** di
+  Ringkasan. Dari pemasukan bulan ini: kebutuhan (≤50%), keinginan (≤30%),
+  tabungan/sisa (≥20%), dengan bar progres. Klasifikasi kategori mengikuti nama
+  umum (Makanan/Transportasi/Tagihan/Kesehatan→kebutuhan; Belanja/Hiburan→
+  keinginan; lainnya→keinginan; Tabungan/Investasi/Donasi→tabungan). Transfer
+  dikecualikan.
+
 ## [2.27.0]
 - **Target & sinking fund**: menu **Info › Target** + perintah `target`. Buat
   target tabungan (mis. `target Liburan 5jt tempo 2027-06-01`), lihat progres

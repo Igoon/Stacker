@@ -1103,5 +1103,19 @@ await check("target: tempo tersimpan + ikut backup", async () => {
   await handleMessage("target hapus Motor");
 });
 
+await check("alokasi 50/30/20: hitung kelompok & konsistensi", async () => {
+  await handleMessage("gaji 10jt");
+  await handleMessage("makan 3jt");
+  await handleMessage("nonton 1jt");
+  const r = await handleMessage("alokasi");
+  assert(r.text.includes("Kebutuhan") && r.text.includes("Keinginan"), "baris alokasi ada");
+  const a = dashboardData().alloc;
+  assert(a.income >= 10_000_000, "income terhitung");
+  assert(a.needs >= 3_000_000, "needs (Makanan) terhitung");
+  assert(a.wants >= 1_000_000, "wants (Hiburan) terhitung");
+  assert.equal(a.savings, a.income - a.needs - a.wants, "savings = income - needs - wants");
+  assert.equal(a.targetNeeds, Math.round(a.income * 0.5), "target needs 50%");
+});
+
 console.log(`\n${pass} ok, ${fail} fail`);
 if (fail > 0) process.exit(1);
