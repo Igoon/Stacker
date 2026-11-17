@@ -453,6 +453,29 @@ test("saldo tersamar default & ketuk untuk lihat", async ({ page }) => {
   await expect(page.locator("#saldoTot")).toContainText("-Rp15rb");
 });
 
+test("samarkan nominal transaksi di chat (toggle Tampilan)", async ({ page }) => {
+  await boot(page);
+  await chat(page, "kopi 15rb");
+  await expect(page.locator("#chat")).toContainText("Rp15.000");
+
+  await page.locator("#info").click();
+  await page.locator("#openWall").click();
+  await page.locator("#hideChat").check();
+  await page.locator("#wallClose").click();
+
+  await expect(page.locator("#chat")).not.toContainText("Rp15.000");
+  await expect(page.locator("#chat")).toContainText("Rp••••");
+
+  await chat(page, "teh 5rb");
+  await expect(page.locator("#chat")).not.toContainText("Rp5.000");
+
+  await page.locator("#info").click();
+  await page.locator("#openWall").click();
+  await page.locator("#hideChat").uncheck();
+  await page.locator("#wallClose").click();
+  await expect(page.locator("#chat")).toContainText("Rp15.000");
+});
+
 test("menu Kategori, Anggaran, dan Ringkasan", async ({ page }) => {
   await boot(page);
 

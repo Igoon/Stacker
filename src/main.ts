@@ -501,6 +501,35 @@ saldoEl.addEventListener("keydown", (e) => {
   }
 });
 
+// Privasi chat: samarkan nominal di bubble (opt-in). Berguna saat menunjukkan
+// layar. Angka non-uang (mis. #id, tanggal) tak ikut disamarkan.
+const HIDE_CHAT_KEY = "stacker-hide-chat";
+function readHideChat(): boolean {
+  try {
+    return localStorage.getItem(HIDE_CHAT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+let hideChat = readHideChat();
+const RUPIAH_RE = /Rp[\d.,]+/g;
+function maskRp(s: string): string {
+  return s.replace(RUPIAH_RE, "Rp••••");
+}
+function applyChatMask(): void {
+  chat.querySelectorAll<HTMLElement>(".bubble").forEach((b) => {
+    const orig = b.dataset.text;
+    const node = b.firstChild;
+    if (orig != null && node && node.nodeType === Node.TEXT_NODE) {
+      node.nodeValue = hideChat ? maskRp(orig) : orig;
+    }
+  });
+  chat.querySelectorAll<HTMLElement>(".tx b[data-full]").forEach((el) => {
+    const full = el.dataset.full ?? "";
+    el.textContent = hideChat ? maskRp(full) : full;
+  });
+}
+
 // Bunyi pengingat singkat (Web Audio, tanpa aset & tanpa jaringan).
 const SOUND_KEY = "stacker-sound";
 function readSound(): boolean {
@@ -648,7 +677,8 @@ function addBubble(
   row.className = "row " + side;
   const b = document.createElement("div");
   b.className = "bubble" + (pre ? " pre" : "") + (svg ? " has-chart" : "");
-  b.textContent = text;
+  b.textContent = hideChat ? maskRp(text) : text;
+  b.dataset.text = text;
   if (svg) {
     // SVG dibuat lokal dari angka (tanpa lib, tanpa request keluar).
     const wrap = document.createElement("div");
@@ -668,8 +698,10 @@ function addBubble(
     d.className = "tx";
     d.dataset.txId = String(tx.id);
     const sign = tx.tipe === "masuk" ? "+" : "-";
+    const full = sign + tx.rupiah;
     const strong = document.createElement("b");
-    strong.textContent = sign + tx.rupiah;
+    strong.textContent = hideChat ? maskRp(full) : full;
+    strong.dataset.full = full;
     d.appendChild(strong);
     d.appendChild(
       document.createTextNode(
@@ -1128,6 +1160,7 @@ for (const p of WALL_PRESETS) {
 }
 
 const hideSaldoEl = document.getElementById("hideSaldo") as HTMLInputElement;
+const hideChatEl = document.getElementById("hideChat") as HTMLInputElement;
 const soundNoticeEl = document.getElementById("soundNotice") as HTMLInputElement;
 const hapticNoticeEl = document.getElementById("hapticNotice") as HTMLInputElement;
 
@@ -1136,6 +1169,7 @@ document.getElementById("openWall")!.onclick = () => {
   currentWall = readWall();
   syncWallControls(currentWall);
   hideSaldoEl.checked = hideSaldo;
+  hideChatEl.checked = hideChat;
   soundNoticeEl.checked = soundOn;
   hapticNoticeEl.checked = hapticOn;
   wallModal.hidden = false;
@@ -1151,6 +1185,17 @@ hideSaldoEl.onchange = () => {
   }
   renderSaldo();
   showToast(hideSaldo ? "Saldo disamarkan di header." : "Saldo ditampilkan di header.");
+};
+
+hideChatEl.onchange = () => {
+  hideChat = hideChatEl.checked;
+  try {
+    localStorage.setItem(HIDE_CHAT_KEY, hideChat ? "1" : "0");
+  } catch {
+    // abaikan
+  }
+  applyChatMask();
+  showToast(hideChat ? "Nominal di chat disamarkan." : "Nominal di chat ditampilkan.");
 };
 
 soundNoticeEl.onchange = () => {

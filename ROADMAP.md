@@ -36,14 +36,15 @@ Prinsip: **lokal dulu, tanpa server, chat-first**. Chat untuk *mencatat*; menu u
 - 2.23.0 Auto-kategorisasi on-device (tebak kategori dari riwayat, tanpa AI)
 - 2.24.0 Deteksi langganan otomatis (pola bulanan nominal sama → saran berulang)
 - 2.25.0 Ringkasan++ (net worth, utang/piutang, proyeksi net, tren 6 bulan)
+- 2.26.0 Samarkan nominal transaksi di chat (opt-in)
 
 ## Berikutnya
-- Quick win: samarkan nominal transaksi di chat (lanjutan saldo tersamar).
+- (Inti selesai.) Kandidat dari "Nanti": Goal/sinking fund, Import CSV bank,
+  WebAuthn, i18n + tema terang, multi-mata uang.
 
 ## Nanti
 - Goal/sinking fund + template 50/30/20.
 - Import CSV bank + auto-kategorisasi.
-- Samarkan nominal transaksi di chat (lanjutan saldo tersamar).
 - Biometric/passkey (WebAuthn) di samping PIN.
 - i18n (EN) + tema terang.
 - Multi-mata uang.

@@ -3,6 +3,12 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.26.0]
+- **Samarkan nominal di chat**: opsi baru di **Info › Tema & tampilan** untuk
+  menyamarkan semua nominal rupiah di bubble chat (jadi `Rp••••`) — praktis saat
+  menunjukkan layar. Angka non-uang (id, tanggal, jumlah transaksi) tetap
+  tampil. Default mati (opt-in).
+
 ## [2.25.0]
 - **Ringkasan++ (dashboard)**: tambah **Net worth** (saldo akun + piutang −
   utang), kartu **Utang** & **Piutang**, **Proyeksi net bulan ini** (run-rate),
