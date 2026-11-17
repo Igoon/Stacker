@@ -200,8 +200,11 @@ header .saldo-io {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  font-weight: 600;
+}
+.tx-icon svg {
+  width: 16px;
+  height: 16px;
+  display: block;
 }
 .tx-cat {
   flex: 1 1 auto;

@@ -1,2 +1,2 @@
 // Versi statis untuk build mobile (package.json tidak bisa dibaca di runtime browser).
-export const APP_VERSION = "2.30.1";
+export const APP_VERSION = "2.31.0";

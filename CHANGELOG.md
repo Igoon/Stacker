@@ -3,6 +3,14 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.31.0]
+- **Ikon kategori SVG** di kartu transaksi (makanan, transportasi, belanja,
+  tagihan, kesehatan, hiburan, gaji, tabungan, investasi, transfer; fallback
+  ikon tag). Ikut warna tema — lebih cepat dikenali daripada awalan huruf.
+- **Update otomatis saat dibuka**: jika server punya versi lebih baru, app
+  memeriksa & menerapkan Service Worker baru otomatis (sekali per versi), tak
+  lagi bergantung pada banner. Tombol **Info › Periksa pembaruan** tetap ada.
+
 ## [2.30.1]
 - **Kartu transaksi dirapikan**: hilangkan **duplikasi akun** (akun tak lagi
   diulang di judul "Tercatat"), tambah **ikon awalan kategori**, dan susun baris
