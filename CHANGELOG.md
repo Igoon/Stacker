@@ -3,6 +3,12 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.22.0]
+- **Menu Cari (UI)**: filter transaksi lewat **Info › Cari** — kata kunci
+  (catatan/kategori/akun), akun, kategori, rentang tanggal, dan nominal
+  min/maks. Hasil menampilkan jumlah + daftar (id, tanggal, tipe, nominal,
+  akun, catatan).
+
 ## [2.21.0]
 - **Menu Utang/Piutang (UI)**: kelola lewat **Info › Utang/Piutang** — daftar
   (sisa per item + total utang/piutang), tambah, bayar sebagian/lunas, dan hapus.

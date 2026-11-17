@@ -264,7 +264,16 @@ const MAX_SEARCH = 10000;
 
 export function searchTx(
   query: string,
-  opts: { accountId?: number; from?: string; to?: string; limit?: number } = {}
+  opts: {
+    accountId?: number;
+    from?: string;
+    to?: string;
+    kategori?: string;
+    tipe?: "masuk" | "keluar";
+    min?: number;
+    max?: number;
+    limit?: number;
+  } = {}
 ): Tx[] {
   const limit = Math.min(Math.max(1, opts.limit ?? 20), MAX_SEARCH);
   const where: string[] = [];
@@ -289,6 +298,22 @@ export function searchTx(
   if (opts.accountId != null) {
     where.push(`t.account_id = ?`);
     args.push(opts.accountId);
+  }
+  if (opts.kategori) {
+    where.push(`t.kategori = ?`);
+    args.push(opts.kategori);
+  }
+  if (opts.tipe) {
+    where.push(`t.tipe = ?`);
+    args.push(opts.tipe);
+  }
+  if (opts.min != null) {
+    where.push(`t.jumlah >= ?`);
+    args.push(opts.min);
+  }
+  if (opts.max != null) {
+    where.push(`t.jumlah <= ?`);
+    args.push(opts.max);
   }
 
   const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";

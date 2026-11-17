@@ -30,10 +30,12 @@ Prinsip: **lokal dulu, tanpa server, chat-first**. Chat untuk *mencatat*; menu u
 - 2.19.0 Header saldo 2 baris (saldo + masuk/keluar bulan) + angka ringkas
 - 2.20.0 Menu Berulang (daftar + aktif/nonaktif + ubah + hapus)
 - 2.21.0 Menu Utang/Piutang (daftar + bayar + hapus)
+- 2.22.0 Menu Cari (kata kunci + akun + kategori + tanggal + nominal)
 
 ## Berikutnya
-### Tuntaskan kelola lewat menu
-- Cari/filter UI (rentang tanggal, nominal, kategori, akun).
+- Kelola lewat menu tuntas (Kategori, Akun, Anggaran, Berulang, Utang/Piutang, Cari).
+  Kandidat berikut: auto-kategorisasi on-device, deteksi langganan, net worth &
+  proyeksi arus kas (lihat "Nanti").
 
 ## Nanti
 - Dashboard++: tren 6 bulan, perbandingan, proyeksi arus kas, *net worth*.

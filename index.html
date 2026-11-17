@@ -162,6 +162,7 @@
       <button id="openBudget" class="menu-row"><span>Anggaran</span><span class="chev">›</span></button>
       <button id="openRec" class="menu-row"><span>Berulang</span><span class="chev">›</span></button>
       <button id="openDebt" class="menu-row"><span>Utang/Piutang</span><span class="chev">›</span></button>
+      <button id="openSearch" class="menu-row"><span>Cari</span><span class="chev">›</span></button>
       <div class="menu-head">Pengaturan</div>
       <button id="openSecurity" class="menu-row"><span>Keamanan &amp; PIN</span><span class="chev">›</span></button>
       <button id="openStorage" class="menu-row"><span>Backup &amp; penyimpanan</span><span id="storageWarn" class="menu-warn" hidden>Perlu izin</span><span class="chev">›</span></button>
@@ -420,6 +421,44 @@
     </div>
     <div class="modal-actions">
       <button id="debtBack">Kembali</button>
+    </div>
+  </div>
+</div>
+
+<div id="searchModal" class="modal" hidden>
+  <div class="modal-box list-box">
+    <h3>Cari transaksi</h3>
+    <div class="cat-form">
+      <label>Kata kunci (catatan/kategori/akun)
+        <input id="searchQ" placeholder="kopi" autocomplete="off" />
+      </label>
+      <label>Akun
+        <select id="searchAcc"></select>
+      </label>
+      <label>Kategori
+        <select id="searchCat"></select>
+      </label>
+      <label>Dari tanggal
+        <input id="searchFrom" type="date" />
+      </label>
+      <label>Sampai tanggal
+        <input id="searchTo" type="date" />
+      </label>
+      <label>Nominal min (mis. 10rb)
+        <input id="searchMin" placeholder="-" autocomplete="off" />
+      </label>
+      <label>Nominal maks (mis. 100rb)
+        <input id="searchMax" placeholder="-" autocomplete="off" />
+      </label>
+      <div class="info-actions">
+        <button id="searchRun">Cari</button>
+        <button id="searchResetForm">Kosongkan</button>
+      </div>
+    </div>
+    <p id="searchSummary" class="info-note" hidden></p>
+    <div id="searchList" class="cat-list"></div>
+    <div class="modal-actions">
+      <button id="searchBack">Kembali</button>
     </div>
   </div>
 </div>

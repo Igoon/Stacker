@@ -18,6 +18,7 @@ import {
   listRecurring,
   listDebts,
   debtTotals,
+  searchTx,
 } from "./db";
 import {
   budgetOverview,
@@ -39,6 +40,7 @@ import { decryptJson, encryptJson, isEncrypted } from "./crypto";
 import { changePin, checkPin, removePin, setPin } from "./pin";
 import { APP_VERSION } from "./version";
 import { isoLocal, parsePeriod } from "./dates";
+import { parseLocal } from "./parser";
 
 interface ChatMsg {
   type: "chat";
@@ -114,6 +116,19 @@ interface ListDebtMsg {
   type: "listdebt";
   id: number;
 }
+interface SearchMsg {
+  type: "search";
+  id: number;
+  q?: string;
+  accountId?: number;
+  from?: string;
+  to?: string;
+  kategori?: string;
+  tipe?: string;
+  minRaw?: string;
+  maxRaw?: string;
+  limit?: number;
+}
 interface CheckDataMsg {
   type: "checkdata";
   id: number;
@@ -163,6 +178,7 @@ type InMsg =
   | ListAccMsg
   | ListRecurringMsg
   | ListDebtMsg
+  | SearchMsg
   | CheckDataMsg
   | SetFirstUseMsg
   | DashMsg
@@ -337,6 +353,27 @@ async function onMessage(msg: InMsg): Promise<void> {
     case "listdebt":
       reply(msg.id, { ok: true, debts: listDebts(), totals: debtTotals() });
       break;
+    case "search": {
+      const amt = (s?: string): number | undefined => {
+        if (!s || !s.trim()) return undefined;
+        const p = parseLocal(s);
+        return p ? p.result.jumlah : undefined;
+      };
+      reply(msg.id, {
+        ok: true,
+        results: searchTx(msg.q ?? "", {
+          accountId: msg.accountId,
+          from: msg.from || undefined,
+          to: msg.to || undefined,
+          kategori: msg.kategori || undefined,
+          tipe: msg.tipe === "masuk" || msg.tipe === "keluar" ? msg.tipe : undefined,
+          min: amt(msg.minRaw),
+          max: amt(msg.maxRaw),
+          limit: msg.limit ?? 100,
+        }),
+      });
+      break;
+    }
     case "checkdata":
       reply(msg.id, { ok: true, issues: checkIntegrity() });
       break;

@@ -563,6 +563,38 @@ test("menu Utang/Piutang: tambah, bayar sebagian, lunas", async ({ page }) => {
   await page.locator("#debtBack").click();
 });
 
+test("menu Cari: filter kategori, nominal, kata kunci", async ({ page }) => {
+  await boot(page);
+  await chat(page, "makan siang 50rb");
+  await chat(page, "kopi 18rb");
+  await chat(page, "gaji 5jt");
+
+  await page.locator("#info").click();
+  await page.locator("#openSearch").click();
+
+  await page.locator("#searchRun").click();
+  await expect(page.locator("#searchSummary")).toContainText("3 transaksi");
+
+  await page.locator("#searchCat").selectOption("Gaji");
+  await page.locator("#searchRun").click();
+  await expect(page.locator("#searchSummary")).toContainText("1 transaksi");
+  await expect(page.locator("#searchList")).toContainText("Gaji");
+
+  await page.locator("#searchCat").selectOption("");
+  await page.locator("#searchMin").fill("1jt");
+  await page.locator("#searchRun").click();
+  await expect(page.locator("#searchSummary")).toContainText("1 transaksi");
+  await expect(page.locator("#searchList")).toContainText("Rp5.000.000");
+
+  await page.locator("#searchMin").fill("");
+  await page.locator("#searchQ").fill("kopi");
+  await page.locator("#searchRun").click();
+  await expect(page.locator("#searchSummary")).toContainText("1 transaksi");
+  await expect(page.locator("#searchList")).toContainText("kopi");
+
+  await page.locator("#searchBack").click();
+});
+
 test("sapaan hanya untuk pengguna baru", async ({ page }) => {
   await boot(page);
   await expect(

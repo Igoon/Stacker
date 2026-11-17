@@ -1857,6 +1857,16 @@ const debtArahEl = document.getElementById("debtArah") as HTMLSelectElement;
 const debtNamaEl = document.getElementById("debtNama") as HTMLInputElement;
 const debtJumlahEl = document.getElementById("debtJumlah") as HTMLInputElement;
 const debtMsgEl = document.getElementById("debtMsg")!;
+const searchModal = document.getElementById("searchModal")!;
+const searchQEl = document.getElementById("searchQ") as HTMLInputElement;
+const searchAccEl = document.getElementById("searchAcc") as HTMLSelectElement;
+const searchCatEl = document.getElementById("searchCat") as HTMLSelectElement;
+const searchFromEl = document.getElementById("searchFrom") as HTMLInputElement;
+const searchToEl = document.getElementById("searchTo") as HTMLInputElement;
+const searchMinEl = document.getElementById("searchMin") as HTMLInputElement;
+const searchMaxEl = document.getElementById("searchMax") as HTMLInputElement;
+const searchSummaryEl = document.getElementById("searchSummary")!;
+const searchListEl = document.getElementById("searchList")!;
 const INFO_PANES = [
   infoModal,
   secModal,
@@ -1869,6 +1879,7 @@ const INFO_PANES = [
   accModal,
   recModal,
   debtModal,
+  searchModal,
 ];
 // Semantik dialog + tutup dengan Esc.
 for (const m of document.querySelectorAll<HTMLElement>(".modal")) {
@@ -2902,6 +2913,116 @@ document.getElementById("debtSave")!.onclick = async () => {
   debtMsgEl.hidden = true;
   await refreshDebtList();
 };
+
+// ---------- Cari / filter (UI) ----------
+interface SearchRow {
+  id: number;
+  tanggal: string;
+  tipe: "masuk" | "keluar";
+  jumlah: number;
+  kategori: string;
+  catatan: string | null;
+  akun?: string | null;
+}
+
+async function refreshSearchOptions(): Promise<void> {
+  const [a, c] = await Promise.all([call({ type: "listacc" }), call({ type: "listcat" })]);
+  const accs = (Array.isArray(a.accounts) ? a.accounts : []) as AccRow[];
+  const cats = (Array.isArray(c.categories) ? c.categories : []) as CatRow[];
+
+  const prevAcc = searchAccEl.value;
+  searchAccEl.replaceChildren();
+  const noneA = document.createElement("option");
+  noneA.value = "";
+  noneA.textContent = "(semua akun)";
+  searchAccEl.appendChild(noneA);
+  for (const x of accs) {
+    const o = document.createElement("option");
+    o.value = String(x.id);
+    o.textContent = x.nama;
+    searchAccEl.appendChild(o);
+  }
+  if (prevAcc) searchAccEl.value = prevAcc;
+
+  const prevCat = searchCatEl.value;
+  searchCatEl.replaceChildren();
+  const noneC = document.createElement("option");
+  noneC.value = "";
+  noneC.textContent = "(semua kategori)";
+  searchCatEl.appendChild(noneC);
+  for (const x of cats) {
+    const o = document.createElement("option");
+    o.value = x.nama;
+    o.textContent = x.nama;
+    searchCatEl.appendChild(o);
+  }
+  if (prevCat) searchCatEl.value = prevCat;
+}
+
+async function runSearch(): Promise<void> {
+  const r = await call({
+    type: "search",
+    q: searchQEl.value.trim(),
+    accountId: searchAccEl.value ? Number(searchAccEl.value) : undefined,
+    kategori: searchCatEl.value || undefined,
+    from: searchFromEl.value || undefined,
+    to: searchToEl.value || undefined,
+    minRaw: searchMinEl.value.trim() || undefined,
+    maxRaw: searchMaxEl.value.trim() || undefined,
+  });
+  const rows = (Array.isArray(r.results) ? r.results : []) as SearchRow[];
+  searchSummaryEl.hidden = false;
+  searchSummaryEl.textContent = `${rows.length} transaksi ditemukan.`;
+  searchListEl.replaceChildren();
+  if (!rows.length) {
+    const empty = document.createElement("p");
+    empty.className = "info-note";
+    empty.textContent = "Tidak ada hasil. Longgarkan filter.";
+    searchListEl.appendChild(empty);
+    return;
+  }
+  for (const t of rows) {
+    const item = document.createElement("div");
+    item.className = "cat-item";
+    const head = document.createElement("div");
+    head.className = "cat-head";
+    const nm = document.createElement("span");
+    nm.className = "cat-name";
+    nm.textContent = `#${t.id} · ${t.kategori}`;
+    const badge = document.createElement("span");
+    badge.className = "cat-badge";
+    badge.textContent = t.tipe;
+    head.append(nm, badge);
+    const info = document.createElement("div");
+    info.className = "cat-kw";
+    info.textContent =
+      `${t.tanggal} · ${t.tipe === "masuk" ? "+" : "−"}${fmtRp(t.jumlah)}` +
+      (t.akun ? ` · ${t.akun}` : "") +
+      (t.catatan ? ` · ${t.catatan}` : "");
+    item.append(head, info);
+    searchListEl.appendChild(item);
+  }
+}
+
+document.getElementById("openSearch")!.onclick = async () => {
+  showInfoPane(searchModal);
+  searchSummaryEl.hidden = true;
+  searchListEl.replaceChildren();
+  await refreshSearchOptions();
+};
+document.getElementById("searchBack")!.onclick = () => showInfoPane(infoModal);
+document.getElementById("searchResetForm")!.onclick = () => {
+  searchQEl.value = "";
+  searchAccEl.value = "";
+  searchCatEl.value = "";
+  searchFromEl.value = "";
+  searchToEl.value = "";
+  searchMinEl.value = "";
+  searchMaxEl.value = "";
+  searchSummaryEl.hidden = true;
+  searchListEl.replaceChildren();
+};
+document.getElementById("searchRun")!.onclick = () => void runSearch();
 
 document.getElementById("updateReload")!.onclick = async () => {
   try {
