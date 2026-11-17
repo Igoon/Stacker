@@ -41,6 +41,7 @@ Prinsip: **lokal dulu, tanpa server, chat-first**. Chat untuk *mencatat*; menu u
 - 2.27.0 Target & sinking fund (progres, saran/bulan, tempo; isi/ambil/hapus)
 - 2.28.0 Panduan alokasi 50/30/20 (perintah `alokasi` + bagian Ringkasan)
 - 2.29.0 Tema terang "Langit" (biru) + perbaikan kontras teks tema terang
+- 2.30.0 Kartu transaksi di chat + chip perintah cepat
 
 ## Berikutnya
 - Kandidat dari "Nanti": Import CSV bank + auto-kategorisasi, WebAuthn,

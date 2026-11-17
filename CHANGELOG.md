@@ -3,6 +3,12 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.30.0]
+- **Kartu transaksi di chat**: tiap transaksi kini tampil sebagai **kartu** rapi
+  (nominal, badge kategori, akun · #id, tombol hapus) — lebih mudah dibaca.
+- **Chip perintah cepat** di atas kolom input: Ringkasan, Alokasi, Target,
+  Berulang, sekali ketuk.
+
 ## [2.29.0]
 - **Tema terang "Langit"** (biru seperti mockup): palet terang dengan aksen biru,
   di samping tema gelap. Default tetap **gelap** (privasi). Sekaligus merapikan

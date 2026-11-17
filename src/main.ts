@@ -264,6 +264,15 @@ const subEl = document.getElementById("sub")!;
 const busyEl = document.getElementById("busy")!;
 const chipsEl = document.getElementById("chips")!;
 const suggestEl = document.getElementById("suggest")!;
+const quickEl = document.getElementById("quick");
+if (quickEl) {
+  for (const b of quickEl.querySelectorAll<HTMLButtonElement>("button[data-cmd]")) {
+    b.onclick = () => {
+      input.value = b.dataset.cmd ?? "";
+      void send();
+    };
+  }
+}
 const undoBtn = document.getElementById("undo") as HTMLButtonElement;
 const redoBtn = document.getElementById("redo") as HTMLButtonElement;
 const historyBtn = document.getElementById("history") as HTMLButtonElement;
@@ -765,16 +774,22 @@ function addBubble(
     d.dataset.txId = String(tx.id);
     const sign = tx.tipe === "masuk" ? "+" : "-";
     const full = sign + tx.rupiah;
+    const head = document.createElement("div");
+    head.className = "tx-head";
     const strong = document.createElement("b");
+    strong.className = "tx-amt";
     strong.textContent = hideChat ? maskRp(full) : full;
     strong.dataset.full = full;
-    d.appendChild(strong);
-    d.appendChild(
-      document.createTextNode(
-        " · " + tx.kategori + (tx.akun ? " · " + tx.akun : "") + " · #" + tx.id
-      )
-    );
+    const badge = document.createElement("span");
+    badge.className = "tx-badge";
+    badge.textContent = tx.kategori;
+    head.append(strong, badge);
+    const meta = document.createElement("div");
+    meta.className = "tx-meta";
+    meta.textContent = (tx.akun ? `${tx.akun} · ` : "") + `#${tx.id}`;
+    d.append(head, meta);
     const btn = document.createElement("button");
+    btn.className = "tx-del";
     btn.textContent = tx.transfer_id ? "Hapus (2 baris)" : "Hapus";
     btn.onclick = async () => {
       const res = await call({ type: "delete", txId: tx.id });
@@ -793,7 +808,6 @@ function addBubble(
       }
       void refresh();
     };
-    d.appendChild(document.createElement("br"));
     d.appendChild(btn);
     b.appendChild(d);
   }

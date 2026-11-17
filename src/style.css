@@ -179,16 +179,36 @@ header .saldo-io {
   border-top-left-radius: 2px;
 }
 .tx {
-  margin-top: 6px;
-  border-top: 1px solid var(--border);
-  padding-top: 6px;
-  font-size: 13px;
-  color: var(--muted);
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
 }
-.tx b {
+.tx-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tx-amt {
+  font-size: 15px;
   color: var(--text);
 }
-.tx button {
+.tx-badge {
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--surface-3);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.tx-meta {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.tx-del {
   margin-top: 6px;
   background: var(--surface-3);
   color: var(--text);
@@ -198,7 +218,7 @@ header .saldo-io {
   font-size: 12px;
   cursor: pointer;
 }
-.tx button:hover {
+.tx-del:hover {
   background: var(--surface-4);
 }
 .dl {
@@ -241,6 +261,27 @@ header .saldo-io {
   white-space: nowrap;
 }
 .chips button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.quick {
+  display: flex;
+  gap: 6px;
+  padding: 6px 12px 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+.quick::-webkit-scrollbar {
+  display: none;
+}
+.quick button {
+  flex: 0 0 auto;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
