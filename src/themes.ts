@@ -4,6 +4,7 @@ export type ThemeId =
   | "teal"
   | "forest"
   | "ocean"
+  | "sky"
   | "plum"
   | "sand"
   | "night"
@@ -129,6 +130,43 @@ export const THEMES: readonly Theme[] = [
       "--on-accent": "#041c28",
       "--code-bg": "#0a1e2c",
       "--editor-bg": "#0c2230",
+    },
+  },
+  {
+    id: "sky",
+    label: "Langit",
+    wallpaper: "linear-gradient(170deg,#f4f8fd,#dbe7f5)",
+    metaColor: "#e6eef8",
+    vars: {
+      "--bg": "#eef4fb",
+      "--app-bg": "#e6eef8",
+      "--surface": "#ffffff",
+      "--surface-2": "#f4f8fd",
+      "--surface-3": "#e8eff8",
+      "--surface-4": "#d8e3f0",
+      "--border": "#d3deeb",
+      "--text": "#0f1e2e",
+      "--muted": "#46586b",
+      "--accent": "#1f6fd0",
+      "--accent-2": "#0ea5e9",
+      "--bubble-out": "#1f6fd0",
+      "--bubble-out-text": "#ffffff",
+      "--on-accent": "#ffffff",
+      "--danger": "#d92d4a",
+      "--danger-text": "#7a1424",
+      "--danger-bg": "#fde2e6",
+      "--danger-bg-hover": "#fbc9d1",
+      "--warning": "#b45309",
+      "--code-bg": "#eef4fb",
+      "--editor-bg": "#f7fafd",
+      "--chart-1": "#1f6fd0",
+      "--chart-2": "#0ea5e9",
+      "--chart-3": "#e11d48",
+      "--chart-4": "#d97706",
+      "--chart-5": "#7c3aed",
+      "--chart-6": "#059669",
+      "--chart-7": "#ea580c",
+      "--chart-8": "#c026d3",
     },
   },
   {

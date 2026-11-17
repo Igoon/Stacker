@@ -3,6 +3,12 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.29.0]
+- **Tema terang "Langit"** (biru seperti mockup): palet terang dengan aksen biru,
+  di samping tema gelap. Default tetap **gelap** (privasi). Sekaligus merapikan
+  warna teks bubble user, toolbar, chips, dan tombol riwayat agar terbaca di tema
+  terang (lolos kontras WCAG AA).
+
 ## [2.28.0]
 - **Panduan 50/30/20**: perintah `alokasi` + bagian **Alokasi 50/30/20** di
   Ringkasan. Dari pemasukan bulan ini: kebutuhan (≤50%), keinginan (≤30%),
