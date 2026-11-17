@@ -3,6 +3,11 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.21.0]
+- **Menu Utang/Piutang (UI)**: kelola lewat **Info › Utang/Piutang** — daftar
+  (sisa per item + total utang/piutang), tambah, bayar sebagian/lunas, dan hapus.
+  Sama seperti chat (bisa di-undo); ledger tetap terpisah dari saldo akun.
+
 ## [2.20.0]
 - **Menu Berulang (UI)**: tambah/kelola transaksi berulang lewat menu
   (**Info › Berulang**) tanpa harus ketik perintah — daftar, aktif/nonaktif,

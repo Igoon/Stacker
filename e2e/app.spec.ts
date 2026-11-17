@@ -538,6 +538,31 @@ test("menu Berulang: tambah, nonaktif/aktif, ubah, hapus", async ({ page }) => {
   await page.locator("#recBack").click();
 });
 
+test("menu Utang/Piutang: tambah, bayar sebagian, lunas", async ({ page }) => {
+  await boot(page);
+  await page.locator("#info").click();
+  await page.locator("#openDebt").click();
+
+  await page.locator("#debtArah").selectOption("utang");
+  await page.locator("#debtNama").fill("budi");
+  await page.locator("#debtJumlah").fill("100rb");
+  await page.locator("#debtSave").click();
+  const item = page.locator("#debtList .cat-item").filter({ hasText: "budi" });
+  await expect(item).toContainText("sisa Rp100.000");
+  await expect(page.locator("#debtTotals")).toContainText("Utang saya: Rp100.000");
+
+  page.once("dialog", (d) => void d.accept("40rb"));
+  await item.getByText("Bayar").click();
+  await expect(item).toContainText("sisa Rp60.000");
+  await expect(item).toContainText("dari Rp100.000");
+
+  page.once("dialog", (d) => void d.accept("60rb"));
+  await item.getByText("Bayar").click();
+  await expect(page.locator("#debtList")).not.toContainText("budi");
+
+  await page.locator("#debtBack").click();
+});
+
 test("sapaan hanya untuk pengguna baru", async ({ page }) => {
   await boot(page);
   await expect(

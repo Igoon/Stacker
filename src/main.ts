@@ -1850,6 +1850,13 @@ const recJumlahEl = document.getElementById("recJumlah") as HTMLInputElement;
 const recAccEl = document.getElementById("recAcc") as HTMLSelectElement;
 const recHariEl = document.getElementById("recHari") as HTMLInputElement;
 const recMsgEl = document.getElementById("recMsg")!;
+const debtModal = document.getElementById("debtModal")!;
+const debtTotalsEl = document.getElementById("debtTotals")!;
+const debtListEl = document.getElementById("debtList")!;
+const debtArahEl = document.getElementById("debtArah") as HTMLSelectElement;
+const debtNamaEl = document.getElementById("debtNama") as HTMLInputElement;
+const debtJumlahEl = document.getElementById("debtJumlah") as HTMLInputElement;
+const debtMsgEl = document.getElementById("debtMsg")!;
 const INFO_PANES = [
   infoModal,
   secModal,
@@ -1861,6 +1868,7 @@ const INFO_PANES = [
   dashModal,
   accModal,
   recModal,
+  debtModal,
 ];
 // Semantik dialog + tutup dengan Esc.
 for (const m of document.querySelectorAll<HTMLElement>(".modal")) {
@@ -2794,6 +2802,105 @@ document.getElementById("recSave")!.onclick = async () => {
   recJumlahEl.value = "";
   recMsgEl.hidden = true;
   await refreshRecList();
+};
+
+// ---------- Utang / Piutang (UI) ----------
+interface DebtRow {
+  id: number;
+  arah: "utang" | "piutang";
+  nama: string;
+  jumlah: number;
+  sisa: number;
+  catatan: string | null;
+  tanggal: string;
+}
+
+async function refreshDebtList(): Promise<void> {
+  const r = await call({ type: "listdebt" });
+  const rows = (Array.isArray(r.debts) ? r.debts : []) as DebtRow[];
+  const t = (r.totals ?? {}) as { utang?: number; piutang?: number };
+  debtTotalsEl.textContent =
+    `Utang saya: ${fmtRp(Number(t.utang ?? 0))} · Piutang saya: ${fmtRp(Number(t.piutang ?? 0))}`;
+  debtListEl.replaceChildren();
+  if (!rows.length) {
+    const empty = document.createElement("p");
+    empty.className = "info-note";
+    empty.textContent = "Belum ada utang/piutang. Isi form di bawah.";
+    debtListEl.appendChild(empty);
+    return;
+  }
+  for (const d of rows) {
+    const item = document.createElement("div");
+    item.className = "cat-item";
+    const head = document.createElement("div");
+    head.className = "cat-head";
+    const nm = document.createElement("span");
+    nm.className = "cat-name";
+    nm.textContent = d.nama;
+    const badge = document.createElement("span");
+    badge.className = "cat-badge";
+    badge.textContent = d.arah;
+    head.append(nm, badge);
+    const info = document.createElement("div");
+    info.className = "cat-kw";
+    info.textContent =
+      `#${d.id} · sisa ${fmtRp(d.sisa)}` +
+      (d.sisa !== d.jumlah ? ` (dari ${fmtRp(d.jumlah)})` : "") +
+      ` · ${d.tanggal}`;
+
+    const actions = document.createElement("div");
+    actions.className = "cat-actions";
+    const pay = document.createElement("button");
+    pay.textContent = "Bayar";
+    pay.onclick = async () => {
+      const val = window.prompt(`Bayar ${d.arah} ke "${d.nama}" (sisa ${fmtRp(d.sisa)}):`, "");
+      if (val == null || !val.trim()) return;
+      const res = await runCmd(`bayar ${d.arah} ${d.nama} ${val.trim()}`);
+      showToast(res.text || "Pembayaran dicatat.");
+      await refreshDebtList();
+    };
+    const del = document.createElement("button");
+    del.textContent = "Hapus";
+    del.onclick = async () => {
+      if (!window.confirm(`Hapus ${d.arah} "${d.nama}" (#${d.id})?`)) return;
+      const res = await runCmd(`${d.arah} hapus ${d.id}`);
+      showToast(res.text || "Dihapus.");
+      await refreshDebtList();
+    };
+    actions.append(pay, del);
+
+    item.append(head, info, actions);
+    debtListEl.appendChild(item);
+  }
+}
+
+document.getElementById("openDebt")!.onclick = async () => {
+  showInfoPane(debtModal);
+  debtMsgEl.hidden = true;
+  await refreshDebtList();
+};
+document.getElementById("debtBack")!.onclick = () => showInfoPane(infoModal);
+document.getElementById("debtResetForm")!.onclick = () => {
+  debtNamaEl.value = "";
+  debtJumlahEl.value = "";
+  debtMsgEl.hidden = true;
+};
+document.getElementById("debtSave")!.onclick = async () => {
+  const arah = debtArahEl.value === "piutang" ? "piutang" : "utang";
+  const nama = debtNamaEl.value.trim();
+  const jumlah = debtJumlahEl.value.trim();
+  if (!nama || !jumlah) {
+    debtMsgEl.hidden = false;
+    debtMsgEl.textContent = "Nama dan nominal wajib diisi.";
+    return;
+  }
+  const prep = arah === "utang" ? "ke" : "dari";
+  const res = await runCmd(`${arah} ${jumlah} ${prep} ${nama}`);
+  showToast(res.text || "Dicatat.");
+  debtNamaEl.value = "";
+  debtJumlahEl.value = "";
+  debtMsgEl.hidden = true;
+  await refreshDebtList();
 };
 
 document.getElementById("updateReload")!.onclick = async () => {

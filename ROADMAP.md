@@ -29,10 +29,10 @@ Prinsip: **lokal dulu, tanpa server, chat-first**. Chat untuk *mencatat*; menu u
 - 2.18.3 Fix tanggal di awal tak menghalangi perintah (mis. transfer)
 - 2.19.0 Header saldo 2 baris (saldo + masuk/keluar bulan) + angka ringkas
 - 2.20.0 Menu Berulang (daftar + aktif/nonaktif + ubah + hapus)
+- 2.21.0 Menu Utang/Piutang (daftar + bayar + hapus)
 
 ## Berikutnya
 ### Tuntaskan kelola lewat menu
-- Utang/Piutang UI (daftar + bayar + hapus).
 - Cari/filter UI (rentang tanggal, nominal, kategori, akun).
 
 ## Nanti
