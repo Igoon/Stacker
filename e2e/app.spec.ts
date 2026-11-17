@@ -56,11 +56,11 @@ test("catat transaksi, saldo akurat, undo mengembalikan", async ({ page }) => {
 
   await chat(page, "makan siang 50rb");
   await expect(page.locator("#chat .tx").last()).toContainText("Makanan");
-  await expect(page.locator("#saldo")).toHaveText(/-Rp50\.000/);
+  await expect(page.locator("#saldoTot")).toHaveText(/-Rp50rb/);
 
   await chat(page, "undo");
   await expect(page.locator("#chat .bubble").filter({ hasText: "Dibatalkan" })).toBeVisible();
-  await expect(page.locator("#saldo")).toHaveText(/Rp0/);
+  await expect(page.locator("#saldoTot")).toHaveText(/Rp0/);
 
   // Data benar-benar hilang: reload => hint transaksi tak muncul.
   await page.reload();
@@ -147,7 +147,7 @@ test("tombol undo membatalkan aksi terakhir", async ({ page }) => {
   await chat(page, "kopi 15rb");
   await page.locator("#undo").click();
   await expect(page.locator("#chat .bubble").filter({ hasText: "Dibatalkan" })).toBeVisible();
-  await expect(page.locator("#saldo")).toHaveText(/Rp0/);
+  await expect(page.locator("#saldoTot")).toHaveText(/Rp0/);
 });
 
 test("tombol backup terenkripsi", async ({ page }) => {
@@ -167,7 +167,7 @@ test("dua pesan cepat diproses berurutan", async ({ page }) => {
   await chat(page, "kopi 10rb");
   await chat(page, "teh 5rb");
   await expect(page.locator("#chat .tx")).toHaveCount(2);
-  await expect(page.locator("#saldo")).toHaveText(/-Rp15\.000/);
+  await expect(page.locator("#saldoTot")).toHaveText(/-Rp15rb/);
 });
 
 test("alias tf dipakai untuk transfer", async ({ page }) => {
@@ -176,7 +176,7 @@ test("alias tf dipakai untuk transfer", async ({ page }) => {
   await expect(page.locator("#chat .bubble").filter({ hasText: "tf → transfer" }).last()).toBeVisible();
   await chat(page, "tf 10rb bsi ke gopay");
   await expect(page.locator("#chat .bubble").filter({ hasText: "Transfer Rp10.000" })).toBeVisible();
-  await expect(page.locator("#saldo")).toHaveText(/Rp0/);
+  await expect(page.locator("#saldoTot")).toHaveText(/Rp0/);
   await chat(page, "alias");
   await expect(page.locator("#chat .bubble").filter({ hasText: "tf → transfer" }).last()).toBeVisible();
 
@@ -221,12 +221,12 @@ test("menu Reset data menjalankan reset transaksi", async ({ page }) => {
 test("reset semua minta konfirmasi & mengosongkan data", async ({ page }) => {
   await boot(page);
   await chat(page, "kopi 15rb");
-  await expect(page.locator("#saldo")).toHaveText(/-Rp15\.000/);
+  await expect(page.locator("#saldoTot")).toHaveText(/-Rp15rb/);
 
   page.once("dialog", (d) => d.accept());
   await chat(page, "reset semua");
   await expect(page.locator("#chat .bubble").filter({ hasText: "Reset total" })).toBeVisible();
-  await expect(page.locator("#saldo")).toHaveText(/Rp0/);
+  await expect(page.locator("#saldoTot")).toHaveText(/Rp0/);
   await expect(page.locator("#chat .tx")).toHaveCount(0);
 });
 
@@ -368,16 +368,16 @@ test("modal info ringkas + sub-modal (storage & tentang)", async ({ page }) => {
 test("tombol Undo & Redo mengubah saldo", async ({ page }) => {
   await boot(page);
   await chat(page, "kopi 5rb");
-  await expect(page.locator("#saldo")).toContainText("-Rp5.000");
+  await expect(page.locator("#saldoTot")).toContainText("-Rp5rb");
   await expect(page.locator("#undo")).toHaveAttribute("title", /kopi 5rb/);
 
   await page.locator("#undo").click();
-  await expect(page.locator("#saldo")).toContainText("Rp0");
+  await expect(page.locator("#saldoTot")).toContainText("Rp0");
   await expect(page.locator("#redo")).toBeEnabled();
   await expect(page.locator("#redo")).toHaveAttribute("title", /kopi 5rb/);
 
   await page.locator("#redo").click();
-  await expect(page.locator("#saldo")).toContainText("-Rp5.000");
+  await expect(page.locator("#saldoTot")).toContainText("-Rp5rb");
   await expect(page.locator("#redo")).toBeDisabled();
 });
 
@@ -450,7 +450,7 @@ test("saldo tersamar default & ketuk untuk lihat", async ({ page }) => {
   await chat(page, "kopi 15rb");
   await expect(page.locator("#saldo")).toContainText("••••");
   await page.locator("#saldo").click();
-  await expect(page.locator("#saldo")).toContainText("-Rp15.000");
+  await expect(page.locator("#saldoTot")).toContainText("-Rp15rb");
 });
 
 test("menu Kategori, Anggaran, dan Ringkasan", async ({ page }) => {
@@ -727,7 +727,7 @@ test("PIN: set via keypad, ubah, unlock, hapus", async ({ page }) => {
 test("hapus semua data membersihkan storage dan mereset app", async ({ page }) => {
   await boot(page);
   await chat(page, "kopi 15rb");
-  await expect(page.locator("#saldo")).toHaveText(/-Rp15\.000/);
+  await expect(page.locator("#saldoTot")).toHaveText(/-Rp15rb/);
   await page.evaluate(() =>
     localStorage.setItem("stacker-wallpaper", JSON.stringify({ kind: "default" }))
   );
@@ -739,7 +739,7 @@ test("hapus semua data membersihkan storage dan mereset app", async ({ page }) =
 
   // Reload otomatis: app kembali bersih dan localStorage dibersihkan.
   await expect(page.locator("#sub")).toHaveText(/^v\d/, { timeout: 60_000 });
-  await expect(page.locator("#saldo")).toHaveText(/Rp0/);
+  await expect(page.locator("#saldoTot")).toHaveText(/Rp0/);
   expect(await page.evaluate(() => localStorage.getItem("stacker-wallpaper"))).toBeNull();
 });
 
@@ -767,5 +767,5 @@ test("hapus semua data wajib PIN bila PIN aktif", async ({ page }) => {
   await submitPad(page, "#pinPad");
   await expect(page.locator("#sub")).toHaveText(/^v\d/, { timeout: 60_000 });
   await expect(page.locator("#lock")).toBeHidden();
-  await expect(page.locator("#saldo")).toHaveText(/Rp0/);
+  await expect(page.locator("#saldoTot")).toHaveText(/Rp0/);
 });
