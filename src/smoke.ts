@@ -104,6 +104,22 @@ await check("transfer ikut tanggal; hapus dua id sekaligus tak salah lapor", asy
   assert(!del.text.includes("Tidak ada"), "pasangan tak dilaporkan hilang");
 });
 
+await check("tanggal di AWAL tak menghalangi perintah transfer", async () => {
+  const r = await handleMessage("2026-11-11 transfer 10rb bsi ke gopay");
+  assert.equal(r.txs?.length, 2, "dua sisi transfer");
+  const [a, b] = r.txs!;
+  assert(a.transfer_id && b.transfer_id, "kedua sisi punya transfer_id");
+  assert.equal(dbmod.getTx(a.id)!.tanggal, "2026-11-11", "sisi keluar bertanggal awal");
+  assert.equal(dbmod.getTx(b.id)!.tanggal, "2026-11-11", "sisi masuk bertanggal awal");
+  await handleMessage(`hapus ${a.id}`);
+});
+
+await check("tanggal di AWAL tetap terbaca pada transaksi biasa", async () => {
+  const r = await handleMessage("2026-10-05 makan 20rb");
+  const t = r.txs![0];
+  assert.equal(dbmod.getTx(t.id)!.tanggal, "2026-10-05", "tanggal transaksi biasa");
+});
+
 await check("ubah nominal transfer mengubah dua sisi; pindah akun ditolak", async () => {
   const r = await handleMessage("transfer 10rb bsi ke gopay");
   const [a, b] = r.txs!;

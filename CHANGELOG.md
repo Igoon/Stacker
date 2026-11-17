@@ -3,6 +3,12 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.18.3]
+- **Fix**: tanggal di **awal** pesan (mis. `2026-11-11 transfer 10rb bsi ke
+  gopay` atau `kemarin transfer 10rb bsi ke gopay`) tidak lagi menghalangi
+  deteksi perintah. Sebelumnya pesan seperti itu tercatat sebagai satu
+  pengeluaran biasa, bukan transfer dua sisi.
+
 ## [2.18.2]
 - **Auto-backup folder**: bila izin folder perlu diperbarui, tombol memakai
   handle folder tersimpan (**Izinkan folder tersimpan**) sehingga tidak membuka

@@ -675,7 +675,15 @@ export async function handleMessage(input: string): Promise<Reply> {
 }
 
 async function handleMessageInner(input: string): Promise<Reply> {
-  const text = input.trim();
+  const raw = input.trim();
+  // Tanggal di AWAL pesan (mis. "2026-11-11 transfer 10rb bsi ke gopay")
+  // tidak boleh menghalangi deteksi perintah berawalan (regex /^perintah/).
+  // `text` dipakai untuk deteksi perintah; `raw` tetap dipakai saat parsing
+  // transaksi agar tanggal & catatan asli tidak hilang.
+  const dateInfo = extractDate(raw);
+  const leadDate =
+    !!dateInfo.tanggal && dateInfo.cleaned.length > 0 && raw.endsWith(dateInfo.cleaned);
+  const text = leadDate ? dateInfo.cleaned : raw;
   const low = text.toLowerCase();
 
   if (!text) return { text: "Tulis sesuatu, contoh: makan siang 50rb" };
@@ -1139,7 +1147,7 @@ async function handleMessageInner(input: string): Promise<Reply> {
 
   if (/^transfer\b/.test(low)) {
     const found = mentionedAccounts(text);
-    const parsed = parseLocal(text);
+    const parsed = parseLocal(raw);
     const nominal = parsed?.result.jumlah;
     if (found.length < 2) {
       return { text: "Sebut dua akun. Contoh: `transfer 100rb bca ke gopay`" };
@@ -1879,8 +1887,8 @@ async function handleMessageInner(input: string): Promise<Reply> {
     return { text: `Perintah "${word}" tidak dikenali. Ketik \`help\` untuk daftar perintah.` };
   }
 
-  const account = resolveAccount(text);
-  const { results, usedAI } = await resolveTransactions(text);
+  const account = resolveAccount(raw);
+  const { results, usedAI } = await resolveTransactions(raw);
   if (results.length === 0) {
     return { text: "Nominal tidak kebaca. Contoh: `makan siang 50rb`" };
   }
