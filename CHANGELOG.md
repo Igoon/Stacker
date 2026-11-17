@@ -3,6 +3,13 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.35.0]
+- **Tema "Otomatis"**: opsi tema baru — otomatis memakai tema terang (**Langit**)
+  pada siang hari dan **Default** (gelap) pada malam hari. Dicek ulang tiap menit
+  dan saat app kembali dibuka.
+- **Hapus opsi "Samarkan nominal transaksi di chat"** dari **Tema & tampilan**;
+  nominal transaksi kini selalu ditampilkan di chat.
+
 ## [2.34.0]
 - **Panic blur otomatis saat menganggur**: selain saat app ditinggal, layar ikut
   disamarkan bila tak ada aktivitas (mengatasi OS yang menangkap snapshot sebelum

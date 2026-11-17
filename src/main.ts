@@ -628,17 +628,8 @@ saldoEl.addEventListener("keydown", (e) => {
   }
 });
 
-// Privasi chat: samarkan nominal di bubble (opt-in). Berguna saat menunjukkan
-// layar. Angka non-uang (mis. #id, tanggal) tak ikut disamarkan.
-const HIDE_CHAT_KEY = "stacker-hide-chat";
-function readHideChat(): boolean {
-  try {
-    return localStorage.getItem(HIDE_CHAT_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-let hideChat = readHideChat();
+// Opsi "samarkan nominal di chat" DIHAPUS: nominal transaksi selalu ditampilkan.
+const hideChat = false;
 const RUPIAH_RE = /Rp[\d.,]+/g;
 function maskRp(s: string): string {
   return s.replace(RUPIAH_RE, "Rp••••");
@@ -1264,11 +1255,22 @@ const WALL_PRESETS: WallPreset[] = THEMES.map((theme) => ({
 
 const WALL_KEY = "stacker-wallpaper";
 const THEME_KEY = "stacker-theme";
-let currentTheme: ThemeId = readTheme();
 
-function readTheme(): ThemeId {
+// "auto" = tema otomatis: terang (Langit) saat siang, Default (gelap) saat malam.
+type ThemePref = ThemeId | "auto";
+const AUTO_LIGHT_THEME: ThemeId = "sky";
+const AUTO_DAY_START = 6; // 06:00
+const AUTO_DAY_END = 18; // 18:00
+
+function resolveAutoTheme(now = new Date()): ThemeId {
+  const h = now.getHours();
+  return h >= AUTO_DAY_START && h < AUTO_DAY_END ? AUTO_LIGHT_THEME : DEFAULT_THEME;
+}
+
+function readTheme(): ThemePref {
   try {
     const saved = localStorage.getItem(THEME_KEY);
+    if (saved === "auto") return "auto";
     if (isThemeId(saved)) return saved;
   } catch {
     // localStorage diblokir; lanjut ke migrasi wallpaper.
@@ -1283,21 +1285,33 @@ function readTheme(): ThemeId {
   return DEFAULT_THEME;
 }
 
-function applyTheme(id: ThemeId): void {
-  const theme = themeById(id);
+let currentPref: ThemePref = readTheme();
+let currentTheme: ThemeId = currentPref === "auto" ? resolveAutoTheme() : currentPref;
+
+function applyTheme(pref: ThemePref, persist = true): void {
+  const resolved: ThemeId = pref === "auto" ? resolveAutoTheme() : pref;
+  const theme = themeById(resolved);
   const root = document.documentElement;
   for (const [name, value] of Object.entries(themeVars(theme))) {
     root.style.setProperty(name, value);
   }
   root.dataset.theme = theme.id;
+  currentPref = pref;
   currentTheme = theme.id;
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute("content", theme.metaColor);
-  try {
-    localStorage.setItem(THEME_KEY, theme.id);
-  } catch {
-    // abaikan
+  if (persist) {
+    try {
+      localStorage.setItem(THEME_KEY, pref);
+    } catch {
+      // abaikan
+    }
   }
+}
+
+function maybeAutoTheme(): void {
+  if (currentPref !== "auto") return;
+  if (resolveAutoTheme() !== currentTheme) applyTheme("auto", false);
 }
 
 type Wall =
@@ -1356,7 +1370,7 @@ function applyWall(w: Wall): void {
 let currentWall: Wall = readWall();
 
 function syncWallControls(w: Wall): void {
-  const activeId = currentTheme;
+  const activeId = currentPref;
   for (const btn of Array.from(wallSwatches.querySelectorAll<HTMLButtonElement>(".swatch"))) {
     btn.setAttribute("aria-pressed", String(btn.dataset.preset === activeId));
   }
@@ -1365,10 +1379,33 @@ function syncWallControls(w: Wall): void {
   wallDimVal.textContent = `${Math.round(dim * 100)}%`;
   const themeLabel = document.getElementById("wallThemeLabel");
   if (themeLabel) {
-    themeLabel.textContent = `Tema aktif: ${themeById(currentTheme).label}${
-      w.kind === "image" ? " - wallpaper kustom" : ""
-    }`;
+    const visual = themeById(currentTheme).label;
+    themeLabel.textContent = `Tema aktif: ${
+      currentPref === "auto" ? `Otomatis (${visual})` : visual
+    }${w.kind === "image" ? " - wallpaper kustom" : ""}`;
   }
+}
+
+// Tombol Otomatis: terang saat siang, default saat malam.
+{
+  const btn = document.createElement("button");
+  btn.className = "swatch";
+  btn.type = "button";
+  btn.dataset.preset = "auto";
+  btn.textContent = "Otomatis";
+  btn.title = "Tema otomatis: terang saat siang, default saat malam";
+  btn.setAttribute("aria-label", "Tema otomatis");
+  btn.style.background = "linear-gradient(90deg,#eef4fb 50%,#111b21 50%)";
+  btn.onclick = () => {
+    applyTheme("auto");
+    if (currentWall.kind !== "image") {
+      currentWall = { kind: "default" };
+      applyWall(currentWall);
+      saveWall(currentWall);
+    }
+    syncWallControls(currentWall);
+  };
+  wallSwatches.appendChild(btn);
 }
 
 for (const p of WALL_PRESETS) {
@@ -1393,7 +1430,6 @@ for (const p of WALL_PRESETS) {
 }
 
 const hideSaldoEl = document.getElementById("hideSaldo") as HTMLInputElement;
-const hideChatEl = document.getElementById("hideChat") as HTMLInputElement;
 const panicOnEl = document.getElementById("panicOn") as HTMLInputElement;
 const panicIdleEl = document.getElementById("panicIdle") as HTMLSelectElement;
 const soundNoticeEl = document.getElementById("soundNotice") as HTMLInputElement;
@@ -1404,7 +1440,6 @@ document.getElementById("openWall")!.onclick = () => {
   currentWall = readWall();
   syncWallControls(currentWall);
   hideSaldoEl.checked = hideSaldo;
-  hideChatEl.checked = hideChat;
   panicOnEl.checked = panicOn;
   panicIdleEl.value = String(panicIdle);
   soundNoticeEl.checked = soundOn;
@@ -1422,17 +1457,6 @@ hideSaldoEl.onchange = () => {
   }
   renderSaldo();
   showToast(hideSaldo ? "Saldo disamarkan di header." : "Saldo ditampilkan di header.");
-};
-
-hideChatEl.onchange = () => {
-  hideChat = hideChatEl.checked;
-  try {
-    localStorage.setItem(HIDE_CHAT_KEY, hideChat ? "1" : "0");
-  } catch {
-    // abaikan
-  }
-  applyChatMask();
-  showToast(hideChat ? "Nominal di chat disamarkan." : "Nominal di chat ditampilkan.");
 };
 
 panicOnEl.onchange = () => {
@@ -1566,7 +1590,10 @@ wallFile.addEventListener("change", async () => {
   }
 });
 
-applyTheme(currentTheme);
+applyTheme(currentPref, false);
+setInterval(maybeAutoTheme, 60_000);
+document.addEventListener("visibilitychange", maybeAutoTheme);
+window.addEventListener("focus", maybeAutoTheme);
 applyWall(currentWall);
 syncWallControls(currentWall);
 
