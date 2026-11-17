@@ -1036,5 +1036,21 @@ await check("header: ringkas rupiah (shortRp)", async () => {
   assert.equal(shortRp(750), "750");
 });
 
+await check("auto-kategori dari riwayat (lokal, tanpa AI)", async () => {
+  const a = dbmod.addTx({ jumlah: 20000, tipe: "keluar", kategori: "Makanan", catatan: "padang", account_id: null });
+  const b = dbmod.addTx({ jumlah: 25000, tipe: "keluar", kategori: "Makanan", catatan: "padang", account_id: null });
+  const r = await handleMessage("padang 30000");
+  assert.equal(r.txs?.[0]?.kategori, "Makanan", "kategori ditebak dari riwayat");
+  assert(!r.text.includes("diproses AI"), "tidak memanggil AI");
+  assert(r.text.includes("ditebak dari riwayat"), "ada catatan tebakan");
+  dbmod.deleteTx(a.id);
+  dbmod.deleteTx(b.id);
+});
+
+await check("auto-kategori: tanpa dukungan riwayat tetap Lainnya", async () => {
+  const r = await handleMessage("zqxwk 50000");
+  assert.equal(r.txs?.[0]?.kategori, "Lainnya", "tanpa riwayat -> Lainnya");
+});
+
 console.log(`\n${pass} ok, ${fail} fail`);
 if (fail > 0) process.exit(1);

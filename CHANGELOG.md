@@ -3,6 +3,13 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.23.0]
+- **Auto-kategorisasi on-device**: bila kategori tak dikenali, Stacker menebak
+  dari **riwayat transaksimu sendiri** (kata yang sama pernah masuk kategori X)
+  — **tanpa AI**, jadi hemat kuota. Kategori hasil tebakan diberi catatan
+  "(ditebak dari riwayat)"; koreksi lewat `ubah #id kategori ...` otomatis
+  memperkuat tebakan berikutnya.
+
 ## [2.22.2]
 - **Update lebih cepat**: registrasi service worker memakai
   `updateViaCache: "none"` + cek update tepat saat app dibuka, sehingga `sw.js`

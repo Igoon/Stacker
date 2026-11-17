@@ -33,16 +33,14 @@ Prinsip: **lokal dulu, tanpa server, chat-first**. Chat untuk *mencatat*; menu u
 - 2.22.0 Menu Cari (kata kunci + akun + kategori + tanggal + nominal)
 - 2.22.1 UI menu Info dirapikan (Cari di atas, lebih rapat, daftar scroll)
 - 2.22.2 Update lebih cepat (SW updateViaCache none + cek saat dibuka)
+- 2.23.0 Auto-kategorisasi on-device (tebak kategori dari riwayat, tanpa AI)
 
 ## Berikutnya
-- Kelola lewat menu tuntas (Kategori, Akun, Anggaran, Berulang, Utang/Piutang, Cari).
-  Kandidat berikut: auto-kategorisasi on-device, deteksi langganan, net worth &
-  proyeksi arus kas (lihat "Nanti").
+- Deteksi langganan otomatis (pola nominal + interval → saran `berulang`).
+- Dashboard++: net worth, proyeksi arus kas, tren 6 bulan.
 
 ## Nanti
 - Dashboard++: tren 6 bulan, perbandingan, proyeksi arus kas, *net worth*.
-- Auto-kategorisasi on-device (dari riwayat) — tanpa cloud.
-- Pendeteksi langganan otomatis (pola nominal + interval → saran `berulang`).
 - Goal/sinking fund + template 50/30/20.
 - Import CSV bank + auto-kategorisasi.
 - Samarkan nominal transaksi di chat (lanjutan saldo tersamar).

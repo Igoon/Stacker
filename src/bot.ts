@@ -1888,7 +1888,7 @@ async function handleMessageInner(input: string): Promise<Reply> {
   }
 
   const account = resolveAccount(raw);
-  const { results, usedAI } = await resolveTransactions(raw);
+  const { results, usedAI, suggested } = await resolveTransactions(raw);
   if (results.length === 0) {
     return { text: "Nominal tidak kebaca. Contoh: `makan siang 50rb`" };
   }
@@ -1910,32 +1910,85 @@ async function handleMessageInner(input: string): Promise<Reply> {
       ? `${txs.length} transaksi tercatat${akunLabel} (total ${total >= 0 ? "+" : "-"}${rupiah(total)}).`
       : `Tercatat${akunLabel}.`;
   const warns = txs.map(budgetWarn).filter((w): w is string => !!w);
-  const body = [usedAI ? `${head}\n(diproses AI)` : head, ...warns].join("\n");
+  const sugNote = suggested ? `(kategori "${suggested}" ditebak dari riwayat — ubah bila salah)` : "";
+  const body = [usedAI ? `${head}\n(diproses AI)` : head, sugNote, ...warns].filter(Boolean).join("\n");
   return { text: body, txs: txs.map(withRupiah) };
+}
+
+// Kata umum yang tak menandakan kategori (agar tebakan riwayat tak mengacau).
+const CAT_STOP = new Set([
+  "beli", "bayar", "untuk", "dengan", "yang", "dan", "dari", "uang", "sama",
+  "top", "via", "tiap", "saya", "juga", "serta", "atau", "lalu", "sudah", "buat",
+]);
+const catTokens = (s: string): string[] =>
+  (s.toLowerCase().match(/[a-z]{3,}/g) ?? []).filter((t) => !CAT_STOP.has(t));
+
+// Tebak kategori dari riwayat lokal (tanpa AI): token catatan -> kategori yang
+// paling sering menyertai token itu pada transaksi lampau (arah sama & kategori
+// valid untuk arah itu, bukan "Lainnya").
+function suggestFromHistory(
+  catatan: string,
+  tipe: "masuk" | "keluar"
+): { kategori: string; hits: number } | null {
+  const toks = new Set(catTokens(catatan));
+  if (toks.size === 0) return null;
+  const valid = new Set(listCategories(tipe).map((c) => c.nama));
+  const score = new Map<string, number>();
+  let total = 0;
+  for (const t of searchTx("", { limit: 400 })) {
+    if (t.tipe !== tipe) continue;
+    if (t.kategori === "Lainnya" || !valid.has(t.kategori)) continue;
+    for (const tok of new Set(catTokens(t.catatan ?? ""))) {
+      if (!toks.has(tok)) continue;
+      score.set(t.kategori, (score.get(t.kategori) ?? 0) + 1);
+      total++;
+    }
+  }
+  if (total === 0) return null;
+  let best = "";
+  let bestScore = 0;
+  for (const [k, s] of score) if (s > bestScore) ((best = k), (bestScore = s));
+  // Butuh dukungan cukup & dominan agar tak menebak sembarangan.
+  if (bestScore < 2 || bestScore / total < 0.6) return null;
+  return { kategori: best, hits: bestScore };
 }
 
 async function resolveTransactions(
   text: string
-): Promise<{ results: ParseResult[]; usedAI: boolean }> {
+): Promise<{ results: ParseResult[]; usedAI: boolean; suggested: string | null }> {
   const local = parseLocal(text);
 
   if (local && local.confidence === "high") {
-    return { results: [local.result], usedAI: false };
+    return { results: [local.result], usedAI: false, suggested: null };
   }
 
   const multi = parseLocalMulti(text);
-  if (multi) return { results: multi.map((m) => m.result), usedAI: false };
+  if (multi) return { results: multi.map((m) => m.result), usedAI: false, suggested: null };
+
+  // Kategori tak dikenal? Coba tebak dari riwayat (lokal, hemat AI).
+  let suggested: string | null = null;
+  if (local && local.result.kategori === "Lainnya") {
+    const s = suggestFromHistory(local.result.catatan, local.result.tipe);
+    if (s) {
+      local.result.kategori = s.kategori;
+      suggested = s.kategori;
+      // Bila satu-satunya masalah hanya kategori, selesai tanpa AI.
+      if (local.reason === "kategori tak dikenal") {
+        return { results: [local.result], usedAI: false, suggested };
+      }
+    }
+  }
 
   const ai = await parseGemini(text);
   if (ai && ai.length > 0) {
     if (local?.result.tanggal) {
       for (const a of ai) if (!a.tanggal) a.tanggal = local.result.tanggal;
     }
-    return { results: ai, usedAI: true };
+    return { results: ai, usedAI: true, suggested: null };
   }
 
-  if (local) return { results: [local.result], usedAI: false };
-  return { results: [], usedAI: false };
+  if (local) return { results: [local.result], usedAI: false, suggested };
+  return { results: [], usedAI: false, suggested: null };
 }
 
 export { aiEnabled };
