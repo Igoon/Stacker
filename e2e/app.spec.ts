@@ -506,6 +506,38 @@ test("menu Akun: tambah multi-kata, sesuaikan, hapus", async ({ page }) => {
   await page.locator("#accBack").click();
 });
 
+test("menu Berulang: tambah, nonaktif/aktif, ubah, hapus", async ({ page }) => {
+  await boot(page);
+  await page.locator("#info").click();
+  await page.locator("#openRec").click();
+
+  await page.locator("#recNote").fill("listrik");
+  await page.locator("#recJumlah").fill("350rb");
+  await page.locator("#recHari").fill("5");
+  await page.locator("#recSave").click();
+  const item = page.locator("#recList .cat-item").filter({ hasText: "listrik" });
+  await expect(item).toContainText("tiap tgl 5");
+  await expect(item.locator(".cat-badge")).toHaveText("aktif");
+
+  await item.getByText("Nonaktifkan").click();
+  await expect(item.locator(".cat-badge")).toHaveText("nonaktif");
+  await item.getByText("Aktifkan").click();
+  await expect(item.locator(".cat-badge")).toHaveText("aktif");
+
+  page.once("dialog", (d) => {
+    void d.accept("400rb");
+    page.once("dialog", (d2) => void d2.accept("10"));
+  });
+  await item.getByText("Ubah").click();
+  await expect(item).toContainText("tiap tgl 10");
+  await expect(item).toContainText("Rp400.000");
+
+  page.once("dialog", (d) => void d.accept());
+  await item.getByText("Hapus").click();
+  await expect(page.locator("#recList")).not.toContainText("listrik");
+  await page.locator("#recBack").click();
+});
+
 test("sapaan hanya untuk pengguna baru", async ({ page }) => {
   await boot(page);
   await expect(

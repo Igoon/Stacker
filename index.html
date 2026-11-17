@@ -160,6 +160,7 @@
       <button id="openCat" class="menu-row"><span>Kategori</span><span class="chev">›</span></button>
       <button id="openAcc" class="menu-row"><span>Akun</span><span class="chev">›</span></button>
       <button id="openBudget" class="menu-row"><span>Anggaran</span><span class="chev">›</span></button>
+      <button id="openRec" class="menu-row"><span>Berulang</span><span class="chev">›</span></button>
       <div class="menu-head">Pengaturan</div>
       <button id="openSecurity" class="menu-row"><span>Keamanan &amp; PIN</span><span class="chev">›</span></button>
       <button id="openStorage" class="menu-row"><span>Backup &amp; penyimpanan</span><span id="storageWarn" class="menu-warn" hidden>Perlu izin</span><span class="chev">›</span></button>
@@ -358,6 +359,36 @@
     </div>
     <div class="modal-actions">
       <button id="accBack">Kembali</button>
+    </div>
+  </div>
+</div>
+
+<div id="recModal" class="modal" hidden>
+  <div class="modal-box list-box">
+    <h3>Transaksi berulang</h3>
+    <p class="info-note">Dicatat otomatis tiap bulan. Catatan juga menentukan kategori &amp; arah (mis. "gaji" = pemasukan).</p>
+    <div id="recList" class="cat-list"></div>
+    <div class="cat-form">
+      <label>Catatan
+        <input id="recNote" placeholder="listrik" autocomplete="off" />
+      </label>
+      <label>Nominal (mis. 350rb)
+        <input id="recJumlah" placeholder="350rb" autocomplete="off" />
+      </label>
+      <label>Akun (opsional)
+        <select id="recAcc"></select>
+      </label>
+      <label>Tanggal tiap bulan (1-28)
+        <input id="recHari" type="number" min="1" max="28" value="1" autocomplete="off" />
+      </label>
+      <p id="recMsg" class="hint" hidden></p>
+      <div class="info-actions">
+        <button id="recSave">Tambah berulang</button>
+        <button id="recResetForm">Kosongkan form</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button id="recBack">Kembali</button>
     </div>
   </div>
 </div>

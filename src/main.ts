@@ -1843,6 +1843,13 @@ const accNameEl = document.getElementById("accName") as HTMLInputElement;
 const accTipeEl = document.getElementById("accTipe") as HTMLSelectElement;
 const accSaldoEl = document.getElementById("accSaldo") as HTMLInputElement;
 const accMsgEl = document.getElementById("accMsg")!;
+const recModal = document.getElementById("recModal")!;
+const recListEl = document.getElementById("recList")!;
+const recNoteEl = document.getElementById("recNote") as HTMLInputElement;
+const recJumlahEl = document.getElementById("recJumlah") as HTMLInputElement;
+const recAccEl = document.getElementById("recAcc") as HTMLSelectElement;
+const recHariEl = document.getElementById("recHari") as HTMLInputElement;
+const recMsgEl = document.getElementById("recMsg")!;
 const INFO_PANES = [
   infoModal,
   secModal,
@@ -1853,6 +1860,7 @@ const INFO_PANES = [
   budgetModal,
   dashModal,
   accModal,
+  recModal,
 ];
 // Semantik dialog + tutup dengan Esc.
 for (const m of document.querySelectorAll<HTMLElement>(".modal")) {
@@ -2648,6 +2656,144 @@ document.getElementById("accSave")!.onclick = async () => {
   accSaldoEl.value = "";
   accMsgEl.hidden = true;
   await refreshAccList();
+};
+
+// ---------- Transaksi berulang (UI) ----------
+interface RecRow {
+  id: number;
+  catatan: string;
+  jumlah: number;
+  tipe: "masuk" | "keluar";
+  kategori: string;
+  account_id: number | null;
+  hari: number;
+  mulai: string;
+  terakhir: string | null;
+  aktif: number;
+}
+
+async function refreshRecList(): Promise<void> {
+  const [r, a] = await Promise.all([call({ type: "listrecurring" }), call({ type: "listacc" })]);
+  const rows = (Array.isArray(r.recurring) ? r.recurring : []) as RecRow[];
+  const accs = (Array.isArray(a.accounts) ? a.accounts : []) as AccRow[];
+  const nameById = new Map(accs.map((x) => [x.id, x.nama]));
+
+  const prevAcc = recAccEl.value;
+  recAccEl.replaceChildren();
+  const none = document.createElement("option");
+  none.value = "";
+  none.textContent = "(tanpa akun)";
+  recAccEl.appendChild(none);
+  for (const x of accs) {
+    const o = document.createElement("option");
+    o.value = x.nama;
+    o.textContent = x.nama;
+    recAccEl.appendChild(o);
+  }
+  if (prevAcc && accs.some((x) => x.nama === prevAcc)) recAccEl.value = prevAcc;
+
+  recListEl.replaceChildren();
+  if (!rows.length) {
+    const empty = document.createElement("p");
+    empty.className = "info-note";
+    empty.textContent = "Belum ada transaksi berulang. Isi form di bawah.";
+    recListEl.appendChild(empty);
+    return;
+  }
+  for (const b of rows) {
+    const item = document.createElement("div");
+    item.className = "cat-item";
+    const head = document.createElement("div");
+    head.className = "cat-head";
+    const nm = document.createElement("span");
+    nm.className = "cat-name";
+    nm.textContent = b.catatan;
+    const badge = document.createElement("span");
+    badge.className = "cat-badge";
+    badge.textContent = b.aktif ? "aktif" : "nonaktif";
+    head.append(nm, badge);
+    const info = document.createElement("div");
+    info.className = "cat-kw";
+    const accName = b.account_id != null ? nameById.get(b.account_id) : undefined;
+    info.textContent =
+      `${b.tipe === "masuk" ? "+" : "−"}${fmtRp(b.jumlah)} · tiap tgl ${b.hari}` +
+      (accName ? ` · ${accName}` : "") +
+      (b.terakhir ? ` · terakhir ${b.terakhir}` : "");
+
+    const actions = document.createElement("div");
+    actions.className = "cat-actions";
+    const tgl = document.createElement("button");
+    tgl.textContent = b.aktif ? "Nonaktifkan" : "Aktifkan";
+    tgl.onclick = async () => {
+      const res = await runCmd(`berulang ${b.aktif ? "nonaktif" : "aktif"} ${b.id}`);
+      showToast(res.text || "Status diubah.");
+      await refreshRecList();
+    };
+    const ed = document.createElement("button");
+    ed.textContent = "Ubah";
+    ed.onclick = async () => {
+      const jml = window.prompt(`Nominal baru untuk "${b.catatan}" (mis. 350rb):`, fmtRp(b.jumlah));
+      if (jml == null || !jml.trim()) return;
+      const hariTxt = window.prompt(`Tanggal tiap bulan (1-28) untuk "${b.catatan}":`, String(b.hari));
+      if (hariTxt == null) return;
+      const hari = Number(hariTxt.trim() || String(b.hari));
+      if (!Number.isInteger(hari) || hari < 1 || hari > 28) {
+        showToast("Tanggal harus 1-28.");
+        return;
+      }
+      const res = await runCmd(`berulang ubah ${b.id} ${jml.trim()} tiap ${hari}`);
+      showToast(res.text || "Berulang diubah.");
+      await refreshRecList();
+    };
+    const del = document.createElement("button");
+    del.textContent = "Hapus";
+    del.onclick = async () => {
+      if (!window.confirm(`Hapus transaksi berulang "${b.catatan}"?`)) return;
+      const res = await runCmd(`berulang hapus ${b.id}`);
+      showToast(res.text || "Berulang dihapus.");
+      await refreshRecList();
+    };
+    actions.append(tgl, ed, del);
+
+    item.append(head, info, actions);
+    recListEl.appendChild(item);
+  }
+}
+
+document.getElementById("openRec")!.onclick = async () => {
+  showInfoPane(recModal);
+  recMsgEl.hidden = true;
+  await refreshRecList();
+};
+document.getElementById("recBack")!.onclick = () => showInfoPane(infoModal);
+document.getElementById("recResetForm")!.onclick = () => {
+  recNoteEl.value = "";
+  recJumlahEl.value = "";
+  recHariEl.value = "1";
+  recAccEl.value = "";
+  recMsgEl.hidden = true;
+};
+document.getElementById("recSave")!.onclick = async () => {
+  const note = recNoteEl.value.trim();
+  const jumlah = recJumlahEl.value.trim();
+  const hari = Number(recHariEl.value);
+  if (!note || !jumlah) {
+    recMsgEl.hidden = false;
+    recMsgEl.textContent = "Catatan dan nominal wajib diisi.";
+    return;
+  }
+  if (!Number.isInteger(hari) || hari < 1 || hari > 28) {
+    recMsgEl.hidden = false;
+    recMsgEl.textContent = "Tanggal harus 1-28.";
+    return;
+  }
+  const acc = recAccEl.value;
+  const res = await runCmd(`berulang ${acc ? acc + " " : ""}${note} ${jumlah} tiap ${hari}`);
+  showToast(res.text || "Transaksi berulang ditambah.");
+  recNoteEl.value = "";
+  recJumlahEl.value = "";
+  recMsgEl.hidden = true;
+  await refreshRecList();
 };
 
 document.getElementById("updateReload")!.onclick = async () => {

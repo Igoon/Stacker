@@ -3,6 +3,12 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.20.0]
+- **Menu Berulang (UI)**: tambah/kelola transaksi berulang lewat menu
+  (**Info › Berulang**) tanpa harus ketik perintah — daftar, aktif/nonaktif,
+  ubah nominal & tanggal, hapus. Membuat tetap lewat jalur chat yang sama,
+  jadi tetap bisa di-undo.
+
 ## [2.19.0]
 - **Header saldo 2 baris**: pil saldo kanan atas kini menampilkan **Saldo** plus
   baris ringkas **masuk · keluar bulan berjalan** (mis. `Saldo Rp10jt` lalu

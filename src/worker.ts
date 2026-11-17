@@ -15,6 +15,7 @@ import {
   checkIntegrity,
   recurringDue,
   ringkasRange,
+  listRecurring,
 } from "./db";
 import {
   budgetOverview,
@@ -103,6 +104,10 @@ interface ListAccMsg {
   type: "listacc";
   id: number;
 }
+interface ListRecurringMsg {
+  type: "listrecurring";
+  id: number;
+}
 interface CheckDataMsg {
   type: "checkdata";
   id: number;
@@ -150,6 +155,7 @@ type InMsg =
   | ListCatMsg
   | ListBudgetMsg
   | ListAccMsg
+  | ListRecurringMsg
   | CheckDataMsg
   | SetFirstUseMsg
   | DashMsg
@@ -317,6 +323,9 @@ async function onMessage(msg: InMsg): Promise<void> {
       break;
     case "listacc":
       reply(msg.id, { ok: true, accounts: accountBalances() });
+      break;
+    case "listrecurring":
+      reply(msg.id, { ok: true, recurring: listRecurring() });
       break;
     case "checkdata":
       reply(msg.id, { ok: true, issues: checkIntegrity() });

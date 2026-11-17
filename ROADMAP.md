@@ -23,10 +23,15 @@ Prinsip: **lokal dulu, tanpa server, chat-first**. Chat untuk *mencatat*; menu u
 - 2.17.3 Fix banner update palsu (race: tunggu versi app berjalan diketahui)
 - 2.17.4 Fix version.json selalu dari jaringan (info update tampil lagi)
 - 2.17.5 Fix atribut hidden (menu Pasang & baris idle tidak selalu tampil)
+- 2.18.0 Redo + riwayat perintah + 8 tema warna
+- 2.18.1 Backup/restore dipindah ke menu penyimpanan
+- 2.18.2 Tema/wallpaper, izin folder tersimpan, undo-redo lebih aman
+- 2.18.3 Fix tanggal di awal tak menghalangi perintah (mis. transfer)
+- 2.19.0 Header saldo 2 baris (saldo + masuk/keluar bulan) + angka ringkas
+- 2.20.0 Menu Berulang (daftar + aktif/nonaktif + ubah + hapus)
 
 ## Berikutnya
-### v2.18.0 — Tuntaskan kelola lewat menu
-- Berulang UI (daftar + aktif/nonaktif + ubah).
+### Tuntaskan kelola lewat menu
 - Utang/Piutang UI (daftar + bayar + hapus).
 - Cari/filter UI (rentang tanggal, nominal, kategori, akun).
 
