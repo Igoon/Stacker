@@ -1082,5 +1082,26 @@ await check("dashboard++: net worth, proyeksi, tren 6 bln", async () => {
   assert(typeof d.avg3Net === "number" && Number.isFinite(d.avg3Net), "rata-rata net 3 bln");
 });
 
+await check("target: buat, isi, ambil, hapus", async () => {
+  const c = await handleMessage("target Liburan 5jt");
+  assert(c.text.includes("dibuat"), "target dibuat");
+  const i = await handleMessage("target isi Liburan 1jt");
+  assert(i.text.includes("Rp1.000.000"), "terkumpul 1jt");
+  const a = await handleMessage("target ambil Liburan 200rb");
+  assert(a.text.includes("Rp800.000"), "sisa 800rb");
+  const list = await handleMessage("target");
+  assert(list.text.includes("Liburan"), "tampil di daftar");
+  const d = await handleMessage("target hapus Liburan");
+  assert(d.text.includes("dihapus"), "dihapus");
+});
+
+await check("target: tempo tersimpan + ikut backup", async () => {
+  await handleMessage("target Motor 6jt tempo 2027-12-31");
+  const list = await handleMessage("target");
+  assert(list.text.includes("2027-12-31"), "tempo tersimpan");
+  assert(dbmod.exportAll().includes("Motor"), "goals ikut export backup");
+  await handleMessage("target hapus Motor");
+});
+
 console.log(`\n${pass} ok, ${fail} fail`);
 if (fail > 0) process.exit(1);

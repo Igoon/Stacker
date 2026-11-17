@@ -1986,6 +1986,12 @@ const searchSummaryEl = document.getElementById("searchSummary")!;
 const searchListEl = document.getElementById("searchList")!;
 const subsModal = document.getElementById("subsModal")!;
 const subsListEl = document.getElementById("subsList")!;
+const goalModal = document.getElementById("goalModal")!;
+const goalListEl = document.getElementById("goalList")!;
+const goalNamaEl = document.getElementById("goalNama") as HTMLInputElement;
+const goalTargetEl = document.getElementById("goalTarget") as HTMLInputElement;
+const goalTempoEl = document.getElementById("goalTempo") as HTMLInputElement;
+const goalMsgEl = document.getElementById("goalMsg")!;
 const INFO_PANES = [
   infoModal,
   secModal,
@@ -2000,6 +2006,7 @@ const INFO_PANES = [
   debtModal,
   searchModal,
   subsModal,
+  goalModal,
 ];
 // Semantik dialog + tutup dengan Esc.
 for (const m of document.querySelectorAll<HTMLElement>(".modal")) {
@@ -3233,6 +3240,109 @@ document.getElementById("openSubs")!.onclick = async () => {
   await refreshSubsList();
 };
 document.getElementById("subsBack")!.onclick = () => showInfoPane(infoModal);
+
+// ---------- Target / sinking fund (UI) ----------
+interface GoalRow {
+  id: number;
+  nama: string;
+  target: number;
+  terkumpul: number;
+  tenggat: string | null;
+}
+
+async function refreshGoalList(): Promise<void> {
+  const r = await call({ type: "listgoals" });
+  const rows = (Array.isArray(r.goals) ? r.goals : []) as GoalRow[];
+  goalListEl.replaceChildren();
+  if (!rows.length) {
+    const empty = document.createElement("p");
+    empty.className = "info-note";
+    empty.textContent = "Belum ada target. Isi form di bawah (mis. Liburan 5jt).";
+    goalListEl.appendChild(empty);
+    return;
+  }
+  for (const g of rows) {
+    const item = document.createElement("div");
+    item.className = "cat-item";
+    const head = document.createElement("div");
+    head.className = "cat-head";
+    const nm = document.createElement("span");
+    nm.className = "cat-name";
+    nm.textContent = g.nama;
+    const badge = document.createElement("span");
+    badge.className = "cat-badge";
+    const pct = g.target > 0 ? Math.min(100, Math.floor((g.terkumpul / g.target) * 100)) : 0;
+    badge.textContent = `${pct}%`;
+    head.append(nm, badge);
+    const sisa = Math.max(0, g.target - g.terkumpul);
+    const info = document.createElement("div");
+    info.className = "cat-kw";
+    let line = `${fmtRp(g.terkumpul)} / ${fmtRp(g.target)} · sisa ${fmtRp(sisa)}`;
+    if (g.tenggat) {
+      const months = Math.ceil((new Date(g.tenggat).getTime() - Date.now()) / (30 * 86_400_000));
+      line += ` · tempo ${g.tenggat}`;
+      if (months > 0 && sisa > 0) line += ` · saran ${fmtRp(Math.ceil(sisa / months))}/bln`;
+    }
+    info.textContent = line;
+    const bar = document.createElement("div");
+    bar.className = "bar" + (g.terkumpul >= g.target ? " over" : "");
+    const fill = document.createElement("span");
+    fill.style.width = Math.min(100, Math.max(0, pct)) + "%";
+    bar.appendChild(fill);
+    const actions = document.createElement("div");
+    actions.className = "cat-actions";
+    const isi = document.createElement("button");
+    isi.textContent = "Isi";
+    isi.onclick = async () => {
+      const val = window.prompt(`Isi target "${g.nama}" (mis. 500rb):`, "");
+      if (val == null || !val.trim()) return;
+      const res = await runCmd(`target isi ${g.nama} ${val.trim()}`);
+      showToast(res.text || "Tersimpan.");
+      await refreshGoalList();
+    };
+    const del = document.createElement("button");
+    del.textContent = "Hapus";
+    del.onclick = async () => {
+      if (!window.confirm(`Hapus target "${g.nama}"?`)) return;
+      const res = await runCmd(`target hapus ${g.nama}`);
+      showToast(res.text || "Dihapus.");
+      await refreshGoalList();
+    };
+    actions.append(isi, del);
+    item.append(head, info, bar, actions);
+    goalListEl.appendChild(item);
+  }
+}
+
+document.getElementById("openGoal")!.onclick = async () => {
+  showInfoPane(goalModal);
+  goalMsgEl.hidden = true;
+  await refreshGoalList();
+};
+document.getElementById("goalBack")!.onclick = () => showInfoPane(infoModal);
+document.getElementById("goalResetForm")!.onclick = () => {
+  goalNamaEl.value = "";
+  goalTargetEl.value = "";
+  goalTempoEl.value = "";
+  goalMsgEl.hidden = true;
+};
+document.getElementById("goalSave")!.onclick = async () => {
+  const nama = goalNamaEl.value.trim();
+  const target = goalTargetEl.value.trim();
+  if (!nama || !target) {
+    goalMsgEl.hidden = false;
+    goalMsgEl.textContent = "Nama dan target wajib diisi.";
+    return;
+  }
+  const tempo = goalTempoEl.value;
+  const res = await runCmd(`target ${nama} ${target}${tempo ? ` tempo ${tempo}` : ""}`);
+  showToast(res.text || "Target dibuat.");
+  goalNamaEl.value = "";
+  goalTargetEl.value = "";
+  goalTempoEl.value = "";
+  goalMsgEl.hidden = true;
+  await refreshGoalList();
+};
 
 document.getElementById("updateReload")!.onclick = async () => {
   try {

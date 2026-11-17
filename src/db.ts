@@ -95,6 +95,15 @@ CREATE TABLE IF NOT EXISTS debts (
   tanggal    TEXT    NOT NULL,
   created_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS goals (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  nama       TEXT    NOT NULL UNIQUE,
+  target     INTEGER NOT NULL,
+  terkumpul  INTEGER NOT NULL DEFAULT 0,
+  tenggat    TEXT,
+  created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
 `);
 
   // Index untuk kueri laporan/riwayat pada data besar.
@@ -467,6 +476,7 @@ export function resetAll(): void {
       "transactions",
       "recurring",
       "debts",
+      "goals",
       "budgets",
       "categories",
       "accounts",
@@ -1056,6 +1066,44 @@ export function debtTotals(): { utang: number; piutang: number } {
   return row;
 }
 
+export interface Goal {
+  id: number;
+  nama: string;
+  target: number;
+  terkumpul: number;
+  tenggat: string | null;
+}
+
+export function listGoals(): Goal[] {
+  return db.prepare(`SELECT * FROM goals ORDER BY id ASC`).all() as Goal[];
+}
+
+export function getGoalByName(nama: string): Goal | undefined {
+  return db.prepare(`SELECT * FROM goals WHERE lower(nama) = lower(?)`).get(nama.trim()) as
+    | Goal
+    | undefined;
+}
+
+export function addGoal(input: { nama: string; target: number; tenggat?: string | null }): Goal {
+  const info = db
+    .prepare(`INSERT INTO goals (nama, target, tenggat) VALUES (?, ?, ?)`)
+    .run(input.nama.trim(), input.target, input.tenggat ?? null);
+  return db.prepare(`SELECT * FROM goals WHERE id = ?`).get(Number(info.lastInsertRowid)) as Goal;
+}
+
+// tambah (positif) / ambil (negatif); tak boleh di bawah 0.
+export function contributeGoal(id: number, delta: number): void {
+  db.prepare(`UPDATE goals SET terkumpul = MAX(0, terkumpul + ?) WHERE id = ?`).run(delta, id);
+}
+
+export function deleteGoal(id: number): boolean {
+  return db.prepare(`DELETE FROM goals WHERE id = ?`).run(id).changes > 0;
+}
+
+export function setGoalDeadline(id: number, tenggat: string | null): void {
+  db.prepare(`UPDATE goals SET tenggat = ? WHERE id = ?`).run(tenggat, id);
+}
+
 // Key settings yang TIDAK ikut export: kredensial + penanda snapshot internal.
 // first_use_at = kapan app dipasang/dipakai pertama (lokal perangkat). Jangan
 // ikut backup supaya tak terbawa/tertimpa ke perangkat lain saat restore.
@@ -1085,6 +1133,7 @@ export function exportAll(): string {
     budgets: listBudgets(),
     recurring: listRecurring(),
     debts: listDebts(false),
+    goals: listGoals(),
     settings,
   };
   return JSON.stringify({ version: 2, tables });
@@ -1107,7 +1156,7 @@ export function importAll(json: string): void {
   };
 
   db.transaction(() => {
-    db.exec(`DELETE FROM transactions; DELETE FROM accounts; DELETE FROM categories; DELETE FROM budgets; DELETE FROM recurring; DELETE FROM debts; DELETE FROM settings;`);
+    db.exec(`DELETE FROM transactions; DELETE FROM accounts; DELETE FROM categories; DELETE FROM budgets; DELETE FROM recurring; DELETE FROM debts; DELETE FROM goals; DELETE FROM settings;`);
 
     const insAcc = db.prepare(
       `INSERT INTO accounts (id, nama, tipe, saldo_awal, created_at) VALUES (?, ?, ?, ?, ?)`
@@ -1180,6 +1229,21 @@ export function importAll(json: string): void {
         x.sisa,
         x.catatan ?? null,
         x.tanggal,
+        x.created_at ?? new Date().toISOString()
+      );
+    }
+
+    const insGoal = db.prepare(
+      `INSERT INTO goals (id, nama, target, terkumpul, tenggat, created_at) VALUES (?, ?, ?, ?, ?, ?)`
+    );
+    for (const r of t.goals ?? []) {
+      const x = r as Goal & { created_at?: string };
+      insGoal.run(
+        x.id,
+        x.nama,
+        x.target,
+        x.terkumpul ?? 0,
+        x.tenggat ?? null,
         x.created_at ?? new Date().toISOString()
       );
     }

@@ -162,6 +162,7 @@
       <button id="openCat" class="menu-row"><span>Kategori</span><span class="chev">›</span></button>
       <button id="openAcc" class="menu-row"><span>Akun</span><span class="chev">›</span></button>
       <button id="openBudget" class="menu-row"><span>Anggaran</span><span class="chev">›</span></button>
+      <button id="openGoal" class="menu-row"><span>Target</span><span class="chev">›</span></button>
       <button id="openRec" class="menu-row"><span>Berulang</span><span class="chev">›</span></button>
       <button id="openDebt" class="menu-row"><span>Utang/Piutang</span><span class="chev">›</span></button>
       <button id="openSubs" class="menu-row"><span>Langganan</span><span class="chev">›</span></button>
@@ -473,6 +474,33 @@
     <div id="subsList" class="cat-list"></div>
     <div class="modal-actions">
       <button id="subsBack">Kembali</button>
+    </div>
+  </div>
+</div>
+
+<div id="goalModal" class="modal" hidden>
+  <div class="modal-box list-box">
+    <h3>Target tabungan</h3>
+    <p class="info-note">Target &amp; sinking fund. Isi berkala; saran/bulan dihitung dari tempo (jatuh tempo).</p>
+    <div id="goalList" class="cat-list"></div>
+    <div class="cat-form">
+      <label>Nama
+        <input id="goalNama" placeholder="Liburan" autocomplete="off" />
+      </label>
+      <label>Target (mis. 5jt)
+        <input id="goalTarget" placeholder="5jt" autocomplete="off" />
+      </label>
+      <label>Tempo (opsional)
+        <input id="goalTempo" type="date" />
+      </label>
+      <p id="goalMsg" class="hint" hidden></p>
+      <div class="info-actions">
+        <button id="goalSave">Tambah target</button>
+        <button id="goalResetForm">Kosongkan form</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button id="goalBack">Kembali</button>
     </div>
   </div>
 </div>

@@ -38,13 +38,12 @@ Prinsip: **lokal dulu, tanpa server, chat-first**. Chat untuk *mencatat*; menu u
 - 2.25.0 Ringkasan++ (net worth, utang/piutang, proyeksi net, tren 6 bulan)
 - 2.26.0 Samarkan nominal transaksi di chat (opt-in)
 - 2.26.1 Periksa pembaruan manual + surface SW waiting saat foreground
+- 2.27.0 Target & sinking fund (progres, saran/bulan, tempo; isi/ambil/hapus)
 
 ## Berikutnya
-- (Inti selesai.) Kandidat dari "Nanti": Goal/sinking fund, Import CSV bank,
-  WebAuthn, i18n + tema terang, multi-mata uang.
+- Template 50/30/20 (preset batas anggaran per kelompok needs/wants/savings).
 
 ## Nanti
-- Goal/sinking fund + template 50/30/20.
 - Import CSV bank + auto-kategorisasi.
 - Biometric/passkey (WebAuthn) di samping PIN.
 - i18n (EN) + tema terang.

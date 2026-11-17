@@ -20,6 +20,11 @@ import {
   getBudget,
   getCategoryByName,
   getDebt,
+  getGoalByName,
+  addGoal,
+  listGoals,
+  contributeGoal,
+  deleteGoal,
   getSetting,
   getTx,
   listAccounts,
@@ -168,6 +173,8 @@ const HELP =
   "  utang 100rb ke budi         (ledger utang/piutang)\n" +
   "  piutang 50rb dari andi\n" +
   "  bayar utang budi 50rb | utang hapus 3 | piutang hapus 4\n" +
+  "  target Liburan 5jt [tempo 2027-06-01]   (target / sinking fund)\n" +
+  "  target | target isi Liburan 500rb | target ambil Liburan 100rb | target hapus Liburan\n" +
   "  pin                         (status kunci; atur lewat ℹ → Keamanan)\n" +
   "  backup | backup kunci <sandi>   (JSON / terenkripsi)\n" +
   "  ai | ai reset               (pemakaian AI)\n" +
@@ -183,7 +190,7 @@ const HELP =
 const ALIAS_TARGETS = [
   "transfer", "hapus", "ubah", "laporan", "ringkasan", "grafik", "csv", "cari",
   "lihat", "riwayat", "saldo", "akun", "kategori", "anggaran", "berulang",
-  "utang", "piutang", "bayar", "pin", "backup", "ai", "versi", "help",
+  "utang", "piutang", "bayar", "target", "pin", "backup", "ai", "versi", "help",
   "undo", "alias",
 ];
 const ALIAS_TARGET_SET = new Set(ALIAS_TARGETS);
@@ -1922,6 +1929,86 @@ async function handleMessageInner(input: string): Promise<Reply> {
       text:
         `${arah === "utang" ? "Utang" : "Piutang"} #${d.id}: ${rupiah(d.jumlah)} ${arah === "utang" ? "ke" : "dari"} ${d.nama} dicatat.` +
         "\n(ledger utang/piutang terpisah — tidak mengubah saldo akun)",
+    };
+  }
+
+  if (low === "target" || low === "target list" || low === "target daftar") {
+    const gs = listGoals();
+    if (!gs.length) {
+      return {
+        text: "Belum ada target. Contoh: `target Dana Darurat 10jt` atau `target Liburan 5jt tempo 2027-06-01`.",
+      };
+    }
+    const lines = gs.map((g) => {
+      const pct = g.target > 0 ? Math.min(100, Math.floor((g.terkumpul / g.target) * 100)) : 0;
+      const sisa = Math.max(0, g.target - g.terkumpul);
+      const tempo = g.tenggat ? ` · tempo ${g.tenggat}` : "";
+      return `  #${g.id} ${g.nama}: ${rupiah(g.terkumpul)} / ${rupiah(g.target)} (${pct}%, sisa ${rupiah(sisa)})${tempo}`;
+    });
+    return {
+      text:
+        `Target:\n${lines.join("\n")}\n\n` +
+        "Isi: `target isi <nama> 500rb` · ambil: `target ambil <nama> 100rb` · hapus: `target hapus <nama>`",
+    };
+  }
+
+  if ((m = text.match(/^target\s+hapus\s+(.+)$/i))) {
+    const nama = m[1].trim();
+    const g = getGoalByName(nama);
+    if (!g) return { text: `Target "${nama}" tidak ada.` };
+    deleteGoal(g.id);
+    return { text: `Target ${g.nama} dihapus.` };
+  }
+
+  if ((m = text.match(/^target\s+isi\s+(.+?)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k))?)$/i))) {
+    const nama = m[1].trim();
+    const g = getGoalByName(nama);
+    if (!g) return { text: `Target "${nama}" tidak ada.` };
+    const nominal = parseAmount(m[2]);
+    if (nominal == null || nominal <= 0) {
+      return { text: "Nominal tidak kebaca. Contoh: `target isi Liburan 500rb`" };
+    }
+    contributeGoal(g.id, nominal);
+    const after = getGoalByName(g.nama)!;
+    const sisa = Math.max(0, after.target - after.terkumpul);
+    return {
+      text:
+        `Target ${after.nama}: ${rupiah(after.terkumpul)} / ${rupiah(after.target)}` +
+        (sisa > 0 ? ` (sisa ${rupiah(sisa)})` : " — tercapai!"),
+    };
+  }
+
+  if ((m = text.match(/^target\s+ambil\s+(.+?)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k))?)$/i))) {
+    const nama = m[1].trim();
+    const g = getGoalByName(nama);
+    if (!g) return { text: `Target "${nama}" tidak ada.` };
+    const nominal = parseAmount(m[2]);
+    if (nominal == null || nominal <= 0) {
+      return { text: "Nominal tidak kebaca. Contoh: `target ambil Liburan 100rb`" };
+    }
+    contributeGoal(g.id, -nominal);
+    const after = getGoalByName(g.nama)!;
+    return { text: `Target ${after.nama}: ${rupiah(after.terkumpul)} / ${rupiah(after.target)}.` };
+  }
+
+  if ((m = text.match(/^target\s+(.+?)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k))?)(?:\s+tempo\s+(\S+))?$/i))) {
+    const nama = m[1].trim();
+    const nominal = parseAmount(m[2]);
+    if (nominal == null || nominal <= 0) {
+      return { text: "Nominal tidak kebaca. Contoh: `target Liburan 5jt`" };
+    }
+    if (getGoalByName(nama)) {
+      return { text: `Target "${nama}" sudah ada. Pakai \`target isi\` untuk menambah.` };
+    }
+    const tenggat = m[3] ? extractDate(m[3]).tanggal ?? null : null;
+    if (m[3] && !tenggat) {
+      return { text: "Tanggal tempo tak dikenali. Contoh: `target Liburan 5jt tempo 2027-06-01`." };
+    }
+    const g = addGoal({ nama, target: nominal, tenggat });
+    return {
+      text:
+        `Target #${g.id}: ${g.nama} ${rupiah(g.target)}` +
+        `${g.tenggat ? ` (tempo ${g.tenggat})` : ""} dibuat.`,
     };
   }
 

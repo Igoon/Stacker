@@ -3,6 +3,13 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.27.0]
+- **Target & sinking fund**: menu **Info › Target** + perintah `target`. Buat
+  target tabungan (mis. `target Liburan 5jt tempo 2027-06-01`), lihat progres
+  (bar %), **saran sisihkan/bulan** dari tempo, isi/ambil berkala
+  (`target isi|ambil <nama> <nominal>`), dan hapus. Cocok untuk dana darurat
+  maupun sinking fund (pengeluaran terjadwal). Ikut backup/restore.
+
 ## [2.26.1]
 - **Periksa pembaruan (manual)**: menu baru **Info › Periksa pembaruan** untuk
   memaksa cek Service Worker lalu mengaktifkan + memuat ulang versi terbaru.

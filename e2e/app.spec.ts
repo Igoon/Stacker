@@ -636,6 +636,28 @@ test("menu Langganan: deteksi pola & jadikan berulang", async ({ page }) => {
   await expect(page.locator("#recList")).toContainText("Spotify");
 });
 
+test("menu Target: tambah, isi, hapus", async ({ page }) => {
+  await boot(page);
+  await page.locator("#info").click();
+  await page.locator("#openGoal").click();
+
+  await page.locator("#goalNama").fill("Liburan");
+  await page.locator("#goalTarget").fill("5jt");
+  await page.locator("#goalSave").click();
+  const item = page.locator("#goalList .cat-item").filter({ hasText: "Liburan" });
+  await expect(item).toContainText("Rp5.000.000");
+
+  page.once("dialog", (d) => void d.accept("1jt"));
+  await item.getByText("Isi").click();
+  await expect(item).toContainText("Rp1.000.000");
+  await expect(item).toContainText("20%");
+
+  page.once("dialog", (d) => void d.accept());
+  await item.getByText("Hapus").click();
+  await expect(page.locator("#goalList .cat-item")).toHaveCount(0);
+  await page.locator("#goalBack").click();
+});
+
 test("sapaan hanya untuk pengguna baru", async ({ page }) => {
   await boot(page);
   await expect(

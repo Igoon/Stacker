@@ -19,6 +19,7 @@ import {
   listDebts,
   debtTotals,
   searchTx,
+  listGoals,
 } from "./db";
 import {
   budgetOverview,
@@ -134,6 +135,10 @@ interface SubsMsg {
   type: "subscriptions";
   id: number;
 }
+interface ListGoalsMsg {
+  type: "listgoals";
+  id: number;
+}
 interface CheckDataMsg {
   type: "checkdata";
   id: number;
@@ -185,6 +190,7 @@ type InMsg =
   | ListDebtMsg
   | SearchMsg
   | SubsMsg
+  | ListGoalsMsg
   | CheckDataMsg
   | SetFirstUseMsg
   | DashMsg
@@ -361,6 +367,9 @@ async function onMessage(msg: InMsg): Promise<void> {
       break;
     case "subscriptions":
       reply(msg.id, { ok: true, subs: detectSubscriptions() });
+      break;
+    case "listgoals":
+      reply(msg.id, { ok: true, goals: listGoals() });
       break;
     case "search": {
       const amt = (s?: string): number | undefined => {
