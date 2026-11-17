@@ -1117,5 +1117,14 @@ await check("alokasi 50/30/20: hitung kelompok & konsistensi", async () => {
   assert.equal(a.targetNeeds, Math.round(a.income * 0.5), "target needs 50%");
 });
 
+await check("kategori ikon kustom terbaca di transaksi", async () => {
+  await handleMessage("kategori tambah Ujikon | ujikon");
+  const r = await handleMessage("kategori ikon Ujikon kesehatan");
+  assert(r.text.includes("kesehatan"), "ikon tersimpan");
+  const t = await handleMessage("ujikon 10rb");
+  assert.equal(t.txs?.[0]?.ikon, "kesehatan", "transaksi membawa ikon kategori");
+  await handleMessage("kategori hapus Ujikon");
+});
+
 console.log(`\n${pass} ok, ${fail} fail`);
 if (fail > 0) process.exit(1);

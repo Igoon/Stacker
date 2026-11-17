@@ -809,8 +809,26 @@ const CAT_ICON_SVG: Record<string, string> = {
 };
 const CAT_ICON_DEFAULT =
   '<path d="M20.6 12.6 12.6 20.6a2 2 0 0 1-2.8 0l-6.4-6.4A2 2 0 0 1 3 12.8V5a2 2 0 0 1 2-2h7.8a2 2 0 0 1 1.4.6l6.4 6.4a2 2 0 0 1 0 2.6z"/><circle cx="7.5" cy="7.5" r="1.2"/>';
-function catIconSvg(k: string): string {
-  const inner = CAT_ICON_SVG[k.toLowerCase().trim()] ?? CAT_ICON_DEFAULT;
+const ICON_OPTIONS: [string, string][] = [
+  ["makanan", "Makanan"],
+  ["transportasi", "Transportasi"],
+  ["belanja", "Belanja"],
+  ["tagihan", "Tagihan"],
+  ["kesehatan", "Kesehatan"],
+  ["hiburan", "Hiburan"],
+  ["gaji", "Gaji"],
+  ["tabungan", "Tabungan"],
+  ["investasi", "Investasi"],
+  ["transfer", "Transfer"],
+  ["tag", "Lainnya"],
+];
+function catIconSvg(name: string, iconId?: string): string {
+  let inner: string | undefined;
+  const id = iconId?.toLowerCase().trim();
+  if (id === "tag") inner = CAT_ICON_DEFAULT;
+  else if (id) inner = CAT_ICON_SVG[id];
+  if (!inner) inner = CAT_ICON_SVG[name.toLowerCase().trim()];
+  if (!inner) inner = CAT_ICON_DEFAULT;
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
 }
 
@@ -852,7 +870,7 @@ function addBubble(
     head.className = "tx-head";
     const icon = document.createElement("span");
     icon.className = "tx-icon";
-    icon.innerHTML = catIconSvg(tx.kategori);
+    icon.innerHTML = catIconSvg(tx.kategori, tx.ikon ?? undefined);
     const cat = document.createElement("span");
     cat.className = "tx-cat";
     cat.textContent = tx.kategori;
@@ -2035,6 +2053,7 @@ const catListEl = document.getElementById("catList")!;
 const catNameEl = document.getElementById("catName") as HTMLInputElement;
 const catTipeEl = document.getElementById("catTipe") as HTMLSelectElement;
 const catKwEl = document.getElementById("catKw") as HTMLInputElement;
+const catIkonEl = document.getElementById("catIkon") as HTMLSelectElement;
 const catMsgEl = document.getElementById("catMsg")!;
 const budgetModal = document.getElementById("budgetModal")!;
 const budgetListEl = document.getElementById("budgetList")!;
@@ -2485,11 +2504,26 @@ interface CatRow {
   nama: string;
   tipe: string;
   keywords: string[];
+  ikon?: string | null;
 }
 let catNames = new Set<string>();
 
 function runCmd(text: string): Promise<Reply & Record<string, unknown>> {
   return call({ type: "chat", text });
+}
+
+function populateCatIcons(): void {
+  if (catIkonEl.options.length) return;
+  const none = document.createElement("option");
+  none.value = "";
+  none.textContent = "(otomatis dari nama)";
+  catIkonEl.appendChild(none);
+  for (const [id, label] of ICON_OPTIONS) {
+    const o = document.createElement("option");
+    o.value = id;
+    o.textContent = label;
+    catIkonEl.appendChild(o);
+  }
 }
 
 async function refreshCatList(): Promise<void> {
@@ -2509,13 +2543,19 @@ async function refreshCatList(): Promise<void> {
     item.className = "cat-item";
     const head = document.createElement("div");
     head.className = "cat-head";
+    const left = document.createElement("span");
+    left.className = "cat-left";
+    const ico = document.createElement("span");
+    ico.className = "cat-ico";
+    ico.innerHTML = catIconSvg(c.nama, c.ikon ?? undefined);
     const nm = document.createElement("span");
     nm.className = "cat-name";
     nm.textContent = c.nama;
+    left.append(ico, nm);
     const badge = document.createElement("span");
     badge.className = "cat-badge";
     badge.textContent = c.tipe;
-    head.append(nm, badge);
+    head.append(left, badge);
     const kw = document.createElement("div");
     kw.className = "cat-kw";
     kw.textContent = c.keywords.length ? c.keywords.join(", ") : "(tanpa kata kunci)";
@@ -2527,6 +2567,7 @@ async function refreshCatList(): Promise<void> {
       catNameEl.value = c.nama;
       catTipeEl.value = c.tipe === "masuk" || c.tipe === "keduanya" ? c.tipe : "keluar";
       catKwEl.value = c.keywords.join(", ");
+      catIkonEl.value = c.ikon ?? "";
       catMsgEl.hidden = true;
       catNameEl.focus();
     };
@@ -2547,12 +2588,14 @@ async function refreshCatList(): Promise<void> {
 document.getElementById("openCat")!.onclick = async () => {
   showInfoPane(katModal);
   catMsgEl.hidden = true;
+  populateCatIcons();
   await refreshCatList();
 };
 document.getElementById("catBack")!.onclick = () => showInfoPane(infoModal);
 document.getElementById("catReset")!.onclick = () => {
   catNameEl.value = "";
   catKwEl.value = "";
+  catIkonEl.value = "";
   catMsgEl.hidden = true;
 };
 document.getElementById("catSave")!.onclick = async () => {
@@ -2573,8 +2616,10 @@ document.getElementById("catSave")!.onclick = async () => {
     const r = await runCmd(`kategori tambah ${tipe} ${nama} | ${list}`);
     showToast(r.text || `Kategori ${nama} ditambah.`);
   }
+  await runCmd(`kategori ikon ${nama} ${catIkonEl.value || "auto"}`);
   catNameEl.value = "";
   catKwEl.value = "";
+  catIkonEl.value = "";
   catMsgEl.hidden = true;
   await refreshCatList();
 };

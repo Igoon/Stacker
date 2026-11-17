@@ -129,6 +129,9 @@ CREATE INDEX IF NOT EXISTS idx_rec_account ON recurring(account_id);
   if (!hasColumn("categories", "tipe")) {
     db.exec(`ALTER TABLE categories ADD COLUMN tipe TEXT NOT NULL DEFAULT 'keluar'`);
   }
+  if (!hasColumn("categories", "ikon")) {
+    db.exec(`ALTER TABLE categories ADD COLUMN ikon TEXT`);
+  }
   if (!hasColumn("budgets", "periode")) {
     db.exec(`ALTER TABLE budgets ADD COLUMN periode TEXT NOT NULL DEFAULT 'bulanan'`);
   }
@@ -193,6 +196,7 @@ export interface Category {
   nama: string;
   keywords: string[];
   tipe: string;
+  ikon: string | null;
   created_at: string;
 }
 
@@ -207,15 +211,17 @@ export interface Tx {
   transfer_id: string | null;
   created_at: string;
   akun?: string | null;
+  ikon?: string | null;
   rupiah?: string;
 }
 
 const today = () => isoLocal();
 
 const TX_SELECT = `
-  SELECT t.*, a.nama AS akun
+  SELECT t.*, a.nama AS akun, c.ikon AS ikon
     FROM transactions t
-    LEFT JOIN accounts a ON a.id = t.account_id`;
+    LEFT JOIN accounts a ON a.id = t.account_id
+    LEFT JOIN categories c ON lower(c.nama) = lower(t.kategori)`;
 
 export function addTx(input: {
   jumlah: number;
@@ -499,8 +505,15 @@ export function listAccounts(): Account[] {
 
 export function listCategories(tipe?: "masuk" | "keluar"): Category[] {
   const rows = db
-    .prepare(`SELECT id, nama, keywords, tipe, created_at FROM categories ORDER BY id ASC`)
-    .all() as { id: number; nama: string; keywords: string; tipe: string; created_at: string }[];
+    .prepare(`SELECT id, nama, keywords, tipe, ikon, created_at FROM categories ORDER BY id ASC`)
+    .all() as {
+    id: number;
+    nama: string;
+    keywords: string;
+    tipe: string;
+    ikon: string | null;
+    created_at: string;
+  }[];
   const cats = rows.map((r) => {
     let keywords: string[] = [];
     try {
@@ -532,6 +545,7 @@ export function addCategory(nama: string, keywords: string[], tipe = "keluar"): 
     nama: nama.trim(),
     keywords,
     tipe,
+    ikon: null,
     created_at: new Date().toISOString(),
   };
 }
@@ -549,11 +563,11 @@ export function updateCategoryKeywords(id: number, keywords: string[]): void {
 }
 
 export function renameCategory(id: number, nama: string): void {
-  const baru = nama.trim();
   const cat = db.prepare(`SELECT nama FROM categories WHERE id = ?`).get(id) as
     | { nama: string }
     | undefined;
   if (!cat) return;
+  const baru = nama.trim();
   const lama = cat.nama;
   db.transaction(() => {
     db.prepare(`UPDATE categories SET nama = ? WHERE id = ?`).run(baru, id);
@@ -570,6 +584,10 @@ export function renameCategory(id: number, nama: string): void {
       else db.prepare(`UPDATE budgets SET kategori = ? WHERE kategori = ?`).run(baru, bOld.kategori);
     }
   });
+}
+
+export function setCategoryIcon(nama: string, ikon: string | null): void {
+  db.prepare(`UPDATE categories SET ikon = ? WHERE lower(nama) = lower(?)`).run(ikon, nama.trim());
 }
 
 export function getAccountByName(nama: string): Account | undefined {
@@ -1128,7 +1146,7 @@ export function exportAll(): string {
     accounts: listAccounts(),
     transactions: db.prepare(`SELECT * FROM transactions ORDER BY id ASC`).all() as unknown[],
     categories: db
-      .prepare(`SELECT id, nama, keywords, tipe, created_at FROM categories ORDER BY id ASC`)
+      .prepare(`SELECT id, nama, keywords, tipe, ikon, created_at FROM categories ORDER BY id ASC`)
       .all() as unknown[],
     budgets: listBudgets(),
     recurring: listRecurring(),
@@ -1167,11 +1185,18 @@ export function importAll(json: string): void {
     }
 
     const insCat = db.prepare(
-      `INSERT INTO categories (id, nama, keywords, tipe, created_at) VALUES (?, ?, ?, ?, ?)`
+      `INSERT INTO categories (id, nama, keywords, tipe, ikon, created_at) VALUES (?, ?, ?, ?, ?, ?)`
     );
     for (const r of t.categories ?? []) {
-      const c = r as { id: number; nama: string; keywords: string; tipe: string; created_at: string };
-      insCat.run(c.id, c.nama, c.keywords, c.tipe, c.created_at);
+      const c = r as {
+        id: number;
+        nama: string;
+        keywords: string;
+        tipe: string;
+        ikon?: string | null;
+        created_at: string;
+      };
+      insCat.run(c.id, c.nama, c.keywords, c.tipe, c.ikon ?? null, c.created_at);
     }
 
     const insTx = db.prepare(

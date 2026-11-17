@@ -779,6 +779,28 @@ footer button.ghost {
   font-size: 13.5px;
   font-weight: 600;
 }
+.cat-item .cat-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.cat-item .cat-ico {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: var(--surface-3);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cat-item .cat-ico svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
 .cat-item .cat-badge {
   font-size: 10.5px;
   padding: 1px 7px;

@@ -3,6 +3,13 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.32.0]
+- **Ikon kategori bisa dicustom**: di **Info › Kategori** ada pilihan **Ikon**
+  (makanan, transportasi, belanja, tagihan, kesehatan, hiburan, gaji, tabungan,
+  investasi, transfer, atau "otomatis dari nama"). Ikon tampil di daftar
+  kategori dan kartu transaksi; ikut backup/restore. Perintah chat:
+  `kategori ikon <nama> <ikon|auto>`.
+
 ## [2.31.1]
 - **Update lebih mulus**: saat auto-update muncul toast **"Memperbarui ke vX…"**
   sebelum reload (tak lagi reload senyap). Perbandingan versi kini **semver**

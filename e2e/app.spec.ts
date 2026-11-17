@@ -501,6 +501,21 @@ test("menu Kategori, Anggaran, dan Ringkasan", async ({ page }) => {
   await page.locator("#dashBack").click();
 });
 
+test("menu Kategori: pilih ikon & tersimpan", async ({ page }) => {
+  await boot(page);
+  await page.locator("#info").click();
+  await page.locator("#openCat").click();
+  await page.locator("#catName").fill("Hobi");
+  await page.locator("#catKw").fill("hobi");
+  await page.locator("#catIkon").selectOption("hiburan");
+  await page.locator("#catSave").click();
+  const item = page.locator("#catList .cat-item").filter({ hasText: "Hobi" });
+  await expect(item).toContainText("Hobi");
+  await item.getByText("Ubah").click();
+  await expect(page.locator("#catIkon")).toHaveValue("hiburan");
+  await page.locator("#catBack").click();
+});
+
 test("menu Akun: tambah multi-kata, sesuaikan, hapus", async ({ page }) => {
   await boot(page);
   await page.locator("#info").click();

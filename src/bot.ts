@@ -52,6 +52,7 @@ import {
   setAccountSaldoAwal,
   setBudget,
   setCategoryTipe,
+  setCategoryIcon,
   setSetting,
   totalChanges,
   transferRange,
@@ -1056,6 +1057,16 @@ async function handleMessageInner(input: string): Promise<Reply> {
         "Pindah sisi: `kategori sisi Sedekah keduanya`\n" +
         "Kata kunci: `kategori tambahkata Sedekah | infak` · `kategori hapuskata Sedekah | zakat`",
     };
+  }
+
+  if ((m = text.match(/^kategori\s+ikon\s+(.+?)\s+(\S+)\s*$/i))) {
+    const name = m[1].trim();
+    const cat = getCategoryByName(name);
+    if (!cat) return { text: `Kategori "${name}" tidak ada.` };
+    const id = m[2].toLowerCase();
+    const ikon = id === "auto" || id === "otomatis" || id === "-" ? null : id;
+    setCategoryIcon(cat.nama, ikon);
+    return { text: `Ikon kategori ${cat.nama} → ${ikon ?? "(otomatis)"}.` };
   }
 
   if ((m = text.match(/^kategori tambahkata\s+(.+)$/i))) {
