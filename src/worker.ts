@@ -25,6 +25,7 @@ import {
   canRedo,
   canUndo,
   dashboardData,
+  detectSubscriptions,
   deleteTxWithUndo,
   handleMessage,
   importJsonWithUndo,
@@ -129,6 +130,10 @@ interface SearchMsg {
   maxRaw?: string;
   limit?: number;
 }
+interface SubsMsg {
+  type: "subscriptions";
+  id: number;
+}
 interface CheckDataMsg {
   type: "checkdata";
   id: number;
@@ -179,6 +184,7 @@ type InMsg =
   | ListRecurringMsg
   | ListDebtMsg
   | SearchMsg
+  | SubsMsg
   | CheckDataMsg
   | SetFirstUseMsg
   | DashMsg
@@ -352,6 +358,9 @@ async function onMessage(msg: InMsg): Promise<void> {
       break;
     case "listdebt":
       reply(msg.id, { ok: true, debts: listDebts(), totals: debtTotals() });
+      break;
+    case "subscriptions":
+      reply(msg.id, { ok: true, subs: detectSubscriptions() });
       break;
     case "search": {
       const amt = (s?: string): number | undefined => {

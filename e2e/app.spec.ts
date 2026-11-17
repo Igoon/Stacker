@@ -595,6 +595,24 @@ test("menu Cari: filter kategori, nominal, kata kunci", async ({ page }) => {
   await page.locator("#searchBack").click();
 });
 
+test("menu Langganan: deteksi pola & jadikan berulang", async ({ page }) => {
+  await boot(page);
+  await chat(page, "2026-01-05 spotify 50rb");
+  await chat(page, "2026-02-05 spotify 50rb");
+  await chat(page, "2026-03-05 spotify 50rb");
+
+  await page.locator("#info").click();
+  await page.locator("#openSubs").click();
+  const item = page.locator("#subsList .cat-item").filter({ hasText: "Spotify" });
+  await expect(item).toContainText("3×");
+  await item.getByText("Jadikan berulang").click();
+  await expect(page.locator("#subsList")).not.toContainText("Spotify");
+
+  await page.locator("#subsBack").click();
+  await page.locator("#openRec").click();
+  await expect(page.locator("#recList")).toContainText("Spotify");
+});
+
 test("sapaan hanya untuk pengguna baru", async ({ page }) => {
   await boot(page);
   await expect(

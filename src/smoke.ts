@@ -12,7 +12,7 @@ const mini = createMiniDb(sqlite3, oo1db as never);
 const { initDb } = await import("./db");
 initDb(mini);
 
-const { handleMessage, deleteTxWithUndo, importJsonWithUndo, aiEnabled, budgetOverview, dashboardData, undoLabel, redoLabel } =
+const { handleMessage, deleteTxWithUndo, importJsonWithUndo, aiEnabled, budgetOverview, dashboardData, undoLabel, redoLabel, detectSubscriptions } =
   await import("./bot");
 const dbmod = await import("./db");
 const { parseLocal } = await import("./parser");
@@ -1050,6 +1050,28 @@ await check("auto-kategori dari riwayat (lokal, tanpa AI)", async () => {
 await check("auto-kategori: tanpa dukungan riwayat tetap Lainnya", async () => {
   const r = await handleMessage("zqxwk 50000");
   assert.equal(r.txs?.[0]?.kategori, "Lainnya", "tanpa riwayat -> Lainnya");
+});
+
+await check("deteksi langganan: pola bulanan nominal sama", async () => {
+  const tgls = ["2026-01-05", "2026-02-05", "2026-03-05"];
+  const ids = tgls.map(
+    (tanggal) =>
+      dbmod.addTx({ jumlah: 54900, tipe: "keluar", kategori: "Hiburan", catatan: "spotify", tanggal, account_id: null }).id
+  );
+  const s = detectSubscriptions().find((x) => x.jumlah === 54900);
+  assert(s, "langganan terdeteksi");
+  assert.equal(s!.count, 3, "3 kejadian");
+  assert.equal(s!.hari, 5, "tanggal 5");
+  assert.equal(s!.catatan, "Spotify", "label vendor");
+  ids.forEach((id) => dbmod.deleteTx(id));
+});
+
+await check("deteksi langganan: nominal acak/jarak tak wajar tak terdeteksi", async () => {
+  const a = dbmod.addTx({ jumlah: 33333, tipe: "keluar", kategori: "Lainnya", catatan: "acak satu", tanggal: "2026-01-10", account_id: null });
+  const b = dbmod.addTx({ jumlah: 33333, tipe: "keluar", kategori: "Lainnya", catatan: "acak dua", tanggal: "2026-01-20", account_id: null });
+  assert(!detectSubscriptions().some((x) => x.jumlah === 33333), "bukan langganan");
+  dbmod.deleteTx(a.id);
+  dbmod.deleteTx(b.id);
 });
 
 console.log(`\n${pass} ok, ${fail} fail`);

@@ -34,10 +34,11 @@ Prinsip: **lokal dulu, tanpa server, chat-first**. Chat untuk *mencatat*; menu u
 - 2.22.1 UI menu Info dirapikan (Cari di atas, lebih rapat, daftar scroll)
 - 2.22.2 Update lebih cepat (SW updateViaCache none + cek saat dibuka)
 - 2.23.0 Auto-kategorisasi on-device (tebak kategori dari riwayat, tanpa AI)
+- 2.24.0 Deteksi langganan otomatis (pola bulanan nominal sama → saran berulang)
 
 ## Berikutnya
-- Deteksi langganan otomatis (pola nominal + interval → saran `berulang`).
 - Dashboard++: net worth, proyeksi arus kas, tren 6 bulan.
+- Quick win: samarkan nominal transaksi di chat (lanjutan saldo tersamar).
 
 ## Nanti
 - Dashboard++: tren 6 bulan, perbandingan, proyeksi arus kas, *net worth*.

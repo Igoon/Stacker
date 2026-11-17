@@ -1873,6 +1873,8 @@ const searchMinEl = document.getElementById("searchMin") as HTMLInputElement;
 const searchMaxEl = document.getElementById("searchMax") as HTMLInputElement;
 const searchSummaryEl = document.getElementById("searchSummary")!;
 const searchListEl = document.getElementById("searchList")!;
+const subsModal = document.getElementById("subsModal")!;
+const subsListEl = document.getElementById("subsList")!;
 const INFO_PANES = [
   infoModal,
   secModal,
@@ -1886,6 +1888,7 @@ const INFO_PANES = [
   recModal,
   debtModal,
   searchModal,
+  subsModal,
 ];
 // Semantik dialog + tutup dengan Esc.
 for (const m of document.querySelectorAll<HTMLElement>(".modal")) {
@@ -3029,6 +3032,65 @@ document.getElementById("searchResetForm")!.onclick = () => {
   searchListEl.replaceChildren();
 };
 document.getElementById("searchRun")!.onclick = () => void runSearch();
+
+// ---------- Deteksi langganan (UI) ----------
+interface SubRow {
+  catatan: string;
+  jumlah: number;
+  kategori: string;
+  count: number;
+  hari: number;
+  lastDate: string;
+}
+
+async function refreshSubsList(): Promise<void> {
+  const r = await call({ type: "subscriptions" });
+  const rows = (Array.isArray(r.subs) ? r.subs : []) as SubRow[];
+  subsListEl.replaceChildren();
+  if (!rows.length) {
+    const empty = document.createElement("p");
+    empty.className = "info-note";
+    empty.textContent =
+      "Belum ada pola langganan. Butuh ≥2 transaksi nominal sama yang berulang tiap bulan.";
+    subsListEl.appendChild(empty);
+    return;
+  }
+  for (const s of rows) {
+    const item = document.createElement("div");
+    item.className = "cat-item";
+    const head = document.createElement("div");
+    head.className = "cat-head";
+    const nm = document.createElement("span");
+    nm.className = "cat-name";
+    nm.textContent = s.catatan;
+    const badge = document.createElement("span");
+    badge.className = "cat-badge";
+    badge.textContent = `${s.count}×`;
+    head.append(nm, badge);
+    const info = document.createElement("div");
+    info.className = "cat-kw";
+    info.textContent =
+      `${fmtRp(s.jumlah)} / bulan · tiap tgl ${s.hari} · ${s.kategori} · terakhir ${s.lastDate}`;
+    const actions = document.createElement("div");
+    actions.className = "cat-actions";
+    const mk = document.createElement("button");
+    mk.textContent = "Jadikan berulang";
+    mk.onclick = async () => {
+      const res = await runCmd(`berulang ${s.catatan} ${s.jumlah} tiap ${s.hari}`);
+      showToast(res.text || "Dijadikan berulang.");
+      await refreshSubsList();
+    };
+    actions.append(mk);
+    item.append(head, info, actions);
+    subsListEl.appendChild(item);
+  }
+}
+
+document.getElementById("openSubs")!.onclick = async () => {
+  showInfoPane(subsModal);
+  await refreshSubsList();
+};
+document.getElementById("subsBack")!.onclick = () => showInfoPane(infoModal);
 
 document.getElementById("updateReload")!.onclick = async () => {
   try {

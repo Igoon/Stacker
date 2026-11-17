@@ -1991,4 +1991,81 @@ async function resolveTransactions(
   return { results: [], usedAI: false, suggested: null };
 }
 
+export interface SubCandidate {
+  catatan: string;
+  jumlah: number;
+  kategori: string;
+  count: number;
+  hari: number;
+  lastDate: string;
+}
+
+const daysDiff = (a: string, b: string): number =>
+  Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
+
+// Deteksi langganan dari riwayat: nominal sama, muncul tiap ~bulan (25-35 hari),
+// dengan kata (vendor) yang sama. Hasil = saran untuk dijadikan `berulang`.
+export function detectSubscriptions(): SubCandidate[] {
+  const rows = searchTx("", { limit: 1000 }).filter(
+    (t) => t.tipe === "keluar" && !t.transfer_id && t.kategori !== "Transfer"
+  );
+  const byAmount = new Map<number, Tx[]>();
+  for (const t of rows) {
+    const arr = byAmount.get(t.jumlah);
+    if (arr) arr.push(t);
+    else byAmount.set(t.jumlah, [t]);
+  }
+  const existing = listRecurring();
+  const out: SubCandidate[] = [];
+
+  for (const [jumlah, list] of byAmount) {
+    if (list.length < 2) continue;
+    const sorted = [...list].sort((a, b) => (a.tanggal < b.tanggal ? -1 : a.tanggal > b.tanggal ? 1 : 0));
+
+    // Semua jarak antar kejadian harus ~1 bulan.
+    let monthly = true;
+    for (let i = 1; i < sorted.length; i++) {
+      const d = daysDiff(sorted[i - 1].tanggal, sorted[i].tanggal);
+      if (d < 25 || d > 35) {
+        monthly = false;
+        break;
+      }
+    }
+    if (!monthly) continue;
+
+    // Butuh kata bersama (vendor sama) di minimal 2 catatan.
+    const tokCount = new Map<string, number>();
+    for (const t of sorted) {
+      for (const tok of new Set(catTokens(t.catatan ?? ""))) {
+        tokCount.set(tok, (tokCount.get(tok) ?? 0) + 1);
+      }
+    }
+    const shared = [...tokCount.entries()]
+      .filter(([, n]) => n >= 2)
+      .sort((a, b) => b[1] - a[1])
+      .map(([t]) => t);
+    if (shared.length === 0) continue;
+
+    // Lewati bila sudah ada `berulang` yang cocok (nominal + kata).
+    const covered = existing.some(
+      (r) => r.jumlah === jumlah && catTokens(r.catatan).some((tok) => shared.includes(tok))
+    );
+    if (covered) continue;
+
+    const last = sorted[sorted.length - 1];
+    const days = sorted.map((t) => Number(t.tanggal.slice(8, 10))).sort((a, b) => a - b);
+    const label = shared.slice(0, 3).join(" ");
+    out.push({
+      catatan: label.charAt(0).toUpperCase() + label.slice(1),
+      jumlah,
+      kategori: last.kategori,
+      count: sorted.length,
+      hari: days[Math.floor(days.length / 2)],
+      lastDate: last.tanggal,
+    });
+  }
+
+  return out.sort((a, b) => (a.lastDate < b.lastDate ? 1 : -1)).slice(0, 20);
+}
+
 export { aiEnabled };

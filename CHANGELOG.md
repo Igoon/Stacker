@@ -3,6 +3,12 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.24.0]
+- **Deteksi langganan otomatis**: Stacker mengenali **pengeluaran yang muncul
+  tiap bulan dengan nominal sama** (mis. langganan/langganan digital) dari
+  riwayat, lalu menawarkannya di **Info › Langganan** untuk dijadikan `berulang`
+  cukup satu klik. Berbasis riwayat lokal — tidak ada data yang keluar.
+
 ## [2.23.0]
 - **Auto-kategorisasi on-device**: bila kategori tak dikenali, Stacker menebak
   dari **riwayat transaksimu sendiri** (kata yang sama pernah masuk kategori X)
