@@ -3,6 +3,12 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.34.0]
+- **Panic blur otomatis saat menganggur**: selain saat app ditinggal, layar ikut
+  disamarkan bila tak ada aktivitas (mengatasi OS yang menangkap snapshot sebelum
+  event). Durasi diatur di **Tema & tampilan** (30 dtk / 1 / 2 / 5 mnt, atau
+  nonaktif). Ketuk layar untuk kembali normal.
+
 ## [2.33.0]
 - **Skor kesehatan finansial (0–100)**: kartu gauge di Ringkasan + perintah
   `skor`. Menilai rasio tabungan (30%), kepatuhan anggaran (20%), beban utang

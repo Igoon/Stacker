@@ -657,8 +657,11 @@ function applyChatMask(): void {
   });
 }
 
-// Panic blur: samarkan seluruh layar saat app ditinggal (pindah app/tab, minimize).
+// Panic blur: samarkan seluruh layar saat app ditinggal (pindah app/tab, minimize)
+// ATAU saat menganggur beberapa lama (mengatasi OS yang menangkap snapshot lebih
+// dulu dari visibilitychange).
 const PANIC_KEY = "stacker-panic";
+const PANIC_IDLE_KEY = "stacker-panic-idle";
 function readPanic(): boolean {
   try {
     const v = localStorage.getItem(PANIC_KEY);
@@ -667,16 +670,49 @@ function readPanic(): boolean {
     return true;
   }
 }
+function readPanicIdle(): number {
+  try {
+    const raw = localStorage.getItem(PANIC_IDLE_KEY);
+    if (raw === null) return 120;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0 ? n : 120;
+  } catch {
+    return 120;
+  }
+}
 let panicOn = readPanic();
+let panicIdle = readPanicIdle();
+let lastActivity = Date.now();
+let idleBlurred = false;
 const panicEl = document.getElementById("panic")!;
 function applyPanic(): void {
-  if (!panicOn) {
-    panicEl.hidden = true;
-    return;
-  }
-  panicEl.hidden = !document.hidden;
+  panicEl.hidden = !(panicOn && (document.hidden || idleBlurred));
 }
-document.addEventListener("visibilitychange", applyPanic);
+function noteActivity(): void {
+  lastActivity = Date.now();
+  if (idleBlurred) {
+    idleBlurred = false;
+    applyPanic();
+  }
+}
+for (const ev of ["pointerdown", "keydown", "touchstart", "scroll", "input"] as const) {
+  window.addEventListener(ev, noteActivity, { passive: true });
+}
+panicEl.addEventListener("pointerdown", (e) => {
+  e.stopPropagation();
+  noteActivity();
+});
+window.setInterval(() => {
+  if (!panicOn || panicIdle <= 0 || document.hidden) return;
+  if (!idleBlurred && Date.now() - lastActivity >= panicIdle * 1000) {
+    idleBlurred = true;
+    applyPanic();
+  }
+}, 2000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) lastActivity = Date.now();
+  applyPanic();
+});
 applyPanic();
 
 // Bunyi pengingat singkat (Web Audio, tanpa aset & tanpa jaringan).
@@ -1359,6 +1395,7 @@ for (const p of WALL_PRESETS) {
 const hideSaldoEl = document.getElementById("hideSaldo") as HTMLInputElement;
 const hideChatEl = document.getElementById("hideChat") as HTMLInputElement;
 const panicOnEl = document.getElementById("panicOn") as HTMLInputElement;
+const panicIdleEl = document.getElementById("panicIdle") as HTMLSelectElement;
 const soundNoticeEl = document.getElementById("soundNotice") as HTMLInputElement;
 const hapticNoticeEl = document.getElementById("hapticNotice") as HTMLInputElement;
 
@@ -1369,6 +1406,7 @@ document.getElementById("openWall")!.onclick = () => {
   hideSaldoEl.checked = hideSaldo;
   hideChatEl.checked = hideChat;
   panicOnEl.checked = panicOn;
+  panicIdleEl.value = String(panicIdle);
   soundNoticeEl.checked = soundOn;
   hapticNoticeEl.checked = hapticOn;
   wallModal.hidden = false;
@@ -1399,6 +1437,8 @@ hideChatEl.onchange = () => {
 
 panicOnEl.onchange = () => {
   panicOn = panicOnEl.checked;
+  idleBlurred = false;
+  lastActivity = Date.now();
   try {
     localStorage.setItem(PANIC_KEY, panicOn ? "1" : "0");
   } catch {
@@ -1406,6 +1446,23 @@ panicOnEl.onchange = () => {
   }
   applyPanic();
   showToast(panicOn ? "Panic blur aktif saat app ditinggal." : "Panic blur dimatikan.");
+};
+
+panicIdleEl.onchange = () => {
+  panicIdle = Number(panicIdleEl.value) || 0;
+  idleBlurred = false;
+  lastActivity = Date.now();
+  try {
+    localStorage.setItem(PANIC_IDLE_KEY, String(panicIdle));
+  } catch {
+    // abaikan
+  }
+  applyPanic();
+  showToast(
+    panicIdle > 0
+      ? `Blur otomatis setelah ${panicIdle} dtk menganggur.`
+      : "Blur otomatis saat menganggur dimatikan."
+  );
 };
 
 soundNoticeEl.onchange = () => {

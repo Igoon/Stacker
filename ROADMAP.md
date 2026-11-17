@@ -47,6 +47,7 @@ Prinsip: **lokal dulu, tanpa server, chat-first**. Chat untuk *mencatat*; menu u
 - 2.31.1 Update lebih mulus (toast, semver, status versi di Tentang)
 - 2.32.0 Ikon kategori bisa dicustom (menu Kategori + `kategori ikon`)
 - 2.33.0 Skor kesehatan finansial (gauge + `skor`) & panic blur
+- 2.34.0 Panic blur otomatis saat menganggur (durasi bisa diatur)
 
 ## Berikutnya
 - Kandidat dari "Nanti": Import CSV bank + auto-kategorisasi, WebAuthn,

@@ -687,6 +687,25 @@ test("panic blur: toggle tersimpan setelah reload", async ({ page }) => {
   await expect(page.locator("#panicOn")).not.toBeChecked();
 });
 
+test("panic blur: aktif otomatis saat menganggur", async ({ page }) => {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem("stacker-panic-idle", "1");
+    } catch {
+      // abaikan
+    }
+  });
+  await page.goto("/");
+  await page.waitForFunction(() => /^v\d/.test(document.getElementById("sub")?.textContent ?? ""), null, {
+    timeout: 60_000,
+  });
+  await expect(page.locator("#panic")).toBeVisible({ timeout: 10_000 });
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event("pointerdown"));
+  });
+  await expect(page.locator("#panic")).toBeHidden();
+});
+
 test("sapaan hanya untuk pengguna baru", async ({ page }) => {
   await boot(page);
   await expect(
