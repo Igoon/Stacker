@@ -118,10 +118,16 @@ if ("serviceWorker" in navigator) {
   });
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register(new URL(/* @vite-ignore */ "../sw.js", import.meta.url), { scope: "./" })
+      .register(new URL(/* @vite-ignore */ "../sw.js", import.meta.url), {
+        scope: "./",
+        // Selalu ambil sw.js dari jaringan, bukan cache HTTP (GitHub Pages
+        // meng-cache sw.js 10 menit) -> update terdeteksi tiap app dibuka.
+        updateViaCache: "none",
+      })
       .then((reg) => {
-        // Cek update walau app lama terbuka (tanpa reload/navigasi).
+        // Cek update segera, lalu berkala; juga saat kembali ke foreground.
         const check = () => void reg.update().catch(() => undefined);
+        check();
         window.setInterval(check, 60 * 60 * 1000);
         document.addEventListener("visibilitychange", () => {
           if (!document.hidden) check();

@@ -3,6 +3,12 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.22.2]
+- **Update lebih cepat**: registrasi service worker memakai
+  `updateViaCache: "none"` + cek update tepat saat app dibuka, sehingga `sw.js`
+  tak lagi tertahan cache HTTP GitHub Pages (~10 menit). Banner "Versi baru"
+  lebih cepat muncul — terutama pada PWA yang terinstall di HP.
+
 ## [2.22.1]
 - **UI menu Info**: dirapikan — "Cari" dinaikkan ke atas, baris menu lebih
   rapat, dan daftar menu punya scroll sendiri sehingga judul + tombol "Tutup"

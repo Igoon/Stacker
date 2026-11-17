@@ -32,6 +32,7 @@ Prinsip: **lokal dulu, tanpa server, chat-first**. Chat untuk *mencatat*; menu u
 - 2.21.0 Menu Utang/Piutang (daftar + bayar + hapus)
 - 2.22.0 Menu Cari (kata kunci + akun + kategori + tanggal + nominal)
 - 2.22.1 UI menu Info dirapikan (Cari di atas, lebih rapat, daftar scroll)
+- 2.22.2 Update lebih cepat (SW updateViaCache none + cek saat dibuka)
 
 ## Berikutnya
 - Kelola lewat menu tuntas (Kategori, Akun, Anggaran, Berulang, Utang/Piutang, Cari).
