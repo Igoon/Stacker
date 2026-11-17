@@ -14,6 +14,7 @@ import {
   listCategories,
   checkIntegrity,
   recurringDue,
+  ringkasRange,
 } from "./db";
 import {
   budgetOverview,
@@ -34,7 +35,7 @@ import { exportJson } from "./backup";
 import { decryptJson, encryptJson, isEncrypted } from "./crypto";
 import { changePin, checkPin, removePin, setPin } from "./pin";
 import { APP_VERSION } from "./version";
-import { isoLocal } from "./dates";
+import { isoLocal, parsePeriod } from "./dates";
 
 interface ChatMsg {
   type: "chat";
@@ -227,6 +228,12 @@ function state() {
     }
   }
 
+  // Ringkas masuk/keluar bulan berjalan untuk header (tanpa transfer).
+  const perBulan = parsePeriod("");
+  const rowsBulan = perBulan ? ringkasRange(perBulan.from, perBulan.to) : [];
+  const monthMasuk = rowsBulan.filter((r) => r.tipe === "masuk").reduce((a, b) => a + b.total, 0);
+  const monthKeluar = rowsBulan.filter((r) => r.tipe === "keluar").reduce((a, b) => a + b.total, 0);
+
   // Chat bersifat ephemeral: jangan kirim riwayat lengkap. Cukup jumlah baris
   // supaya UI bisa menampilkan hint singkat saat pertama dibuka.
   return {
@@ -242,6 +249,8 @@ function state() {
     alerts: budgetOverview().filter((b) => b.pct >= 100).length + (recurringDue() ? 1 : 0),
     saldo: saldo(),
     saldoRupiah: rupiahSigned(saldo()),
+    monthMasuk,
+    monthKeluar,
     aiEnabled: aiEnabled(),
     ai: aiStats(),
     accounts: accountBalances().map((a) => ({

@@ -3,6 +3,13 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.19.0]
+- **Header saldo 2 baris**: pil saldo kanan atas kini menampilkan **Saldo** plus
+  baris ringkas **masuk · keluar bulan berjalan** (mis. `Saldo Rp10jt` lalu
+  `+2jt · −500rb`). Angka dipendekkan (`10.000.000` → `Rp10jt`) agar muat.
+  Tetap satu ketukan untuk lihat/samarkan (privasi bawaan). Transfer
+  dikecualikan dari hitungan, sama seperti laporan.
+
 ## [2.18.3]
 - **Fix**: tanggal di **awal** pesan (mis. `2026-11-11 transfer 10rb bsi ke
   gopay` atau `kemarin transfer 10rb bsi ke gopay`) tidak lagi menghalangi

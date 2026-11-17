@@ -16,6 +16,7 @@ const { handleMessage, deleteTxWithUndo, importJsonWithUndo, aiEnabled, budgetOv
   await import("./bot");
 const dbmod = await import("./db");
 const { parseLocal } = await import("./parser");
+const { shortRp } = await import("./chart");
 const { addHistoryEntry } = await import("./history");
 const { THEMES, themeVars } = await import("./themes");
 const { folderAction, folderButtonLabel, folderPermission } = await import("./folder");
@@ -1025,6 +1026,14 @@ await check("folder: izin & label tombol", async () => {
   assert.equal(folderButtonLabel(true, true), "Izinkan folder tersimpan");
   assert.equal(folderButtonLabel(true, false), "Ganti folder…");
   assert.equal(folderAction(false, true), "pick");
+});
+
+await check("header: ringkas rupiah (shortRp)", async () => {
+  assert.equal(shortRp(10_000_000), "10jt");
+  assert.equal(shortRp(1_500_000), "1,5jt");
+  assert.equal(shortRp(500_000), "500rb");
+  assert.equal(shortRp(2_000_000_000), "2M");
+  assert.equal(shortRp(750), "750");
 });
 
 console.log(`\n${pass} ok, ${fail} fail`);

@@ -1,6 +1,7 @@
 // main.ts — UI chat di main thread. Semua logika + DB berjalan di worker.
 import "./style.css";
 import { startsWithCommand } from "./commands";
+import { shortRp } from "./chart";
 import {
   addHistoryEntry,
   HISTORY_LIMIT,
@@ -185,6 +186,8 @@ worker.onmessage = (ev: MessageEvent<{ id: number } & Record<string, unknown>>) 
 const chat = document.getElementById("chat")!;
 const input = document.getElementById("input") as HTMLInputElement;
 const saldoEl = document.getElementById("saldo")!;
+const saldoTotEl = document.getElementById("saldoTot")!;
+const saldoIoEl = document.getElementById("saldoIo")!;
 const subEl = document.getElementById("sub")!;
 const busyEl = document.getElementById("busy")!;
 const chipsEl = document.getElementById("chips")!;
@@ -455,7 +458,15 @@ function readHideSaldo(): boolean {
 }
 let hideSaldo = readHideSaldo();
 let saldoRevealed = false;
-let lastSaldoRupiah = "-";
+let lastSaldoNum = NaN;
+let lastMasuk = 0;
+let lastKeluar = 0;
+
+// Format ringkas untuk header (mis. 10.000.000 -> "Rp10jt").
+function fmtShortRp(n: number): string {
+  if (!Number.isFinite(n)) return "-";
+  return (n < 0 ? "-" : "") + "Rp" + shortRp(n);
+}
 
 function toggleSaldo(): void {
   if (!hideSaldo) return;
@@ -463,12 +474,14 @@ function toggleSaldo(): void {
   renderSaldo();
 }
 function renderSaldo(): void {
-  saldoEl.textContent = "Saldo: " + (hideSaldo && !saldoRevealed ? "••••" : lastSaldoRupiah);
+  const hidden = hideSaldo && !saldoRevealed;
+  saldoTotEl.textContent = "Saldo " + (hidden ? "••••" : fmtShortRp(lastSaldoNum));
+  saldoIoEl.textContent = hidden ? "••••" : `+${shortRp(lastMasuk)} · −${shortRp(lastKeluar)}`;
   saldoEl.title = hideSaldo ? (saldoRevealed ? "Ketuk untuk samarkan" : "Ketuk untuk lihat saldo") : "";
   saldoEl.setAttribute(
     "aria-label",
     !hideSaldo
-      ? `Saldo ${lastSaldoRupiah}`
+      ? `Saldo ${fmtShortRp(lastSaldoNum)}, masuk ${shortRp(lastMasuk)}, keluar ${shortRp(lastKeluar)} bulan ini`
       : saldoRevealed
         ? "Saldo terlihat, ketuk untuk samarkan"
         : "Saldo tersamar, ketuk untuk lihat"
@@ -727,7 +740,9 @@ function showStartupHint(s: Record<string, unknown>): void {
 async function refresh(): Promise<Record<string, unknown>> {
   const gen = chatGeneration;
   const r = await call({ type: "state" });
-  lastSaldoRupiah = String(r.saldoRupiah ?? "-");
+  lastSaldoNum = Number(r.saldo ?? NaN);
+  lastMasuk = Number(r.monthMasuk ?? 0);
+  lastKeluar = Number(r.monthKeluar ?? 0);
   renderSaldo();
   pinSet = !!r.pinSet;
   txCount = Number(r.txCount ?? 0);
