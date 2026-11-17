@@ -2,6 +2,7 @@
 import { COMMAND_WORD_SET } from "./commands";
 import {
   accountBalances,
+  activeDaysSince,
   addAccount,
   addCategory,
   addDebt,
@@ -177,6 +178,7 @@ const HELP =
   "  target Liburan 5jt [tempo 2027-06-01]   (target / sinking fund)\n" +
   "  target | target isi Liburan 500rb | target ambil Liburan 100rb | target hapus Liburan\n" +
   "  alokasi                     (panduan 50/30/20 bulan ini)\n" +
+  "  skor                        (skor kesehatan finansial 0-100)\n" +
   "  pin                         (status kunci; atur lewat ℹ → Keamanan)\n" +
   "  backup | backup kunci <sandi>   (JSON / terenkripsi)\n" +
   "  ai | ai reset               (pemakaian AI)\n" +
@@ -443,6 +445,79 @@ export function computeAlloc(): Alloc {
   };
 }
 
+export interface HealthFactor {
+  key: string;
+  label: string;
+  score: number;
+  weight: number;
+  detail: string;
+}
+export interface Health {
+  score: number;
+  tier: string;
+  factors: HealthFactor[];
+  tip: string;
+}
+
+// Skor kesehatan finansial 0-100 (rule-based, lokal, tanpa AI).
+export function computeHealth(): Health {
+  const per = parsePeriod("");
+  const rows = per ? ringkasRange(per.from, per.to) : [];
+  const income = rows.filter((r) => r.tipe === "masuk").reduce((a, b) => a + b.total, 0);
+  const expenses = rows.filter((r) => r.tipe === "keluar").reduce((a, b) => a + b.total, 0);
+  const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
+
+  // 1) Rasio tabungan (target >= 30%).
+  const rate = income > 0 ? (income - expenses) / income : 0;
+  const savingsScore = income > 0 ? clamp((rate / 0.3) * 100) : 50;
+  const savingsDetail = income > 0 ? `${Math.round(rate * 100)}% dari pemasukan` : "belum ada pemasukan";
+
+  // 2) Kepatuhan anggaran.
+  const budgets = budgetOverview();
+  const inBudget = budgets.filter((b) => b.pct <= 100).length;
+  const budgetScore = budgets.length ? clamp((inBudget / budgets.length) * 100) : 60;
+  const budgetDetail = budgets.length ? `${inBudget}/${budgets.length} kategori dalam batas` : "belum ada anggaran";
+
+  // 3) Beban utang (debt-to-income).
+  const { utang } = debtTotals();
+  const dti = income > 0 ? utang / income : utang > 0 ? 1 : 0;
+  const debtScore = clamp((1 - dti) * 100);
+  const debtDetail = utang > 0 ? `utang ${rupiah(utang)}` : "tanpa utang";
+
+  // 4) Dana darurat (dalam bulan biaya).
+  const saldoNow = saldo();
+  const months = expenses > 0 ? saldoNow / expenses : saldoNow > 0 ? 3 : 0;
+  const bufferScore = clamp((months / 3) * 100);
+  const bufferDetail = `${months.toFixed(1)}× biaya bulanan`;
+
+  // 5) Konsistensi mencatat (hari aktif 30 hari terakhir).
+  const from = isoLocal(new Date(Date.now() - 29 * 86_400_000));
+  const days = activeDaysSince(from);
+  const consistencyScore = clamp((days / 30) * 100);
+  const consistencyDetail = `${days} hari aktif/30`;
+
+  const factors: HealthFactor[] = [
+    { key: "savings", label: "Rasio tabungan", score: savingsScore, weight: 30, detail: savingsDetail },
+    { key: "budget", label: "Kepatuhan anggaran", score: budgetScore, weight: 20, detail: budgetDetail },
+    { key: "debt", label: "Beban utang", score: debtScore, weight: 20, detail: debtDetail },
+    { key: "buffer", label: "Dana darurat", score: bufferScore, weight: 15, detail: bufferDetail },
+    { key: "consistency", label: "Konsistensi mencatat", score: consistencyScore, weight: 15, detail: consistencyDetail },
+  ];
+  const score = Math.round(factors.reduce((a, f) => a + f.score * f.weight, 0) / 100);
+  const tier = score >= 80 ? "Sehat" : score >= 60 ? "Baik" : score >= 40 ? "Cukup" : "Perlu perhatian";
+  const tipFor: Record<string, string> = {
+    savings: "Tingkatkan rasio tabungan (target ≥30% dari pemasukan).",
+    budget: "Jaga kategori tetap di bawah batas anggaran.",
+    debt: "Kurangi atau lunasi utang untuk menurunkan beban.",
+    buffer: "Kumpulkan dana darurat (idealnya 3× biaya bulanan).",
+    consistency: "Catat transaksi tiap hari agar konsisten.",
+  };
+  const worst = [...factors].sort(
+    (a, b) => b.weight * (100 - b.score) - a.weight * (100 - a.score)
+  )[0];
+  return { score, tier, factors, tip: tipFor[worst.key] ?? "" };
+}
+
 export function dashboardData(): {
   label: string;
   masuk: number;
@@ -461,6 +536,7 @@ export function dashboardData(): {
   svg: string;
   trendSvg: string;
   alloc: Alloc;
+  health: Health;
 } {
   const per = parsePeriod("");
   const label = per?.label ?? "bulan ini";
@@ -532,6 +608,7 @@ export function dashboardData(): {
     svg,
     trendSvg,
     alloc: computeAlloc(),
+    health: computeHealth(),
   };
 }
 
@@ -1994,6 +2071,18 @@ async function handleMessageInner(input: string): Promise<Reply> {
       text:
         `${arah === "utang" ? "Utang" : "Piutang"} #${d.id}: ${rupiah(d.jumlah)} ${arah === "utang" ? "ke" : "dari"} ${d.nama} dicatat.` +
         "\n(ledger utang/piutang terpisah — tidak mengubah saldo akun)",
+    };
+  }
+
+  if (low === "skor" || low === "kesehatan") {
+    const h = computeHealth();
+    const lines = h.factors.map((f) => `  ${f.label}: ${f.score}/100 (${f.detail})`);
+    return {
+      text:
+        `Skor kesehatan finansial: ${h.score}/100 — ${h.tier}\n` +
+        lines.join("\n") +
+        `\n\nSaran: ${h.tip}`,
+      pre: true,
     };
   }
 

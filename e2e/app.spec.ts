@@ -673,6 +673,20 @@ test("menu Target: tambah, isi, hapus", async ({ page }) => {
   await page.locator("#goalBack").click();
 });
 
+test("panic blur: toggle tersimpan setelah reload", async ({ page }) => {
+  await boot(page);
+  await page.locator("#info").click();
+  await page.locator("#openWall").click();
+  await expect(page.locator("#panicOn")).toBeChecked();
+  await page.locator("#panicOn").uncheck();
+  await page.locator("#wallClose").click();
+  await page.reload();
+  await page.waitForFunction(() => /^v\d/.test(document.getElementById("sub")?.textContent ?? ""));
+  await page.locator("#info").click();
+  await page.locator("#openWall").click();
+  await expect(page.locator("#panicOn")).not.toBeChecked();
+});
+
 test("sapaan hanya untuk pengguna baru", async ({ page }) => {
   await boot(page);
   await expect(
@@ -777,6 +791,7 @@ test("Ringkasan++: net worth, proyeksi, tren 6 bulan", async ({ page }) => {
   await page.locator("#openDash").click();
   await expect(page.locator("#dashBody")).toContainText("Net worth");
   await expect(page.locator("#dashBody")).toContainText("Proyeksi net bulan");
+  await expect(page.locator("#dashBody")).toContainText("Skor kesehatan finansial");
   await expect(page.locator("#dashBody")).toContainText("Tren 6 bulan");
   await expect(page.locator("#dashBody svg")).toHaveCount(2);
   await page.locator("#dashBack").click();

@@ -1126,5 +1126,14 @@ await check("kategori ikon kustom terbaca di transaksi", async () => {
   await handleMessage("kategori hapus Ujikon");
 });
 
+await check("skor kesehatan 0-100 & faktor", async () => {
+  const h = dashboardData().health;
+  assert(h.score >= 0 && h.score <= 100, "skor dalam 0-100");
+  assert.equal(h.factors.length, 5, "5 faktor");
+  assert(h.tier.length > 0, "tier terisi");
+  const r = await handleMessage("skor");
+  assert(r.text.includes("/100"), "perintah skor jalan");
+});
+
 console.log(`\n${pass} ok, ${fail} fail`);
 if (fail > 0) process.exit(1);

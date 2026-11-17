@@ -265,6 +265,14 @@ export function countTx(): number {
   return (db.prepare(`SELECT COUNT(*) AS n FROM transactions`).get() as { n: number }).n;
 }
 
+export function activeDaysSince(from: string): number {
+  return (
+    db.prepare(`SELECT COUNT(DISTINCT tanggal) AS n FROM transactions WHERE tanggal >= ?`).get(from) as {
+      n: number;
+    }
+  ).n;
+}
+
 export function totalChanges(): number {
   return db.totalChanges();
 }

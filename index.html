@@ -100,6 +100,7 @@
     </label>
     <label class="row-check"><input id="hideSaldo" type="checkbox" /> Samarkan saldo di header (ketuk untuk lihat)</label>
     <label class="row-check"><input id="hideChat" type="checkbox" /> Samarkan nominal transaksi di chat</label>
+    <label class="row-check"><input id="panicOn" type="checkbox" /> Samarkan layar saat app ditinggal (panic blur)</label>
     <label class="row-check"><input id="soundNotice" type="checkbox" checked /> Bunyi "ting" saat pengingat</label>
     <label class="row-check"><input id="hapticNotice" type="checkbox" checked /> Getar saat mencatat/undo</label>
     <div class="modal-actions">
@@ -552,6 +553,10 @@
 </div>
 
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<div id="panic" class="panic" hidden>
+  <div class="panic-logo">Stacker</div>
+  <div class="panic-text">Layar disamarkan</div>
+</div>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

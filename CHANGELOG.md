@@ -3,6 +3,14 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.33.0]
+- **Skor kesehatan finansial (0–100)**: kartu gauge di Ringkasan + perintah
+  `skor`. Menilai rasio tabungan (30%), kepatuhan anggaran (20%), beban utang
+  (20%), dana darurat (15%), dan konsistensi mencatat (15%), plus satu saran
+  perbaikan. Rule-based, lokal, tanpa AI.
+- **Panic blur**: layar otomatis **disamarkan (blur)** saat app ditinggal/pindah
+  dan normal lagi saat dibuka. Toggle di **Tema & tampilan** (default aktif).
+
 ## [2.32.0]
 - **Ikon kategori bisa dicustom**: di **Info › Kategori** ada pilihan **Ikon**
   (makanan, transportasi, belanja, tagihan, kesehatan, hiburan, gaji, tabungan,

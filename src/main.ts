@@ -657,6 +657,28 @@ function applyChatMask(): void {
   });
 }
 
+// Panic blur: samarkan seluruh layar saat app ditinggal (pindah app/tab, minimize).
+const PANIC_KEY = "stacker-panic";
+function readPanic(): boolean {
+  try {
+    const v = localStorage.getItem(PANIC_KEY);
+    return v === null ? true : v === "1";
+  } catch {
+    return true;
+  }
+}
+let panicOn = readPanic();
+const panicEl = document.getElementById("panic")!;
+function applyPanic(): void {
+  if (!panicOn) {
+    panicEl.hidden = true;
+    return;
+  }
+  panicEl.hidden = !document.hidden;
+}
+document.addEventListener("visibilitychange", applyPanic);
+applyPanic();
+
 // Bunyi pengingat singkat (Web Audio, tanpa aset & tanpa jaringan).
 const SOUND_KEY = "stacker-sound";
 function readSound(): boolean {
@@ -1336,6 +1358,7 @@ for (const p of WALL_PRESETS) {
 
 const hideSaldoEl = document.getElementById("hideSaldo") as HTMLInputElement;
 const hideChatEl = document.getElementById("hideChat") as HTMLInputElement;
+const panicOnEl = document.getElementById("panicOn") as HTMLInputElement;
 const soundNoticeEl = document.getElementById("soundNotice") as HTMLInputElement;
 const hapticNoticeEl = document.getElementById("hapticNotice") as HTMLInputElement;
 
@@ -1345,6 +1368,7 @@ document.getElementById("openWall")!.onclick = () => {
   syncWallControls(currentWall);
   hideSaldoEl.checked = hideSaldo;
   hideChatEl.checked = hideChat;
+  panicOnEl.checked = panicOn;
   soundNoticeEl.checked = soundOn;
   hapticNoticeEl.checked = hapticOn;
   wallModal.hidden = false;
@@ -1371,6 +1395,17 @@ hideChatEl.onchange = () => {
   }
   applyChatMask();
   showToast(hideChat ? "Nominal di chat disamarkan." : "Nominal di chat ditampilkan.");
+};
+
+panicOnEl.onchange = () => {
+  panicOn = panicOnEl.checked;
+  try {
+    localStorage.setItem(PANIC_KEY, panicOn ? "1" : "0");
+  } catch {
+    // abaikan
+  }
+  applyPanic();
+  showToast(panicOn ? "Panic blur aktif saat app ditinggal." : "Panic blur dimatikan.");
 };
 
 soundNoticeEl.onchange = () => {
@@ -2805,6 +2840,65 @@ async function renderDash(): Promise<void> {
     )
   );
   dashBodyEl.appendChild(cards);
+
+  const health = (r.health ?? {}) as {
+    score?: number;
+    tier?: string;
+    tip?: string;
+    factors?: { label: string; score: number; detail: string }[];
+  };
+  if (typeof health.score === "number" && Array.isArray(health.factors)) {
+    const hTitle = document.createElement("div");
+    hTitle.className = "dash-title";
+    hTitle.textContent = "Skor kesehatan finansial";
+    const box = document.createElement("div");
+    box.className = "health";
+    const score = Number(health.score);
+    const color =
+      score >= 80
+        ? "var(--accent)"
+        : score >= 60
+          ? "var(--accent-2)"
+          : score >= 40
+            ? "var(--warning)"
+            : "var(--danger)";
+    const ring = document.createElement("div");
+    ring.className = "health-ring";
+    ring.style.background = `conic-gradient(${color} 0 ${score}%, var(--surface-3) ${score}% 100%)`;
+    const hole = document.createElement("div");
+    hole.className = "health-hole";
+    hole.textContent = String(score);
+    ring.appendChild(hole);
+    const meta = document.createElement("div");
+    meta.className = "health-meta";
+    const tier = document.createElement("div");
+    tier.className = "health-tier";
+    tier.textContent = String(health.tier ?? "");
+    const tip = document.createElement("div");
+    tip.className = "health-tip";
+    tip.textContent = health.tip ? "Saran: " + String(health.tip) : "";
+    meta.append(tier, tip);
+    box.append(ring, meta);
+    dashBodyEl.append(hTitle, box);
+    const flist = document.createElement("div");
+    flist.className = "dash-list";
+    for (const f of health.factors) {
+      const row = document.createElement("div");
+      row.className = "dr";
+      const a = document.createElement("span");
+      a.textContent = f.label;
+      const b = document.createElement("span");
+      b.textContent = `${f.score}/100`;
+      row.append(a, b);
+      const bar = document.createElement("div");
+      bar.className = "bar";
+      const fill = document.createElement("span");
+      fill.style.width = Math.max(0, Math.min(100, Number(f.score))) + "%";
+      bar.appendChild(fill);
+      flist.append(row, bar);
+    }
+    dashBodyEl.appendChild(flist);
+  }
 
   const alloc = (r.alloc ?? {}) as {
     income?: number;
