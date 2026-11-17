@@ -389,10 +389,17 @@ export function dashboardData(): {
   keluar: number;
   net: number;
   totalSaldo: number;
+  netWorth: number;
+  utang: number;
+  piutang: number;
+  projNet: number;
+  avg3Net: number;
   top: { kategori: string; total: number }[];
   accounts: { nama: string; saldo: number }[];
   today: { keluar: number; masuk: number; count: number };
+  trend: { label: string; masuk: number; keluar: number }[];
   svg: string;
+  trendSvg: string;
 } {
   const per = parsePeriod("");
   const label = per?.label ?? "bulan ini";
@@ -417,16 +424,52 @@ export function dashboardData(): {
     masuk: txsToday.filter((t) => t.tipe === "masuk").reduce((a, t) => a + t.jumlah, 0),
     count: txsToday.length,
   };
+
+  // Net worth = aset (saldo akun + piutang) − utang.
+  const { utang, piutang } = debtTotals();
+  const totalSaldo = saldo();
+  const netWorth = totalSaldo + piutang - utang;
+
+  // Tren 6 bulan + rata-rata net 3 bulan.
+  const monthNet = (p: Period): { label: string; masuk: number; keluar: number } => {
+    const rr = ringkasRange(p.from, p.to);
+    return {
+      label: p.label.slice(0, 3),
+      masuk: rr.filter((x) => x.tipe === "masuk").reduce((a, b) => a + b.total, 0),
+      keluar: rr.filter((x) => x.tipe === "keluar").reduce((a, b) => a + b.total, 0),
+    };
+  };
+  const trend = lastMonths(6).map(monthNet);
+  const trendSvg = trend.length ? buildTrendSvg(trend) : "";
+  const nets = lastMonths(3).map((p) => {
+    const m = monthNet(p);
+    return m.masuk - m.keluar;
+  });
+  const avg3Net = nets.length ? Math.round(nets.reduce((a, b) => a + b, 0) / nets.length) : 0;
+
+  // Proyeksi net bulan ini (run-rate dari hari yang sudah berjalan).
+  const iso = isoLocal();
+  const dayN = Number(iso.slice(8, 10)) || 1;
+  const dim = per ? Number(per.to.slice(8, 10)) || 31 : 31;
+  const projNet = Math.round(((masuk - keluar) / dayN) * dim);
+
   return {
     label,
     masuk,
     keluar,
     net: masuk - keluar,
-    totalSaldo: saldo(),
+    totalSaldo,
+    netWorth,
+    utang,
+    piutang,
+    projNet,
+    avg3Net,
     top,
     accounts,
     today,
+    trend,
     svg,
+    trendSvg,
   };
 }
 

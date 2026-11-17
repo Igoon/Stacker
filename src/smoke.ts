@@ -1074,5 +1074,13 @@ await check("deteksi langganan: nominal acak/jarak tak wajar tak terdeteksi", as
   dbmod.deleteTx(b.id);
 });
 
+await check("dashboard++: net worth, proyeksi, tren 6 bln", async () => {
+  const d = dashboardData();
+  assert.equal(d.netWorth, d.totalSaldo + d.piutang - d.utang, "net worth = saldo + piutang - utang");
+  assert.equal(d.trend.length, 6, "tren 6 bulan");
+  assert(typeof d.projNet === "number" && Number.isFinite(d.projNet), "proyeksi net");
+  assert(typeof d.avg3Net === "number" && Number.isFinite(d.avg3Net), "rata-rata net 3 bln");
+});
+
 console.log(`\n${pass} ok, ${fail} fail`);
 if (fail > 0) process.exit(1);

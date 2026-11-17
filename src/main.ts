@@ -2510,11 +2510,33 @@ async function renderDash(): Promise<void> {
   const todayCount = Number(today.count ?? 0);
   const todayKeluar = Number(today.keluar ?? 0);
   const todayMasuk = Number(today.masuk ?? 0);
+  const hidden = hideSaldo && !saldoRevealed;
+  const mask = (v: string): string => (hidden ? "••••" : v);
+  const signed = (n: number): string => (n < 0 ? "-" : "+") + fmtRp(Math.abs(n));
+  const netWorth = Number(r.netWorth ?? 0);
+  const utang = Number(r.utang ?? 0);
+  const piutang = Number(r.piutang ?? 0);
+  const projNet = Number(r.projNet ?? 0);
+  const avg3Net = Number(r.avg3Net ?? 0);
+  const netWorthCard = card("Net worth", mask(signed(netWorth)), true);
+  if (hideSaldo) {
+    netWorthCard.style.cursor = "pointer";
+    netWorthCard.onclick = () => {
+      saldoRevealed = !saldoRevealed;
+      renderSaldo();
+      void renderDash();
+    };
+  }
   cards.append(
     saldoCard,
+    netWorthCard,
     card(`Masuk · ${String(r.label ?? "")}`, fmtRp(Number(r.masuk ?? 0))),
     card("Keluar", fmtRp(Number(r.keluar ?? 0))),
-    card("Net", (net < 0 ? "-" : "+") + fmtRp(Math.abs(net)), true),
+    card("Net", signed(net), true),
+    card("Utang", fmtRp(utang)),
+    card("Piutang", fmtRp(piutang)),
+    card("Proyeksi net bulan", signed(projNet), true),
+    card("Rata-rata net 3 bln", signed(avg3Net), true),
     card(
       `Hari ini · ${todayCount} transaksi`,
       "-" + fmtRp(todayKeluar) + (todayMasuk > 0 ? ` · +${fmtRp(todayMasuk)}` : ""),
@@ -2547,6 +2569,15 @@ async function renderDash(): Promise<void> {
     wrap.className = "chart";
     wrap.innerHTML = r.svg;
     dashBodyEl.appendChild(wrap);
+  }
+  if (typeof r.trendSvg === "string" && r.trendSvg) {
+    const t = document.createElement("div");
+    t.className = "dash-title";
+    t.textContent = "Tren 6 bulan";
+    const wrap = document.createElement("div");
+    wrap.className = "chart";
+    wrap.innerHTML = r.trendSvg;
+    dashBodyEl.append(t, wrap);
   }
   const accounts = (Array.isArray(r.accounts) ? r.accounts : []) as { nama: string; saldo: number }[];
   if (accounts.length) {

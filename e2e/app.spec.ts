@@ -709,6 +709,19 @@ test("Ringkasan menampilkan kartu Hari ini", async ({ page }) => {
   await page.locator("#dashBack").click();
 });
 
+test("Ringkasan++: net worth, proyeksi, tren 6 bulan", async ({ page }) => {
+  await boot(page);
+  await chat(page, "gaji 5jt");
+  await chat(page, "makan 200rb");
+  await page.locator("#info").click();
+  await page.locator("#openDash").click();
+  await expect(page.locator("#dashBody")).toContainText("Net worth");
+  await expect(page.locator("#dashBody")).toContainText("Proyeksi net bulan");
+  await expect(page.locator("#dashBody")).toContainText("Tren 6 bulan");
+  await expect(page.locator("#dashBody svg")).toHaveCount(2);
+  await page.locator("#dashBack").click();
+});
+
 test("atribut hidden benar-benar menyembunyikan (baris idle tanpa PIN)", async ({ page }) => {
   await boot(page);
   await page.locator("#info").click();

@@ -3,6 +3,12 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.25.0]
+- **Ringkasan++ (dashboard)**: tambah **Net worth** (saldo akun + piutang −
+  utang), kartu **Utang** & **Piutang**, **Proyeksi net bulan ini** (run-rate),
+  **Rata-rata net 3 bulan**, dan **grafik Tren 6 bulan** (masuk vs keluar) —
+  melengkapi donut komposisi yang sudah ada.
+
 ## [2.24.0]
 - **Deteksi langganan otomatis**: Stacker mengenali **pengeluaran yang muncul
   tiap bulan dengan nominal sama** (mis. langganan/langganan digital) dari
