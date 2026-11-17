@@ -44,6 +44,7 @@ Prinsip: **lokal dulu, tanpa server, chat-first**. Chat untuk *mencatat*; menu u
 - 2.30.0 Kartu transaksi di chat + chip perintah cepat
 - 2.30.1 Kartu transaksi: hapus duplikasi akun + ikon kategori
 - 2.31.0 Ikon kategori SVG + update otomatis saat app dibuka
+- 2.31.1 Update lebih mulus (toast, semver, status versi di Tentang)
 
 ## Berikutnya
 - Kandidat dari "Nanti": Import CSV bank + auto-kategorisasi, WebAuthn,

@@ -50,6 +50,20 @@ let swReloading = false;
 // (menghindari "update" palsu saat app sudah di versi terbaru).
 let pendingUpdateCheck = false;
 let checkUpdateWhenReady: (() => void) | null = null;
+let latestVersion = "";
+
+// true bila `remote` lebih baru dari `local` (semver sederhana x.y.z).
+function isNewer(remote: string, local: string): boolean {
+  const a = remote.split(/[.\-+]/).map((x) => parseInt(x, 10) || 0);
+  const b = local.split(/[.\-+]/).map((x) => parseInt(x, 10) || 0);
+  const n = Math.max(a.length, b.length);
+  for (let i = 0; i < n; i++) {
+    const x = a[i] ?? 0;
+    const y = b[i] ?? 0;
+    if (x !== y) return x > y;
+  }
+  return false;
+}
 
 // Service worker: cache app shell. Kalau SW baru mengambil alih, tampilkan bar
 // "Muat ulang" — jangan reload otomatis supaya input user tak hilang.
@@ -74,9 +88,10 @@ if ("serviceWorker" in navigator) {
       if (res.ok) {
         const v = (await res.json()) as { version?: string; notes?: string[] };
         ver = String(v.version ?? "");
-        // Bandingkan dengan versi yang SEDANG berjalan. Kalau sama, berarti
-        // sudah memakai versi terbaru → jangan tampilkan notif palsu.
-        if (ver && appVersion && ver === appVersion) {
+        if (ver) latestVersion = ver;
+        // Hanya tampilkan bila server benar-benar lebih baru (hindari notif
+        // palsu saat versi sama, atau saat server rollback ke versi lama).
+        if (ver && appVersion && !isNewer(ver, appVersion)) {
           bar.hidden = true;
           return;
         }
@@ -153,7 +168,7 @@ if ("serviceWorker" in navigator) {
 
 // Perbarui paksa (tombol "Periksa pembaruan"): cek SW baru, bila ada aktifkan +
 // muat ulang. Berguna saat banner update tak muncul pada PWA yang terinstall.
-function waitInstalled(reg: ServiceWorkerRegistration): Promise<ServiceWorker | null> {
+function waitInstalled(reg: ServiceWorkerRegistration, timeoutMs = 8000): Promise<ServiceWorker | null> {
   return new Promise((resolve) => {
     if (reg.waiting) return resolve(reg.waiting);
     const watch = (w: ServiceWorker | null): void => {
@@ -183,11 +198,11 @@ function waitInstalled(reg: ServiceWorkerRegistration): Promise<ServiceWorker | 
     window.setTimeout(() => {
       reg.removeEventListener("updatefound", onFound);
       resolve(reg.waiting ?? null);
-    }, 8000);
+    }, timeoutMs);
   });
 }
 
-async function forceUpdate(silent = false): Promise<void> {
+async function forceUpdate(silent = false, target = ""): Promise<void> {
   if (!("serviceWorker" in navigator)) {
     if (!silent) window.location.reload();
     return;
@@ -204,11 +219,12 @@ async function forceUpdate(silent = false): Promise<void> {
     if (!silent) showToast("Tak bisa memeriksa (offline?).");
     return;
   }
-  const w = await waitInstalled(reg);
+  const w = await waitInstalled(reg, silent ? 5000 : 8000);
   if (w) {
     swReloading = true;
+    showToast(target ? `Memperbarui ke v${target}…` : "Memperbarui…");
     w.postMessage({ type: "SKIP_WAITING" });
-    window.setTimeout(() => window.location.reload(), 2000);
+    window.setTimeout(() => window.location.reload(), 1200);
   } else if (!silent) {
     showToast("Sudah versi terbaru.");
   }
@@ -225,17 +241,28 @@ async function maybeAutoUpdate(): Promise<void> {
     const res = await fetch(`./version.json?t=${Date.now()}`, { cache: "no-store" });
     if (!res.ok) return;
     ver = String(((await res.json()) as { version?: string }).version ?? "");
+    if (ver) latestVersion = ver;
   } catch {
     return; // offline
   }
-  if (!ver || !appVersion || ver === appVersion) return;
+  if (!ver || !appVersion || !isNewer(ver, appVersion)) return;
   try {
     if (sessionStorage.getItem("stacker-auto-updated") === ver) return;
     sessionStorage.setItem("stacker-auto-updated", ver);
   } catch {
     // sessionStorage bisa diblokir; tetap coba.
   }
-  await forceUpdate(true);
+  await forceUpdate(true, ver);
+}
+
+// Ambil versi terbaru dari server untuk ditampilkan di Info/Tentang.
+async function refreshLatestVersion(): Promise<void> {
+  try {
+    const res = await fetch(`./version.json?t=${Date.now()}`, { cache: "no-store" });
+    if (res.ok) latestVersion = String(((await res.json()) as { version?: string }).version ?? "");
+  } catch {
+    // offline / tak tersedia
+  }
 }
 
 let ready = false;
@@ -2338,6 +2365,13 @@ function renderInfo(): void {
     .join("\n");
   aboutLines.textContent = [
     `Versi: v${appVersion || "-"}`,
+    `Server: v${latestVersion || "-"}${
+      latestVersion && appVersion
+        ? isNewer(latestVersion, appVersion)
+          ? " (update tersedia — ketuk Muat ulang)"
+          : " (terbaru)"
+        : ""
+    }`,
     `Build: ${__BUILD_SHA__ || "lokal"} (${__BUILD_TIME__.slice(0, 10)})`,
     `Hash bundle SHA-256: ${bundleHash || "menghitung…"}`,
     `Host AI: ${aiHosts}`,
@@ -2367,7 +2401,7 @@ function showInfoPane(pane: HTMLElement): void {
 }
 
 document.getElementById("info")!.onclick = async () => {
-  await Promise.all([refreshStorageText(), refresh(), refreshAiHosts()]);
+  await Promise.all([refreshStorageText(), refresh(), refreshAiHosts(), refreshLatestVersion()]);
   showInfoPane(infoModal);
   if (!bundleHash) {
     bundleHash = await bundleSha256();

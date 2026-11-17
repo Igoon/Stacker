@@ -3,6 +3,13 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.31.1]
+- **Update lebih mulus**: saat auto-update muncul toast **"Memperbarui ke vX…"**
+  sebelum reload (tak lagi reload senyap). Perbandingan versi kini **semver**
+  (hanya update bila benar-benar lebih baru), waktu tunggu auto lebih singkat,
+  dan panel **Tentang** menampilkan **versi server + status**
+  ("terbaru"/"update tersedia").
+
 ## [2.31.0]
 - **Ikon kategori SVG** di kartu transaksi (makanan, transportasi, belanja,
   tagihan, kesehatan, hiburan, gaji, tabungan, investasi, transfer; fallback
