@@ -3,6 +3,11 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.22.1]
+- **UI menu Info**: dirapikan — "Cari" dinaikkan ke atas, baris menu lebih
+  rapat, dan daftar menu punya scroll sendiri sehingga judul + tombol "Tutup"
+  selalu terlihat (sebelumnya seluruh modal ikut bergeser).
+
 ## [2.22.0]
 - **Menu Cari (UI)**: filter transaksi lewat **Info › Cari** — kata kunci
   (catatan/kategori/akun), akun, kategori, rentang tanggal, dan nominal
