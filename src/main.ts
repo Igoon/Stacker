@@ -911,7 +911,7 @@ function addBubble(
       doneTransfers.add(tx.transfer_id);
     }
     const d = document.createElement("div");
-    d.className = "tx";
+    d.className = "tx " + (tx.tipe === "masuk" ? "in" : "out");
     d.dataset.txId = String(tx.id);
     const sign = tx.tipe === "masuk" ? "+" : "-";
     const full = sign + tx.rupiah;
@@ -1374,7 +1374,7 @@ function syncWallControls(w: Wall): void {
   for (const btn of Array.from(wallSwatches.querySelectorAll<HTMLButtonElement>(".swatch"))) {
     btn.setAttribute("aria-pressed", String(btn.dataset.preset === activeId));
   }
-  const dim = w.kind === "image" ? w.dim : 45;
+  const dim = w.kind === "image" ? w.dim : 0.45;
   wallDim.value = String(Math.round(dim * 100));
   wallDimVal.textContent = `${Math.round(dim * 100)}%`;
   const themeLabel = document.getElementById("wallThemeLabel");
@@ -2241,6 +2241,11 @@ const INFO_PANES = [
 for (const m of document.querySelectorAll<HTMLElement>(".modal")) {
   m.setAttribute("role", "dialog");
   m.setAttribute("aria-modal", "true");
+  m.addEventListener("click", (e) => {
+    if (e.target !== m) return;
+    if (m.id === "pinModal") closePinModal(true);
+    else m.hidden = true;
+  });
 }
 window.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
@@ -2317,6 +2322,8 @@ async function wipeAllData(): Promise<void> {
       "stacker-haptic",
       "stacker-first-use",
       "stacker-cmd-history",
+      "stacker-panic",
+      "stacker-panic-idle",
     ]) {
       try {
         localStorage.removeItem(k);
@@ -2627,8 +2634,10 @@ interface CatRow {
 }
 let catNames = new Set<string>();
 
-function runCmd(text: string): Promise<Reply & Record<string, unknown>> {
-  return call({ type: "chat", text });
+async function runCmd(text: string): Promise<Reply & Record<string, unknown>> {
+  const res = await call({ type: "chat", text });
+  void refresh();
+  return res;
 }
 
 function populateCatIcons(): void {
@@ -2745,7 +2754,8 @@ document.getElementById("catSave")!.onclick = async () => {
 
 // ---------- Manajemen anggaran (UI) ----------
 function fmtRp(n: number): string {
-  return "Rp" + Math.round(n).toLocaleString("id-ID");
+  const v = Math.round(n);
+  return (v < 0 ? "-" : "") + "Rp" + Math.abs(v).toLocaleString("id-ID");
 }
 
 async function refreshBudgetCats(): Promise<void> {
@@ -3000,12 +3010,12 @@ async function renderDash(): Promise<void> {
     title.textContent = "Alokasi 50/30/20";
     const list = document.createElement("div");
     list.className = "dash-list";
-    const rows3: [string, number, number][] = [
-      ["Kebutuhan (50%)", Number(alloc.needs ?? 0), Number(alloc.targetNeeds ?? 0)],
-      ["Keinginan (30%)", Number(alloc.wants ?? 0), Number(alloc.targetWants ?? 0)],
-      ["Tabungan (20%)", Number(alloc.savings ?? 0), Number(alloc.targetSavings ?? 0)],
+    const rows3: [string, number, number, boolean][] = [
+      ["Kebutuhan (50%)", Number(alloc.needs ?? 0), Number(alloc.targetNeeds ?? 0), true],
+      ["Keinginan (30%)", Number(alloc.wants ?? 0), Number(alloc.targetWants ?? 0), true],
+      ["Tabungan (20%)", Number(alloc.savings ?? 0), Number(alloc.targetSavings ?? 0), false],
     ];
-    for (const [label, v, t] of rows3) {
+    for (const [label, v, t, isLimit] of rows3) {
       const row = document.createElement("div");
       row.className = "dr";
       const a = document.createElement("span");
@@ -3015,7 +3025,8 @@ async function renderDash(): Promise<void> {
       b.textContent = `${fmtRp(v)} (${pctOf}%)`;
       row.append(a, b);
       const bar = document.createElement("div");
-      bar.className = "bar" + (t > 0 && v > t ? " over" : "");
+      bar.className =
+        "bar" + (isLimit && t > 0 && v > t ? " over" : !isLimit && v >= t ? " done" : "");
       const fill = document.createElement("span");
       fill.style.width = (t > 0 ? Math.min(100, Math.max(0, (v / t) * 100)) : 0) + "%";
       bar.appendChild(fill);
@@ -3083,6 +3094,10 @@ document.getElementById("openDash")!.onclick = async () => {
   showInfoPane(dashModal);
   await renderDash();
 };
+document.getElementById("quickDash")?.addEventListener("click", () => {
+  showInfoPane(dashModal);
+  void renderDash();
+});
 document.getElementById("dashBack")!.onclick = () => showInfoPane(infoModal);
 
 // ---------- Manajemen akun (UI) ----------
@@ -3646,7 +3661,7 @@ async function refreshGoalList(): Promise<void> {
     }
     info.textContent = line;
     const bar = document.createElement("div");
-    bar.className = "bar" + (g.terkumpul >= g.target ? " over" : "");
+    bar.className = "bar" + (g.terkumpul >= g.target ? " done" : "");
     const fill = document.createElement("span");
     fill.style.width = Math.min(100, Math.max(0, pct)) + "%";
     bar.appendChild(fill);
@@ -3725,7 +3740,7 @@ document.getElementById("checkUpdate")!.onclick = () => void forceUpdate();
 
 pickDirBtn.onclick = async () => {
   if (!supportsFolderBackup()) {
-    showToast("Browser ini tak mendukung auto-backup folder. Pakai Backup JSON di Info â†’ Backup & penyimpanan.");
+    showToast("Browser ini tak mendukung auto-backup folder. Pakai Backup JSON di Info → Backup & penyimpanan.");
     return;
   }
   if (folder && folderNeedsPermission) {

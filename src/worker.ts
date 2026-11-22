@@ -216,7 +216,6 @@ async function boot(): Promise<void> {
   dbRef = db;
   poolRef = poolUtil;
   initDb(mini);
-  runRecurringWithUndo();
 }
 
 function reply(id: number, payload: unknown): void {
@@ -277,6 +276,7 @@ function state() {
 
   // Chat bersifat ephemeral: jangan kirim riwayat lengkap. Cukup jumlah baris
   // supaya UI bisa menampilkan hint singkat saat pertama dibuka.
+  const curSaldo = saldo();
   return {
     ok: true,
     version: APP_VERSION,
@@ -288,8 +288,8 @@ function state() {
     redoCount: redoCount(),
     firstUseAt: getSetting("first_use_at"),
     alerts: budgetOverview().filter((b) => b.pct >= 100).length + (recurringDue() ? 1 : 0),
-    saldo: saldo(),
-    saldoRupiah: rupiahSigned(saldo()),
+    saldo: curSaldo,
+    saldoRupiah: rupiahSigned(curSaldo),
     monthMasuk,
     monthKeluar,
     aiEnabled: aiEnabled(),
