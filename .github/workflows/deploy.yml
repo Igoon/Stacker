@@ -38,6 +38,9 @@ jobs:
         run: npm run build
 
       - name: Attest build provenance
+        # Jangan blokir deploy bila layanan attestation GitHub sedang gangguan.
+        # Provenance tetap dihasilkan saat layanan normal.
+        continue-on-error: true
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
         with:
           subject-path: "dist/**/*"
