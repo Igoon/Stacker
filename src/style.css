@@ -1304,3 +1304,95 @@ footer button.ghost {
   font-size: 13px;
   color: var(--muted);
 }
+
+/* ---------- v2.37.0 UI Enhancements ---------- */
+.tx-actions {
+  margin-top: 7px;
+  padding-left: 37px;
+  display: flex;
+  gap: 6px;
+}
+
+.tx-actions .tx-del {
+  margin: 0;
+}
+
+.tx-edit {
+  background: var(--surface-3);
+  color: var(--text);
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.tx-edit:hover {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.dash-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px 6px;
+}
+
+.dash-nav span {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: capitalize;
+  color: var(--text);
+}
+
+.dash-nav button {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+
+.dash-nav button:hover:not(:disabled) {
+  background: var(--surface-4);
+}
+
+.dash-nav button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.form-row > label {
+  min-width: 0;
+}
+
+.info-actions.row-actions {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.info-actions.row-actions button {
+  flex: 1 1 auto;
+  text-align: center;
+}

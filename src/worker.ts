@@ -38,6 +38,7 @@ import {
 } from "./bot";
 import { aiEnabled, aiStats, getAiConfig, setAiConfig } from "./ai";
 import { exportJson } from "./backup";
+import { toCSV } from "./csv";
 import { decryptJson, encryptJson, isEncrypted } from "./crypto";
 import { changePin, checkPin, removePin, setPin } from "./pin";
 import { APP_VERSION } from "./version";
@@ -151,6 +152,18 @@ interface SetFirstUseMsg {
 interface DashMsg {
   type: "dashboard";
   id: number;
+  period?: string;
+}
+interface ExportCsvMsg {
+  type: "exportcsv";
+  id: number;
+  q?: string;
+  accountId?: number;
+  from?: string;
+  to?: string;
+  kategori?: string;
+  minRaw?: string;
+  maxRaw?: string;
 }
 interface MarkBackupMsg {
   type: "markbackup";
@@ -194,6 +207,7 @@ type InMsg =
   | CheckDataMsg
   | SetFirstUseMsg
   | DashMsg
+  | ExportCsvMsg
   | MarkBackupMsg;
 
 let mini: MiniDb;
@@ -402,8 +416,35 @@ async function onMessage(msg: InMsg): Promise<void> {
       break;
     }
     case "dashboard":
-      reply(msg.id, { ok: true, ...dashboardData() });
+      reply(msg.id, { ok: true, ...dashboardData(msg.period ?? "") });
       break;
+    case "exportcsv": {
+      const amt = (s?: string): number | undefined => {
+        if (!s || !s.trim()) return undefined;
+        const p = parseLocal(s);
+        return p ? p.result.jumlah : undefined;
+      };
+      const rows = searchTx(msg.q ?? "", {
+        accountId: msg.accountId,
+        from: msg.from || undefined,
+        to: msg.to || undefined,
+        kategori: msg.kategori || undefined,
+        min: amt(msg.minRaw),
+        max: amt(msg.maxRaw),
+        limit: 10000,
+      }).reverse();
+      if (!rows.length) {
+        reply(msg.id, { ok: false, error: "Tidak ada transaksi untuk diekspor." });
+        break;
+      }
+      const range = msg.from || msg.to ? `${msg.from || "awal"}_${msg.to || "akhir"}` : isoLocal();
+      reply(msg.id, {
+        ok: true,
+        count: rows.length,
+        file: { name: `stacker-transaksi-${range}.csv`, content: toCSV(rows) },
+      });
+      break;
+    }
     case "wipe": {
       // Hapus total: tutup DB dulu (WAJIB sebelum wipeFiles), lalu kosongkan
       // seluruh file OPFS SAH pool. UI akan reload dan DB dibuka ulang bersih.

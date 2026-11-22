@@ -463,10 +463,36 @@ function showToast(msg: string): void {
   }, 3600);
 }
 
-// Saran perintah dari riwayat saat mengetik.
+let cachedAccountNames: string[] = [];
+
+// Saran perintah dari riwayat + autocomplete @akun saat mengetik.
 function updateSuggest(): void {
-  const q = input.value.trim().toLowerCase();
+  const raw = input.value;
   suggestEl.replaceChildren();
+  const atMatch = raw.match(/(?:^|\s)@([^\s]*)$/);
+  if (atMatch && cachedAccountNames.length > 0) {
+    const prefix = atMatch[1].toLowerCase();
+    const accMatches = cachedAccountNames
+      .filter((a) => !prefix || a.toLowerCase().includes(prefix))
+      .slice(0, 8);
+    if (accMatches.length > 0) {
+      for (const acc of accMatches) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = "@" + acc;
+        b.onclick = () => {
+          const cut = raw.slice(0, raw.length - atMatch[1].length - 1);
+          input.value = `${cut}@${acc} `;
+          input.focus();
+          suggestEl.hidden = true;
+        };
+        suggestEl.appendChild(b);
+      }
+      suggestEl.hidden = false;
+      return;
+    }
+  }
+  const q = raw.trim().toLowerCase();
   if (!q) {
     suggestEl.hidden = true;
     return;
@@ -932,8 +958,16 @@ function addBubble(
     meta.className = "tx-meta";
     meta.textContent = (tx.akun ? `${tx.akun} · ` : "") + `#${tx.id}`;
     d.append(head, meta);
+    const txActions = document.createElement("div");
+    txActions.className = "tx-actions";
+    const editBtn = document.createElement("button");
+    editBtn.className = "tx-edit";
+    editBtn.type = "button";
+    editBtn.textContent = "Ubah";
+    editBtn.onclick = () => void openEditTxModal(tx, d);
     const btn = document.createElement("button");
     btn.className = "tx-del";
+    btn.type = "button";
     btn.textContent = tx.transfer_id ? "Hapus (2 baris)" : "Hapus";
     btn.onclick = async () => {
       const res = await call({ type: "delete", txId: tx.id });
@@ -952,7 +986,8 @@ function addBubble(
       }
       void refresh();
     };
-    d.appendChild(btn);
+    txActions.append(editBtn, btn);
+    d.appendChild(txActions);
     b.appendChild(d);
   }
   if (file) {
@@ -1008,6 +1043,11 @@ async function refresh(): Promise<Record<string, unknown>> {
   renderSaldo();
   pinSet = !!r.pinSet;
   txCount = Number(r.txCount ?? 0);
+  if (Array.isArray(r.accounts)) {
+    cachedAccountNames = (r.accounts as { nama?: string }[])
+      .map((a) => String(a.nama ?? ""))
+      .filter(Boolean);
+  }
   chipsEl.hidden = txCount > 0;
   undoBtn.disabled = !r.canUndo;
   redoBtn.disabled = !r.canRedo;
@@ -1156,6 +1196,17 @@ document.getElementById("export")!.onclick = async () => {
   saveFile(`stacker-backup-${todayStr()}.json`, r.json as string);
   lastBackupAt = todayStr();
   void call({ type: "markbackup", tanggal: lastBackupAt });
+};
+
+document.getElementById("exportCsvAll")!.onclick = async () => {
+  const r = await call({ type: "exportcsv" });
+  if (!r.ok || !r.file) {
+    showToast(String(r.error ?? "Tidak ada transaksi untuk diekspor."));
+    return;
+  }
+  const f = r.file as { name: string; content: string };
+  saveFile(f.name, f.content);
+  showToast(`CSV ${Number(r.count ?? 0)} transaksi siap diunduh.`);
 };
 
 document.getElementById("exportEnc")!.onclick = () => {
@@ -2865,8 +2916,33 @@ document.getElementById("budgetSave")!.onclick = async () => {
 };
 
 // ---------- Dashboard / Ringkasan (UI) ----------
+const dashPrevBtn = document.getElementById("dashPrev") as HTMLButtonElement;
+const dashNextBtn = document.getElementById("dashNext") as HTMLButtonElement;
+const dashPeriodLabel = document.getElementById("dashPeriodLabel")!;
+const currentYm = (): string => todayStr().slice(0, 7);
+let dashYm = currentYm();
+
+function shiftYm(ym: string, delta: number): string {
+  const [y, mo] = ym.split("-").map(Number);
+  const d = new Date(y, (mo || 1) - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+dashPrevBtn.onclick = () => {
+  dashYm = shiftYm(dashYm, -1);
+  void renderDash();
+};
+dashNextBtn.onclick = () => {
+  if (dashYm >= currentYm()) return;
+  dashYm = shiftYm(dashYm, 1);
+  void renderDash();
+};
+
 async function renderDash(): Promise<void> {
-  const r = await call({ type: "dashboard" });
+  const r = await call({ type: "dashboard", period: dashYm });
+  if (typeof r.ym === "string" && r.ym) dashYm = r.ym;
+  dashPeriodLabel.textContent = String(r.label ?? dashYm);
+  dashNextBtn.disabled = dashYm >= currentYm();
   dashBodyEl.replaceChildren();
   const card = (k: string, v: string, wide = false): HTMLElement => {
     const d = document.createElement("div");
@@ -3091,12 +3167,21 @@ async function renderDash(): Promise<void> {
 }
 
 document.getElementById("openDash")!.onclick = async () => {
+  dashYm = currentYm();
   showInfoPane(dashModal);
   await renderDash();
 };
 document.getElementById("quickDash")?.addEventListener("click", () => {
+  dashYm = currentYm();
   showInfoPane(dashModal);
   void renderDash();
+});
+document.getElementById("quickSearch")?.addEventListener("click", async () => {
+  showInfoPane(searchModal);
+  searchSummaryEl.hidden = true;
+  searchListEl.replaceChildren();
+  await refreshSearchOptions();
+  searchQEl.focus();
 });
 document.getElementById("dashBack")!.onclick = () => showInfoPane(infoModal);
 
@@ -3557,6 +3642,156 @@ document.getElementById("searchResetForm")!.onclick = () => {
   searchListEl.replaceChildren();
 };
 document.getElementById("searchRun")!.onclick = () => void runSearch();
+document.getElementById("searchExportCsv")!.onclick = async () => {
+  const r = await call({
+    type: "exportcsv",
+    q: searchQEl.value.trim(),
+    accountId: searchAccEl.value ? Number(searchAccEl.value) : undefined,
+    kategori: searchCatEl.value || undefined,
+    from: searchFromEl.value || undefined,
+    to: searchToEl.value || undefined,
+    minRaw: searchMinEl.value.trim() || undefined,
+    maxRaw: searchMaxEl.value.trim() || undefined,
+  });
+  if (!r.ok || !r.file) {
+    showToast(String(r.error ?? "Tidak ada transaksi untuk diekspor."));
+    return;
+  }
+  const f = r.file as { name: string; content: string };
+  saveFile(f.name, f.content);
+  showToast(`CSV ${Number(r.count ?? 0)} transaksi siap diunduh.`);
+};
+
+// ---------- Edit Transaksi Cepat (UI) ----------
+const editTxModal = document.getElementById("editTxModal")!;
+const editTxTitle = document.getElementById("editTxTitle")!;
+const editTxJumlah = document.getElementById("editTxJumlah") as HTMLInputElement;
+const editTxTanggal = document.getElementById("editTxTanggal") as HTMLInputElement;
+const editTxExtra = document.getElementById("editTxExtra")!;
+const editTxCat = document.getElementById("editTxCat") as HTMLSelectElement;
+const editTxAcc = document.getElementById("editTxAcc") as HTMLSelectElement;
+const editTxNote = document.getElementById("editTxNote") as HTMLInputElement;
+const editTxMsg = document.getElementById("editTxMsg")!;
+let editingTx: { tx: Tx; card: HTMLElement } | null = null;
+
+async function openEditTxModal(tx: Tx, card: HTMLElement): Promise<void> {
+  editingTx = { tx, card };
+  editTxTitle.textContent = tx.transfer_id ? `Ubah transfer #${tx.id}` : `Ubah transaksi #${tx.id}`;
+  editTxJumlah.value = String(tx.jumlah);
+  editTxTanggal.value = tx.tanggal;
+  editTxNote.value = tx.catatan ?? "";
+  editTxMsg.hidden = true;
+  editTxExtra.hidden = !!tx.transfer_id;
+
+  if (!tx.transfer_id) {
+    const [cRes, aRes] = await Promise.all([call({ type: "listcat" }), call({ type: "listacc" })]);
+    const cats = (Array.isArray(cRes.categories) ? cRes.categories : []) as CatRow[];
+    const accs = (Array.isArray(aRes.accounts) ? aRes.accounts : []) as AccRow[];
+
+    editTxCat.replaceChildren();
+    const catOpts = [...cats.map((c) => c.nama)];
+    if (!catOpts.includes("Lainnya")) catOpts.push("Lainnya");
+    if (tx.kategori && !catOpts.includes(tx.kategori)) catOpts.unshift(tx.kategori);
+    for (const nm of catOpts) {
+      const o = document.createElement("option");
+      o.value = nm;
+      o.textContent = nm;
+      editTxCat.appendChild(o);
+    }
+    editTxCat.value = tx.kategori;
+
+    editTxAcc.replaceChildren();
+    for (const a of accs) {
+      const o = document.createElement("option");
+      o.value = a.nama;
+      o.textContent = a.nama;
+      editTxAcc.appendChild(o);
+    }
+    if (tx.akun) editTxAcc.value = tx.akun;
+  }
+
+  editTxModal.hidden = false;
+  editTxJumlah.focus();
+}
+
+document.getElementById("editTxCancel")!.onclick = () => {
+  editingTx = null;
+  editTxModal.hidden = true;
+};
+
+document.getElementById("editTxSave")!.onclick = async () => {
+  if (!editingTx) return;
+  const { tx, card } = editingTx;
+  const jmlRaw = editTxJumlah.value.trim();
+  const tglRaw = editTxTanggal.value.trim();
+  if (!jmlRaw) {
+    editTxMsg.hidden = false;
+    editTxMsg.textContent = "Nominal wajib diisi.";
+    return;
+  }
+
+  let updatedTx: Tx = { ...tx };
+  let changed = false;
+
+  if (jmlRaw !== String(tx.jumlah)) {
+    const r = await runCmd(`ubah #${tx.id} jadi ${jmlRaw}`);
+    if (!r.ok || !Array.isArray(r.txs) || !r.txs.length) {
+      editTxMsg.hidden = false;
+      editTxMsg.textContent = String(r.text || r.error || "Nominal tidak valid.");
+      return;
+    }
+    updatedTx = r.txs[0];
+    changed = true;
+  }
+
+  if (tglRaw && tglRaw !== tx.tanggal) {
+    const r = await runCmd(`ubah #${tx.id} tanggal ${tglRaw}`);
+    if (Array.isArray(r.txs) && r.txs.length) updatedTx = r.txs[0];
+    changed = true;
+  }
+
+  if (!tx.transfer_id) {
+    const newCat = editTxCat.value;
+    if (newCat && newCat !== tx.kategori) {
+      const r = await runCmd(`ubah #${tx.id} kategori ${newCat}`);
+      if (Array.isArray(r.txs) && r.txs.length) updatedTx = r.txs[0];
+      changed = true;
+    }
+    const newAcc = editTxAcc.value;
+    if (newAcc && newAcc !== (tx.akun ?? "")) {
+      const r = await runCmd(`ubah #${tx.id} akun ${newAcc}`);
+      if (Array.isArray(r.txs) && r.txs.length) updatedTx = r.txs[0];
+      changed = true;
+    }
+    const newNote = editTxNote.value.trim();
+    if (newNote && newNote !== (tx.catatan ?? "")) {
+      const r = await runCmd(`ubah #${tx.id} catatan ${newNote}`);
+      if (Array.isArray(r.txs) && r.txs.length) updatedTx = r.txs[0];
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    Object.assign(tx, updatedTx);
+    const sign = tx.tipe === "masuk" ? "+" : "-";
+    const full = sign + (tx.rupiah ?? fmtRp(tx.jumlah));
+    const catEl = card.querySelector(".tx-cat");
+    const amtEl = card.querySelector<HTMLElement>(".tx-amt");
+    const metaEl = card.querySelector(".tx-meta");
+    const iconEl = card.querySelector(".tx-icon");
+    if (catEl) catEl.textContent = tx.kategori;
+    if (amtEl) {
+      amtEl.textContent = full;
+      amtEl.dataset.full = full;
+    }
+    if (metaEl) metaEl.textContent = (tx.akun ? `${tx.akun} · ` : "") + `#${tx.id}`;
+    if (iconEl) iconEl.innerHTML = catIconSvg(tx.kategori, tx.ikon ?? undefined);
+    showToast(`Transaksi #${tx.id} diperbarui.`);
+  }
+
+  editingTx = null;
+  editTxModal.hidden = true;
+};
 
 // ---------- Deteksi langganan (UI) ----------
 interface SubRow {

@@ -421,8 +421,8 @@ function catGroup(nama: string): "needs" | "wants" | "savings" {
 }
 
 // Panduan 50/30/20 dari pemasukan bulan berjalan (transfer dikecualikan).
-export function computeAlloc(): Alloc {
-  const per = parsePeriod("");
+export function computeAlloc(periodArg = ""): Alloc {
+  const per = parsePeriod(periodArg) ?? parsePeriod("");
   const rows = per ? ringkasRange(per.from, per.to) : [];
   const income = rows.filter((r) => r.tipe === "masuk").reduce((a, b) => a + b.total, 0);
   let needs = 0;
@@ -518,7 +518,8 @@ export function computeHealth(): Health {
   return { score, tier, factors, tip: tipFor[worst.key] ?? "" };
 }
 
-export function dashboardData(): {
+export function dashboardData(periodArg = ""): {
+  ym: string;
   label: string;
   masuk: number;
   keluar: number;
@@ -538,7 +539,8 @@ export function dashboardData(): {
   alloc: Alloc;
   health: Health;
 } {
-  const per = parsePeriod("");
+  const per = parsePeriod(periodArg) ?? parsePeriod("");
+  const ym = per?.from.slice(0, 7) ?? isoLocal().slice(0, 7);
   const label = per?.label ?? "bulan ini";
   const rows = per ? ringkasRange(per.from, per.to) : [];
   const keluarCats = rows
@@ -591,6 +593,7 @@ export function dashboardData(): {
   const projNet = Math.round(((masuk - keluar) / dayN) * dim);
 
   return {
+    ym,
     label,
     masuk,
     keluar,
@@ -607,7 +610,7 @@ export function dashboardData(): {
     trend,
     svg,
     trendSvg,
-    alloc: computeAlloc(),
+    alloc: computeAlloc(periodArg),
     health: computeHealth(),
   };
 }
@@ -2196,6 +2199,24 @@ async function handleMessageInner(input: string): Promise<Reply> {
     return { text: "Nominal tidak kebaca. Contoh: `makan siang 50rb`" };
   }
 
+  const recentTx = listTx(5);
+  const nowMs = Date.now();
+  const todayIso = isoLocal();
+  const dupNotes: string[] = [];
+  for (const p of results) {
+    const tgl = p.tanggal ?? todayIso;
+    const accId = account?.id ?? null;
+    const dup = recentTx.find((r) => {
+      if (r.jumlah !== p.jumlah || r.tipe !== p.tipe || r.kategori !== p.kategori) return false;
+      if ((r.account_id ?? null) !== accId || r.tanggal !== tgl) return false;
+      const ts = Date.parse(r.created_at.replace(" ", "T") + "Z");
+      return Number.isFinite(ts) && nowMs - ts >= 0 && nowMs - ts <= 120_000;
+    });
+    if (dup) {
+      dupNotes.push(`⚠️ Mirip transaksi #${dup.id} barusan — ketik \`undo\` jika dobel.`);
+    }
+  }
+
   const txs = results.map((p) =>
     addTx({
       jumlah: p.jumlah,
@@ -2213,7 +2234,9 @@ async function handleMessageInner(input: string): Promise<Reply> {
       : "Tercatat.";
   const warns = txs.map(budgetWarn).filter((w): w is string => !!w);
   const sugNote = suggested ? `(kategori "${suggested}" ditebak dari riwayat — ubah bila salah)` : "";
-  const body = [usedAI ? `${head}\n(diproses AI)` : head, sugNote, ...warns].filter(Boolean).join("\n");
+  const body = [usedAI ? `${head}\n(diproses AI)` : head, sugNote, ...dupNotes, ...warns]
+    .filter(Boolean)
+    .join("\n");
   return { text: body, txs: txs.map(withRupiah) };
 }
 

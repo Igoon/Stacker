@@ -3,17 +3,13 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
-## [2.36.0]
-- **Tombol Dashboard cepat**: pintasan **📊 Dashboard** di bilah perintah cepat.
-- **Pembeda transaksi masuk/keluar**: kartu transaksi di chat kini berwarna
-  (garis aksen + jumlah) sesuai arahnya.
-- **Modal**: tutup dengan ketuk area luar (backdrop); tombol aksi bergaya
-  `danger` lebih jelas.
-- **Saldo negatif** ditampilkan dengan tanda minus yang benar.
-- **Alokasi 50/30/20**: "Tabungan" kini target (bar hijau "selesai"), bukan batas.
-- **Poles UI menyeluruh**: token radius, animasi masuk/fade, tap-highlight,
-  keypad PIN (dots), hover/active state, dan perbaikan tampilan header/saldo.
-- Refresh otomatis setelah menjalankan perintah.
+## [2.37.0]
+- **Edit transaksi cepat**: tombol **Ubah** langsung di kartu transaksi pada chat untuk mengedit nominal, tanggal, kategori, akun, dan catatan tanpa mengetik perintah.
+- **Navigasi bulan di Dashboard**: tombol `<` dan `>` di Ringkasan untuk melihat grafik, alokasi, dan pengeluaran bulan-bulan sebelumnya.
+- **Export CSV langsung dari UI**: tombol **Export CSV** di modal **Cari transaksi** (sesuai filter aktif) dan di **Backup & penyimpanan** (semua transaksi).
+- **Autocomplete `@akun`**: ketik `@` di kolom chat untuk memunculkan saran nama akun secara otomatis.
+- **Peringatan transaksi duplikat**: deteksi transaksi identik dalam 2 menit terakhir dengan pengingat cepat untuk `undo` jika tidak sengaja dobel.
+- **Optimasi UI & perbaikan bug**: akses cepat **Dashboard** & **Cari** di bar bawah, form filter Cari 2 kolom yang lebih ringkas, pembeda warna kartu pemasukan/pengeluaran, *backdrop click* penutup modal, animasi halus, serta perbaikan bug slider wallpaper, format Rupiah negatif, sinkronisasi header dari modal, tema terang, dan notifikasi transaksi berulang saat boot.
 
 ## [2.35.0]
 - **Tema "Otomatis"**: opsi tema baru — otomatis memakai tema terang (**Langit**)
