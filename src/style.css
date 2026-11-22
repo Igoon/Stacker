@@ -1503,3 +1503,50 @@ header .top-right {
 #promptModal {
   z-index: 25;
 }
+
+/* ---------- v2.38.1 Kartu Transaksi 2 Baris Kompak ---------- */
+.tx {
+  padding: 8px 10px;
+}
+
+.tx-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  padding-left: 37px;
+}
+
+.tx-foot .tx-meta {
+  margin-top: 0;
+  padding-left: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tx-foot .tx-actions {
+  margin-top: 0;
+  padding-left: 0;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tx-foot .tx-edit,
+.tx-foot .tx-del {
+  margin: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 7px;
+  font-size: 13px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}

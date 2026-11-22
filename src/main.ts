@@ -915,6 +915,48 @@ function catIconSvg(name: string, iconId?: string): string {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
 }
 
+function fmtTxDate(iso?: string | null): string {
+  if (!iso) return "";
+  const now = new Date();
+  const today = todayStr();
+  if (iso === today) return "Hari ini";
+  const yest = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const yestIso = `${yest.getFullYear()}-${String(yest.getMonth() + 1).padStart(2, "0")}-${String(
+    yest.getDate()
+  ).padStart(2, "0")}`;
+  if (iso === yestIso) return "Kemarin";
+  const parts = iso.split("-").map(Number);
+  if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return iso;
+  const d = new Date(parts[0], parts[1] - 1, parts[2]);
+  const sameYear = parts[0] === now.getFullYear();
+  try {
+    return d.toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "short",
+      ...(sameYear ? {} : { year: "2-digit" }),
+    });
+  } catch {
+    return iso.slice(5);
+  }
+}
+
+function txTitle(tx: Tx): string {
+  const note = (tx.catatan ?? "").trim();
+  if (note && note.toLowerCase() !== tx.kategori.toLowerCase()) return note;
+  return tx.kategori;
+}
+
+function txMetaText(tx: Tx): string {
+  const parts: string[] = [];
+  const title = txTitle(tx);
+  if (title.toLowerCase() !== tx.kategori.toLowerCase()) parts.push(tx.kategori);
+  if (tx.akun) parts.push(tx.akun);
+  const dt = fmtTxDate(tx.tanggal);
+  if (dt) parts.push(dt);
+  parts.push(`#${tx.id}`);
+  return parts.join(" · ");
+}
+
 function addBubble(
   text: string,
   side: "me" | "bot",
@@ -956,27 +998,39 @@ function addBubble(
     icon.innerHTML = catIconSvg(tx.kategori, tx.ikon ?? undefined);
     const cat = document.createElement("span");
     cat.className = "tx-cat";
-    cat.textContent = tx.kategori;
+    const titleTxt = txTitle(tx);
+    cat.textContent = titleTxt;
+    cat.title = titleTxt;
     const strong = document.createElement("b");
     strong.className = "tx-amt";
     strong.textContent = hideChat ? maskRp(full) : full;
     strong.dataset.full = full;
     head.append(icon, cat, strong);
+    const foot = document.createElement("div");
+    foot.className = "tx-foot";
     const meta = document.createElement("div");
     meta.className = "tx-meta";
-    meta.textContent = (tx.akun ? `${tx.akun} · ` : "") + `#${tx.id}`;
-    d.append(head, meta);
+    const metaTxt = txMetaText(tx);
+    meta.textContent = metaTxt;
+    meta.title = metaTxt;
     const txActions = document.createElement("div");
     txActions.className = "tx-actions";
     const editBtn = document.createElement("button");
     editBtn.className = "tx-edit";
     editBtn.type = "button";
-    editBtn.textContent = "Ubah";
+    editBtn.textContent = "✎";
+    editBtn.title = `Ubah #${tx.id}`;
+    editBtn.setAttribute("aria-label", `Ubah transaksi #${tx.id}`);
     editBtn.onclick = () => void openEditTxModal(tx, d);
     const btn = document.createElement("button");
     btn.className = "tx-del";
     btn.type = "button";
-    btn.textContent = tx.transfer_id ? "Hapus (2 baris)" : "Hapus";
+    btn.textContent = "✕";
+    btn.title = tx.transfer_id ? "Hapus transfer (2 baris)" : `Hapus #${tx.id}`;
+    btn.setAttribute(
+      "aria-label",
+      tx.transfer_id ? `Hapus transfer #${tx.id} (2 baris)` : `Hapus transaksi #${tx.id}`
+    );
     btn.onclick = async () => {
       const res = await call({ type: "delete", txId: tx.id });
       // Transfer = dua baris; hapus semua bubble dengan id yang benar-benar
@@ -995,7 +1049,8 @@ function addBubble(
       void refresh();
     };
     txActions.append(editBtn, btn);
-    d.appendChild(txActions);
+    foot.append(meta, txActions);
+    d.append(head, foot);
     b.appendChild(d);
   }
   if (file) {
@@ -3989,12 +4044,20 @@ document.getElementById("editTxSave")!.onclick = async () => {
       const amtEl = el.querySelector<HTMLElement>(".tx-amt");
       const metaEl = el.querySelector(".tx-meta");
       const iconEl = el.querySelector(".tx-icon");
-      if (catEl) catEl.textContent = tx.kategori;
+      if (catEl) {
+        const t = txTitle(tx);
+        catEl.textContent = t;
+        catEl.setAttribute("title", t);
+      }
       if (amtEl) {
         amtEl.textContent = full;
         amtEl.dataset.full = full;
       }
-      if (metaEl) metaEl.textContent = (tx.akun ? `${tx.akun} · ` : "") + `#${tx.id}`;
+      if (metaEl) {
+        const mt = txMetaText(tx);
+        metaEl.textContent = mt;
+        metaEl.setAttribute("title", mt);
+      }
       if (iconEl) iconEl.innerHTML = catIconSvg(tx.kategori, tx.ikon ?? undefined);
     }
     showToast(`Transaksi #${tx.id} diperbarui.`);

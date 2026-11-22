@@ -3,6 +3,9 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.38.1]
+- **Kartu transaksi 2 baris yang lebih ringkas & informatif**: menampilkan **catatan** sebagai judul utama (atau kategori jika tanpa catatan) serta **kategori, akun, tanggal ringkas** (*Hari ini*, *Kemarin*, atau *22 Nov*), dan `#id` dalam satu baris bawah bersama tombol ikon kompak **Ubah (✏️)** dan **Hapus (🗑️)**.
+
 ## [2.38.0]
 - **Cari transaksi interaktif**: tombol **Ubah** dan **Hapus** langsung pada setiap hasil pencarian.
 - **Modal input kustom**: menggantikan seluruh `window.prompt()` bawaan browser (ubah nama akun, sesuaikan saldo, ubah berulang, bayar utang, isi target) agar konsisten dengan tema aktif.
