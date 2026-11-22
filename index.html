@@ -21,20 +21,17 @@
 <div class="app">
   <header>
     <div class="top">
-      <div>
-        <div class="name">Stacker</div>
+      <div class="brand">
+        <div class="name">Stacker <span id="busy" class="busy-dot" hidden>…</span></div>
         <div class="sub" id="sub">catat keuangan lewat chat</div>
       </div>
-      <div class="saldo" id="saldo" role="button" tabindex="0" aria-label="Saldo">
-        <div class="saldo-tot" id="saldoTot">Saldo: -</div>
-        <div class="saldo-io" id="saldoIo">+0 · −0</div>
+      <div class="top-right">
+        <div class="saldo" id="saldo" role="button" tabindex="0" aria-label="Saldo">
+          <div class="saldo-tot" id="saldoTot">Saldo: -</div>
+          <div class="saldo-io" id="saldoIo">+0 · −0</div>
+        </div>
+        <button id="info" class="menu-btn" type="button" aria-label="Menu & pengaturan" title="Menu & pengaturan">☰</button>
       </div>
-    </div>
-    <div class="toolbar">
-      <button id="undo" aria-label="Batalkan aksi terakhir" title="Batalkan aksi terakhir" disabled>↶ Undo</button>
-      <button id="redo" aria-label="Ulangi aksi yang dibatalkan" title="Ulangi aksi yang dibatalkan" disabled>↷ Redo</button>
-      <button id="info" aria-label="Info & pengaturan" title="Info & pengaturan">ℹ Info</button>
-      <span id="busy" hidden>…</span>
     </div>
   </header>
   <div id="update" class="updatebar" hidden>
@@ -44,7 +41,13 @@
     </div>
     <button id="updateReload">Muat ulang</button>
   </div>
-  <div id="chat" aria-live="polite" aria-relevant="additions"></div>
+  <div class="chat-wrap">
+    <div id="undoBar" class="undo-float" hidden>
+      <button id="undo" type="button" aria-label="Batalkan aksi terakhir" title="Batalkan aksi terakhir" disabled>↶ Undo</button>
+      <button id="redo" type="button" aria-label="Ulangi aksi yang dibatalkan" title="Ulangi aksi yang dibatalkan" disabled>↷ Redo</button>
+    </div>
+    <div id="chat" aria-live="polite" aria-relevant="additions"></div>
+  </div>
   <div id="chips" class="chips" hidden></div>
   <div id="suggest" class="suggest" hidden></div>
   <div id="quick" class="quick">

@@ -3,6 +3,9 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.37.1]
+- **Header 1 baris + Undo/Redo melayang**: header lebih ringkas dengan tombol menu `☰` sejajar pil saldo; tombol **Undo/Redo** kini muncul otomatis sebagai pil melayang hanya saat ada riwayat aksi yang bisa dibatalkan/diulangi.
+
 ## [2.37.0]
 - **Edit transaksi cepat**: tombol **Ubah** langsung di kartu transaksi pada chat untuk mengedit nominal, tanggal, kategori, akun, dan catatan tanpa mengetik perintah.
 - **Navigasi bulan di Dashboard**: tombol `<` dan `>` di Ringkasan untuk melihat grafik, alokasi, dan pengeluaran bulan-bulan sebelumnya.

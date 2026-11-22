@@ -325,6 +325,7 @@ if (quickEl) {
     };
   }
 }
+const undoBar = document.getElementById("undoBar");
 const undoBtn = document.getElementById("undo") as HTMLButtonElement;
 const redoBtn = document.getElementById("redo") as HTMLButtonElement;
 const historyBtn = document.getElementById("history") as HTMLButtonElement;
@@ -1049,8 +1050,13 @@ async function refresh(): Promise<Record<string, unknown>> {
       .filter(Boolean);
   }
   chipsEl.hidden = txCount > 0;
-  undoBtn.disabled = !r.canUndo;
-  redoBtn.disabled = !r.canRedo;
+  const hasUndo = !!r.canUndo;
+  const hasRedo = !!r.canRedo;
+  undoBtn.disabled = !hasUndo;
+  redoBtn.disabled = !hasRedo;
+  undoBtn.hidden = !hasUndo;
+  redoBtn.hidden = !hasRedo;
+  if (undoBar) undoBar.hidden = !(hasUndo || hasRedo);
   const undoCount = Number(r.undoCount ?? 0);
   const redoCount = Number(r.redoCount ?? 0);
   const undoName = typeof r.undoLabel === "string" ? r.undoLabel : "";
