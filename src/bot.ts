@@ -110,7 +110,7 @@ const HELP =
   "  gaji 5jt\n" +
   "  parkir 5rb sama kopi 18rb   (banyak sekaligus)\n" +
   "  gopay makan 50rb            (akun di depan)\n" +
-  "  makan 50rb @bca             (akun pakai @)\n" +
+  "  makan 50rb @bca             (akun pakai @; ketik @ untuk saran akun)\n" +
   "  kemarin makan 50rb          (tanggal relatif)\n" +
   "  tgl 3 bayar kos 1jt\n" +
   "  3 september jajan 20rb\n" +
@@ -174,12 +174,12 @@ const HELP =
   "  berulang ubah 1 400rb tiap 10\n" +
   "  utang 100rb ke budi         (ledger utang/piutang)\n" +
   "  piutang 50rb dari andi\n" +
-  "  bayar utang budi 50rb | utang hapus 3 | piutang hapus 4\n" +
+  "  bayar utang budi 50rb [@bsi] | utang hapus 3 | piutang hapus 4\n" +
   "  target Liburan 5jt [tempo 2027-06-01]   (target / sinking fund)\n" +
-  "  target | target isi Liburan 500rb | target ambil Liburan 100rb | target hapus Liburan\n" +
+  "  target | target isi Liburan 500rb [@bsi] | target ambil Liburan 100rb | target hapus Liburan\n" +
   "  alokasi                     (panduan 50/30/20 bulan ini)\n" +
   "  skor                        (skor kesehatan finansial 0-100)\n" +
-  "  pin                         (status kunci; atur lewat ℹ → Keamanan)\n" +
+  "  pin                         (status kunci; atur lewat ☰ → Keamanan)\n" +
   "  backup | backup kunci <sandi>   (JSON / terenkripsi)\n" +
   "  ai | ai reset               (pemakaian AI)\n" +
   "  versi                       (versi aplikasi)\n" +
@@ -976,8 +976,8 @@ async function handleMessageInner(input: string): Promise<Reply> {
     const set = !!getSetting("pin_hash");
     return {
       text: set
-        ? "PIN: aktif.\nApp mengunci otomatis setelah 2 menit idle atau saat pindah app.\nUbah/hapus lewat ℹ → Keamanan (keypad visual)."
-        : "PIN: nonaktif.\nAtur lewat ℹ → Keamanan (keypad visual).\nPIN hanya mengunci tampilan — data tetap tersimpan di perangkat.",
+        ? "PIN: aktif.\nApp mengunci otomatis setelah 2 menit idle atau saat pindah app.\nUbah/hapus lewat ☰ → Keamanan (keypad visual)."
+        : "PIN: nonaktif.\nAtur lewat ☰ → Keamanan (keypad visual).\nPIN hanya mengunci tampilan — data tetap tersimpan di perangkat.",
     };
   }
 

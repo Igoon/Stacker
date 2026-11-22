@@ -2531,7 +2531,7 @@ async function autoBackup(force = false): Promise<void> {
     if (!backupPermWarned) {
       backupPermWarned = true;
       addBubble(
-        "Auto-backup butuh izin folder lagi (browser meminta ulang). Buka ℹ → Backup & penyimpanan → Izinkan folder tersimpan.",
+        "Auto-backup butuh izin folder lagi (browser meminta ulang). Buka ☰ → Backup & penyimpanan → Izinkan folder tersimpan.",
         "bot"
       );
     }
@@ -4303,7 +4303,7 @@ backupNowBtn.onclick = async () => {
   const ok = await folderPermission(folder, true);
   if (!ok) {
     folderNeedsPermission = true;
-    showToast("Izin folder ditolak. Coba lagi lewat ℹ → Backup & penyimpanan.");
+    showToast("Izin folder ditolak. Coba lagi lewat ☰ → Backup & penyimpanan.");
     return;
   }
   folderNeedsPermission = false;

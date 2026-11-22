@@ -3,6 +3,9 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.38.2]
+- **Pembaruan teks `help` & petunjuk menu**: menambahkan keterangan autocomplete `@akun`, opsi `[@akun]` pada `bayar utang/piutang` dan `target isi`, serta menyelaraskan ikon petunjuk menu dari `ℹ →` menjadi `☰ →` di seluruh pesan bot dan notifikasi UI.
+
 ## [2.38.1]
 - **Kartu transaksi 2 baris yang lebih ringkas & informatif**: menampilkan **catatan** sebagai judul utama (atau kategori jika tanpa catatan) serta **kategori, akun, tanggal ringkas** (*Hari ini*, *Kemarin*, atau *22 Nov*), dan `#id` dalam satu baris bawah bersama tombol ikon kompak **Ubah (✏️)** dan **Hapus (🗑️)**.
 
