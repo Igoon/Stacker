@@ -2032,14 +2032,30 @@ async function handleMessageInner(input: string): Promise<Reply> {
     };
   }
 
-  if ((m = text.match(/^bayar\s+(utang|piutang)\s+(.+?)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k))?)$/i))) {
+  if ((m = text.match(/^bayar\s+(utang|piutang)\s+(.+?)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k))?)(?:\s+@(.+))?$/i))) {
     const arah = m[1].toLowerCase() === "utang" ? "utang" : "piutang";
     const nama = m[2].trim();
     const nominal = parseAmount(m[3]);
     if (nominal == null || nominal <= 0) return { text: "Nominal tidak kebaca. Contoh: `bayar utang budi 50rb`" };
+    const accName = m[4]?.trim();
+    const acc = accName ? getAccountByName(accName) : undefined;
+    if (accName && !acc) return { text: `Akun "${accName}" tidak ada. Lihat: \`akun\`` };
     const res = payDebt(arah, nama, nominal);
     if (res.paid === 0) return { text: `Tidak ada ${arah} aktif untuk "${nama}".` };
     const tail = res.sisaTotal > 0 ? `Sisa ${rupiah(res.sisaTotal)}.` : "Lunas.";
+    if (acc) {
+      const tx = addTx({
+        jumlah: res.paid,
+        tipe: arah === "utang" ? "keluar" : "masuk",
+        kategori: "Lainnya",
+        catatan: `${arah === "utang" ? "Bayar utang" : "Terima piutang"} ${res.nama}`,
+        account_id: acc.id,
+      });
+      return {
+        text: `${arah === "utang" ? "Utang" : "Piutang"} ${res.nama} dibayar ${rupiah(res.paid)} (${acc.nama}). ${tail}`,
+        txs: [withRupiah(tx)],
+      };
+    }
     return {
       text: `${arah === "utang" ? "Utang" : "Piutang"} ${res.nama} dibayar ${rupiah(res.paid)}. ${tail}`,
     };
@@ -2136,7 +2152,7 @@ async function handleMessageInner(input: string): Promise<Reply> {
     return { text: `Target ${g.nama} dihapus.` };
   }
 
-  if ((m = text.match(/^target\s+isi\s+(.+?)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k))?)$/i))) {
+  if ((m = text.match(/^target\s+isi\s+(.+?)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k))?)(?:\s+@(.+))?$/i))) {
     const nama = m[1].trim();
     const g = getGoalByName(nama);
     if (!g) return { text: `Target "${nama}" tidak ada.` };
@@ -2144,14 +2160,30 @@ async function handleMessageInner(input: string): Promise<Reply> {
     if (nominal == null || nominal <= 0) {
       return { text: "Nominal tidak kebaca. Contoh: `target isi Liburan 500rb`" };
     }
+    const accName = m[3]?.trim();
+    const acc = accName ? getAccountByName(accName) : undefined;
+    if (accName && !acc) return { text: `Akun "${accName}" tidak ada. Lihat: \`akun\`` };
     contributeGoal(g.id, nominal);
     const after = getGoalByName(g.nama)!;
     const sisa = Math.max(0, after.target - after.terkumpul);
-    return {
-      text:
-        `Target ${after.nama}: ${rupiah(after.terkumpul)} / ${rupiah(after.target)}` +
-        (sisa > 0 ? ` (sisa ${rupiah(sisa)})` : " — tercapai!"),
-    };
+    const msgText =
+      `Target ${after.nama}: ${rupiah(after.terkumpul)} / ${rupiah(after.target)}` +
+      (sisa > 0 ? ` (sisa ${rupiah(sisa)})` : " — tercapai!");
+    if (acc) {
+      const tabCat = getCategoryByName("Tabungan")?.nama ?? "Lainnya";
+      const tx = addTx({
+        jumlah: nominal,
+        tipe: "keluar",
+        kategori: tabCat,
+        catatan: `Target ${after.nama}`,
+        account_id: acc.id,
+      });
+      return {
+        text: `${msgText} (potong ${acc.nama})`,
+        txs: [withRupiah(tx)],
+      };
+    }
+    return { text: msgText };
   }
 
   if ((m = text.match(/^target\s+ambil\s+(.+?)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k))?)$/i))) {

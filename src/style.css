@@ -1497,3 +1497,9 @@ header .top-right {
 .undo-float button:active:not(:disabled) {
   transform: scale(0.95);
 }
+
+/* Modal sekunder (edit cepat & prompt input) selalu di atas modal daftar */
+#editTxModal,
+#promptModal {
+  z-index: 25;
+}

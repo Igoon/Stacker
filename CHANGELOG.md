@@ -3,6 +3,13 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.38.0]
+- **Cari transaksi interaktif**: tombol **Ubah** dan **Hapus** langsung pada setiap hasil pencarian.
+- **Modal input kustom**: menggantikan seluruh `window.prompt()` bawaan browser (ubah nama akun, sesuaikan saldo, ubah berulang, bayar utang, isi target) agar konsisten dengan tema aktif.
+- **Sinkron saldo akun untuk Utang & Target**: opsi centang *Sekalian potong/tambah saldo akun* saat membayar utang/piutang atau mengisi target (juga mendukung `@akun` lewat chat).
+- **3 transaksi terakhir saat app dibuka**: langsung menampilkan 3 transaksi terbaru di layar awal agar mudah dicek/diubah.
+- **Bar akses cepat lebih efektif**: mengganti tombol duplikat dengan **📊 Dashboard**, **🔍 Cari**, **Saldo**, **Transfer**, **Target**, dan **Berulang**.
+
 ## [2.37.1]
 - **Header 1 baris + Undo/Redo melayang**: header lebih ringkas dengan tombol menu `☰` sejajar pil saldo; tombol **Undo/Redo** kini muncul otomatis sebagai pil melayang hanya saat ada riwayat aksi yang bisa dibatalkan/diulangi.
 

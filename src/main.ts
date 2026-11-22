@@ -324,6 +324,13 @@ if (quickEl) {
       void send();
     };
   }
+  for (const b of quickEl.querySelectorAll<HTMLButtonElement>("button[data-fill]")) {
+    b.onclick = () => {
+      input.value = b.dataset.fill ?? "";
+      input.focus();
+      updateSuggest();
+    };
+  }
 }
 const undoBar = document.getElementById("undoBar");
 const undoBtn = document.getElementById("undo") as HTMLButtonElement;
@@ -1021,10 +1028,13 @@ function showStartupHint(s: Record<string, unknown>): void {
   hintShown = true;
   const n = Number(s.txCount ?? 0);
   if (n > 0) {
+    const recent = Array.isArray(s.recentTxs) ? (s.recentTxs as Tx[]) : [];
     addBubble(
-      `${n} transaksi tersimpan di perangkat ini.\n` +
-        "Ketik `riwayat` untuk melihat, `help` untuk daftar perintah.",
-      "bot"
+      recent.length
+        ? `${n} transaksi tersimpan · ${recent.length} terakhir:`
+        : `${n} transaksi tersimpan di perangkat ini.\nKetik \`riwayat\` untuk melihat, \`help\` untuk daftar perintah.`,
+      "bot",
+      recent.length ? recent : undefined
     );
     return;
   }
@@ -2301,6 +2311,7 @@ for (const m of document.querySelectorAll<HTMLElement>(".modal")) {
   m.addEventListener("click", (e) => {
     if (e.target !== m) return;
     if (m.id === "pinModal") closePinModal(true);
+    else if (m.id === "promptModal") closePromptModal(null);
     else m.hidden = true;
   });
 }
@@ -2310,6 +2321,7 @@ window.addEventListener("keydown", (e) => {
   const top = open[open.length - 1];
   if (!top) return;
   if (top.id === "pinModal") closePinModal(true);
+  else if (top.id === "promptModal") closePromptModal(null);
   else top.hidden = true;
 });
 const pickDirBtn = document.getElementById("pickDir") as HTMLButtonElement;
@@ -2627,6 +2639,138 @@ document.getElementById("storeBack")!.onclick = () => showInfoPane(infoModal);
 document.getElementById("aboutBack")!.onclick = () => showInfoPane(infoModal);
 document.getElementById("resetBack")!.onclick = () => showInfoPane(infoModal);
 
+// ---------- Modal Input Kustom (pengganti window.prompt) ----------
+const promptModal = document.getElementById("promptModal")!;
+const promptTitleEl = document.getElementById("promptTitle")!;
+const promptHintEl = document.getElementById("promptHint")!;
+const promptLabel1Text = document.getElementById("promptLabel1Text")!;
+const promptInputEl = document.getElementById("promptInput") as HTMLInputElement;
+const promptRow2El = document.getElementById("promptRow2")!;
+const promptLabel2Text = document.getElementById("promptLabel2Text")!;
+const promptInput2El = document.getElementById("promptInput2") as HTMLInputElement;
+const promptAccWrap = document.getElementById("promptAccWrap")!;
+const promptSyncAcc = document.getElementById("promptSyncAcc") as HTMLInputElement;
+const promptSyncLabel = document.getElementById("promptSyncLabel")!;
+const promptAccRow = document.getElementById("promptAccRow")!;
+const promptAccSel = document.getElementById("promptAccSel") as HTMLSelectElement;
+const promptMsgEl = document.getElementById("promptMsg")!;
+
+interface PromptResult {
+  value: string;
+  value2?: string;
+  account?: string;
+}
+let promptResolve: ((res: PromptResult | null) => void) | null = null;
+let promptValidator: ((res: PromptResult) => string | null) | null = null;
+
+function closePromptModal(res: PromptResult | null): void {
+  promptModal.hidden = true;
+  const resolve = promptResolve;
+  promptResolve = null;
+  promptValidator = null;
+  resolve?.(res);
+}
+
+promptSyncAcc.onchange = () => {
+  promptAccRow.hidden = !promptSyncAcc.checked;
+};
+
+document.getElementById("promptCancel")!.onclick = () => closePromptModal(null);
+
+function submitPromptModal(): void {
+  const res: PromptResult = {
+    value: promptInputEl.value.trim(),
+    value2: promptRow2El.hidden ? undefined : promptInput2El.value.trim(),
+    account: !promptAccWrap.hidden && promptSyncAcc.checked ? promptAccSel.value : undefined,
+  };
+  if (promptValidator) {
+    const err = promptValidator(res);
+    if (err) {
+      promptMsgEl.hidden = false;
+      promptMsgEl.textContent = err;
+      return;
+    }
+  }
+  closePromptModal(res);
+}
+
+document.getElementById("promptOk")!.onclick = submitPromptModal;
+promptInputEl.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    submitPromptModal();
+  }
+});
+promptInput2El.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    submitPromptModal();
+  }
+});
+
+async function askModalPrompt(opts: {
+  title: string;
+  hint?: string;
+  label?: string;
+  placeholder?: string;
+  defaultValue?: string;
+  inputMode?: string;
+  label2?: string;
+  placeholder2?: string;
+  defaultValue2?: string;
+  inputMode2?: string;
+  syncAccountLabel?: string;
+  validate?: (res: PromptResult) => string | null;
+}): Promise<PromptResult | null> {
+  promptTitleEl.textContent = opts.title;
+  promptHintEl.textContent = opts.hint ?? "";
+  promptHintEl.hidden = !opts.hint;
+  promptLabel1Text.textContent = opts.label ?? "Nilai";
+  promptInputEl.placeholder = opts.placeholder ?? "";
+  promptInputEl.value = opts.defaultValue ?? "";
+  promptInputEl.inputMode = opts.inputMode ?? "text";
+
+  if (opts.label2) {
+    promptRow2El.hidden = false;
+    promptLabel2Text.textContent = opts.label2;
+    promptInput2El.placeholder = opts.placeholder2 ?? "";
+    promptInput2El.value = opts.defaultValue2 ?? "";
+    promptInput2El.inputMode = opts.inputMode2 ?? "text";
+  } else {
+    promptRow2El.hidden = true;
+    promptInput2El.value = "";
+  }
+
+  if (opts.syncAccountLabel) {
+    const r = await call({ type: "listacc" });
+    const accs = (Array.isArray(r.accounts) ? r.accounts : []) as AccRow[];
+    promptAccSel.replaceChildren();
+    for (const a of accs) {
+      const o = document.createElement("option");
+      o.value = a.nama;
+      o.textContent = a.nama;
+      promptAccSel.appendChild(o);
+    }
+    promptSyncLabel.textContent = opts.syncAccountLabel;
+    promptSyncAcc.checked = false;
+    promptAccRow.hidden = true;
+    promptAccWrap.hidden = accs.length === 0;
+  } else {
+    promptAccWrap.hidden = true;
+    promptSyncAcc.checked = false;
+    promptAccRow.hidden = true;
+  }
+
+  promptMsgEl.hidden = true;
+  promptValidator = opts.validate ?? null;
+  promptModal.hidden = false;
+  promptInputEl.focus();
+  promptInputEl.select();
+  return new Promise((resolve) => {
+    promptResolve = resolve;
+  });
+}
+
 // Reset data (jalur utama lewat menu; chat `reset ...` tetap ada sebagai pintasan).
 async function runReset(kind: "transaksi" | "kategori" | "akun" | "semua"): Promise<void> {
   if (!ready) return;
@@ -2634,8 +2778,13 @@ async function runReset(kind: "transaksi" | "kategori" | "akun" | "semua"): Prom
     if (pinSet) {
       if (!(await verifyPinForWipe())) return;
     } else {
-      const typed = window.prompt("Ketik RESET untuk konfirmasi reset total:");
-      if ((typed ?? "").trim().toUpperCase() !== "RESET") return;
+      const typed = await askModalPrompt({
+        title: "Konfirmasi reset total",
+        hint: "Semua transaksi, akun, kategori, anggaran, utang, dan target akan dikembalikan ke awal.",
+        label: "Ketik RESET untuk melanjutkan",
+        placeholder: "RESET",
+      });
+      if ((typed?.value ?? "").toUpperCase() !== "RESET") return;
     }
   } else if (
     !window.confirm(
@@ -3233,18 +3382,30 @@ async function refreshAccList(): Promise<void> {
     const ren = document.createElement("button");
     ren.textContent = "Ubah nama";
     ren.onclick = async () => {
-      const baru = window.prompt(`Nama baru untuk "${a.nama}":`, a.nama);
-      if (baru == null || !baru.trim() || baru.trim() === a.nama) return;
-      const res = await runCmd(`akun ubah ${a.nama} jadi ${baru.trim()}`);
-      showToast(res.text || `Akun ${a.nama} → ${baru.trim()}.`);
+      const ans = await askModalPrompt({
+        title: `Ubah nama akun`,
+        label: `Nama baru untuk "${a.nama}"`,
+        defaultValue: a.nama,
+        validate: (v) => (!v.value ? "Nama akun tidak boleh kosong." : null),
+      });
+      if (!ans || ans.value === a.nama) return;
+      const res = await runCmd(`akun ubah ${a.nama} jadi ${ans.value}`);
+      showToast(res.text || `Akun ${a.nama} → ${ans.value}.`);
       await refreshAccList();
     };
     const adj = document.createElement("button");
     adj.textContent = "Sesuaikan";
     adj.onclick = async () => {
-      const val = window.prompt(`Saldo nyata untuk "${a.nama}" (mis. 100jt):`, "");
-      if (val == null || !val.trim()) return;
-      const res = await runCmd(`sesuaikan ${a.nama} ${val.trim()}`);
+      const ans = await askModalPrompt({
+        title: `Sesuaikan saldo ${a.nama}`,
+        hint: "Saldo awal akun akan dihitung ulang agar saldo saat ini cocok dengan nominal nyata.",
+        label: "Saldo nyata (mis. 100jt atau 250000)",
+        placeholder: "500rb",
+        inputMode: "decimal",
+        validate: (v) => (!v.value ? "Nominal wajib diisi." : null),
+      });
+      if (!ans) return;
+      const res = await runCmd(`sesuaikan ${a.nama} ${ans.value}`);
       showToast(res.text || `Saldo ${a.nama} disesuaikan.`);
       await refreshAccList();
     };
@@ -3376,16 +3537,24 @@ async function refreshRecList(): Promise<void> {
     const ed = document.createElement("button");
     ed.textContent = "Ubah";
     ed.onclick = async () => {
-      const jml = window.prompt(`Nominal baru untuk "${b.catatan}" (mis. 350rb):`, fmtRp(b.jumlah));
-      if (jml == null || !jml.trim()) return;
-      const hariTxt = window.prompt(`Tanggal tiap bulan (1-28) untuk "${b.catatan}":`, String(b.hari));
-      if (hariTxt == null) return;
-      const hari = Number(hariTxt.trim() || String(b.hari));
-      if (!Number.isInteger(hari) || hari < 1 || hari > 28) {
-        showToast("Tanggal harus 1-28.");
-        return;
-      }
-      const res = await runCmd(`berulang ubah ${b.id} ${jml.trim()} tiap ${hari}`);
+      const ans = await askModalPrompt({
+        title: `Ubah berulang: ${b.catatan}`,
+        label: "Nominal baru (mis. 350rb)",
+        defaultValue: String(b.jumlah),
+        inputMode: "decimal",
+        label2: "Tanggal tiap bulan (1-28)",
+        defaultValue2: String(b.hari),
+        inputMode2: "numeric",
+        validate: (v) => {
+          if (!v.value) return "Nominal wajib diisi.";
+          const h = Number(v.value2 || String(b.hari));
+          if (!Number.isInteger(h) || h < 1 || h > 28) return "Tanggal harus antara 1 sampai 28.";
+          return null;
+        },
+      });
+      if (!ans) return;
+      const hari = Number(ans.value2 || String(b.hari));
+      const res = await runCmd(`berulang ubah ${b.id} ${ans.value} tiap ${hari}`);
       showToast(res.text || "Berulang diubah.");
       await refreshRecList();
     };
@@ -3489,9 +3658,19 @@ async function refreshDebtList(): Promise<void> {
     const pay = document.createElement("button");
     pay.textContent = "Bayar";
     pay.onclick = async () => {
-      const val = window.prompt(`Bayar ${d.arah} ke "${d.nama}" (sisa ${fmtRp(d.sisa)}):`, "");
-      if (val == null || !val.trim()) return;
-      const res = await runCmd(`bayar ${d.arah} ${d.nama} ${val.trim()}`);
+      const ans = await askModalPrompt({
+        title: `${d.arah === "utang" ? "Bayar utang" : "Terima piutang"}: ${d.nama}`,
+        hint: `Sisa saat ini: ${fmtRp(d.sisa)}`,
+        label: "Nominal (mis. 50rb)",
+        placeholder: String(d.sisa),
+        inputMode: "decimal",
+        syncAccountLabel:
+          d.arah === "utang" ? "Sekalian potong saldo akun" : "Sekalian tambah saldo akun",
+        validate: (v) => (!v.value ? "Nominal wajib diisi." : null),
+      });
+      if (!ans) return;
+      const accSuffix = ans.account ? ` @${ans.account}` : "";
+      const res = await runCmd(`bayar ${d.arah} ${d.nama} ${ans.value}${accSuffix}`);
       showToast(res.text || "Pembayaran dicatat.");
       await refreshDebtList();
     };
@@ -3540,15 +3719,7 @@ document.getElementById("debtSave")!.onclick = async () => {
 };
 
 // ---------- Cari / filter (UI) ----------
-interface SearchRow {
-  id: number;
-  tanggal: string;
-  tipe: "masuk" | "keluar";
-  jumlah: number;
-  kategori: string;
-  catatan: string | null;
-  akun?: string | null;
-}
+interface SearchRow extends Tx {}
 
 async function refreshSearchOptions(): Promise<void> {
   const [a, c] = await Promise.all([call({ type: "listacc" }), call({ type: "listcat" })]);
@@ -3624,7 +3795,32 @@ async function runSearch(): Promise<void> {
       `${t.tanggal} · ${t.tipe === "masuk" ? "+" : "−"}${fmtRp(t.jumlah)}` +
       (t.akun ? ` · ${t.akun}` : "") +
       (t.catatan ? ` · ${t.catatan}` : "");
-    item.append(head, info);
+    const actions = document.createElement("div");
+    actions.className = "cat-actions";
+    const ed = document.createElement("button");
+    ed.type = "button";
+    ed.textContent = "Ubah";
+    ed.onclick = () => {
+      void openEditTxModal(t, null, () => void runSearch());
+    };
+    const del = document.createElement("button");
+    del.type = "button";
+    del.textContent = t.transfer_id ? "Hapus (2 baris)" : "Hapus";
+    del.onclick = async () => {
+      if (!window.confirm(`Hapus transaksi #${t.id} (${t.kategori} ${fmtRp(t.jumlah)})?`)) return;
+      const res = await call({ type: "delete", txId: t.id });
+      const ids = Array.isArray(res.ids) ? (res.ids as number[]) : [t.id];
+      removeTxRows(ids);
+      showToast(
+        Number(res.removed ?? 0) > 1
+          ? "Transfer (2 baris) dihapus. Ketik undo untuk batalkan."
+          : `Transaksi #${t.id} dihapus.`
+      );
+      void refresh();
+      await runSearch();
+    };
+    actions.append(ed, del);
+    item.append(head, info, actions);
     searchListEl.appendChild(item);
   }
 }
@@ -3678,10 +3874,14 @@ const editTxCat = document.getElementById("editTxCat") as HTMLSelectElement;
 const editTxAcc = document.getElementById("editTxAcc") as HTMLSelectElement;
 const editTxNote = document.getElementById("editTxNote") as HTMLInputElement;
 const editTxMsg = document.getElementById("editTxMsg")!;
-let editingTx: { tx: Tx; card: HTMLElement } | null = null;
+let editingTx: { tx: Tx; card: HTMLElement | null; onSaved?: () => void } | null = null;
 
-async function openEditTxModal(tx: Tx, card: HTMLElement): Promise<void> {
-  editingTx = { tx, card };
+async function openEditTxModal(
+  tx: Tx,
+  card: HTMLElement | null,
+  onSaved?: () => void
+): Promise<void> {
+  editingTx = { tx, card, onSaved };
   editTxTitle.textContent = tx.transfer_id ? `Ubah transfer #${tx.id}` : `Ubah transaksi #${tx.id}`;
   editTxJumlah.value = String(tx.jumlah);
   editTxTanggal.value = tx.tanggal;
@@ -3727,7 +3927,7 @@ document.getElementById("editTxCancel")!.onclick = () => {
 
 document.getElementById("editTxSave")!.onclick = async () => {
   if (!editingTx) return;
-  const { tx, card } = editingTx;
+  const { tx, card, onSaved } = editingTx;
   const jmlRaw = editTxJumlah.value.trim();
   const tglRaw = editTxTanggal.value.trim();
   if (!jmlRaw) {
@@ -3781,18 +3981,24 @@ document.getElementById("editTxSave")!.onclick = async () => {
     Object.assign(tx, updatedTx);
     const sign = tx.tipe === "masuk" ? "+" : "-";
     const full = sign + (tx.rupiah ?? fmtRp(tx.jumlah));
-    const catEl = card.querySelector(".tx-cat");
-    const amtEl = card.querySelector<HTMLElement>(".tx-amt");
-    const metaEl = card.querySelector(".tx-meta");
-    const iconEl = card.querySelector(".tx-icon");
-    if (catEl) catEl.textContent = tx.kategori;
-    if (amtEl) {
-      amtEl.textContent = full;
-      amtEl.dataset.full = full;
+    const targets = card
+      ? [card]
+      : Array.from(chat.querySelectorAll<HTMLElement>(`.tx[data-tx-id="${tx.id}"]`));
+    for (const el of targets) {
+      const catEl = el.querySelector(".tx-cat");
+      const amtEl = el.querySelector<HTMLElement>(".tx-amt");
+      const metaEl = el.querySelector(".tx-meta");
+      const iconEl = el.querySelector(".tx-icon");
+      if (catEl) catEl.textContent = tx.kategori;
+      if (amtEl) {
+        amtEl.textContent = full;
+        amtEl.dataset.full = full;
+      }
+      if (metaEl) metaEl.textContent = (tx.akun ? `${tx.akun} · ` : "") + `#${tx.id}`;
+      if (iconEl) iconEl.innerHTML = catIconSvg(tx.kategori, tx.ikon ?? undefined);
     }
-    if (metaEl) metaEl.textContent = (tx.akun ? `${tx.akun} · ` : "") + `#${tx.id}`;
-    if (iconEl) iconEl.innerHTML = catIconSvg(tx.kategori, tx.ikon ?? undefined);
     showToast(`Transaksi #${tx.id} diperbarui.`);
+    onSaved?.();
   }
 
   editingTx = null;
@@ -3911,9 +4117,19 @@ async function refreshGoalList(): Promise<void> {
     const isi = document.createElement("button");
     isi.textContent = "Isi";
     isi.onclick = async () => {
-      const val = window.prompt(`Isi target "${g.nama}" (mis. 500rb):`, "");
-      if (val == null || !val.trim()) return;
-      const res = await runCmd(`target isi ${g.nama} ${val.trim()}`);
+      const sisaGoal = Math.max(0, g.target - g.terkumpul);
+      const ans = await askModalPrompt({
+        title: `Isi target: ${g.nama}`,
+        hint: `Terkumpul ${fmtRp(g.terkumpul)} / ${fmtRp(g.target)} (sisa ${fmtRp(sisaGoal)})`,
+        label: "Nominal tabungan (mis. 500rb)",
+        placeholder: "500rb",
+        inputMode: "decimal",
+        syncAccountLabel: "Sekalian potong saldo akun",
+        validate: (v) => (!v.value ? "Nominal wajib diisi." : null),
+      });
+      if (!ans) return;
+      const accSuffix = ans.account ? ` @${ans.account}` : "";
+      const res = await runCmd(`target isi ${g.nama} ${ans.value}${accSuffix}`);
       showToast(res.text || "Tersimpan.");
       await refreshGoalList();
     };

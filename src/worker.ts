@@ -6,7 +6,9 @@ import { createMiniDb, type MiniDb } from "./mini-sqlite";
 import {
   initDb,
   saldo,
+  rupiah,
   rupiahSigned,
+  listTx,
   countTx,
   accountBalances,
   getSetting,
@@ -316,6 +318,7 @@ function state() {
       rupiah: a.rupiah,
     })),
     txCount: n,
+    recentTxs: listTx(3).map((t) => ({ ...t, rupiah: rupiah(t.jumlah) })),
     pinSet: !!getSetting("pin_hash"),
     lastBackupAt: lastBackup,
     notices,

@@ -53,10 +53,10 @@
   <div id="quick" class="quick">
     <button id="quickDash" type="button">📊 Dashboard</button>
     <button id="quickSearch" type="button">🔍 Cari</button>
-    <button data-cmd="ringkasan">Ringkasan</button>
-    <button data-cmd="alokasi">Alokasi</button>
-    <button data-cmd="target">Target</button>
-    <button data-cmd="berulang">Berulang</button>
+    <button data-cmd="saldo" type="button">Saldo</button>
+    <button data-fill="transfer " type="button">Transfer</button>
+    <button data-cmd="target" type="button">Target</button>
+    <button data-cmd="berulang" type="button">Berulang</button>
   </div>
   <footer>
     <button id="history" class="ghost" aria-label="Riwayat perintah" title="Riwayat perintah">↺</button>
@@ -574,6 +574,38 @@
     <div class="modal-actions">
       <button id="histClear">Hapus riwayat</button>
       <button id="histClose">Tutup</button>
+    </div>
+  </div>
+</div>
+
+<div id="promptModal" class="modal" hidden>
+  <div class="modal-box">
+    <h3 id="promptTitle">Input</h3>
+    <p id="promptHint" class="hint" hidden></p>
+    <div class="cat-form">
+      <label id="promptLabel1">
+        <span id="promptLabel1Text">Nilai</span>
+        <input id="promptInput" autocomplete="off" />
+      </label>
+      <label id="promptRow2" hidden>
+        <span id="promptLabel2Text">Nilai 2</span>
+        <input id="promptInput2" autocomplete="off" />
+      </label>
+      <div id="promptAccWrap" class="cat-form" hidden>
+        <label class="row-check">
+          <input id="promptSyncAcc" type="checkbox" />
+          <span id="promptSyncLabel">Sekalian catat ke saldo akun</span>
+        </label>
+        <label id="promptAccRow" hidden>
+          <span>Akun</span>
+          <select id="promptAccSel"></select>
+        </label>
+      </div>
+      <p id="promptMsg" class="hint" hidden></p>
+    </div>
+    <div class="modal-actions">
+      <button id="promptCancel" type="button">Batal</button>
+      <button id="promptOk" type="button">Simpan</button>
     </div>
   </div>
 </div>
