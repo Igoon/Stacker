@@ -3,6 +3,18 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.36.0]
+- **Tombol Dashboard cepat**: pintasan **📊 Dashboard** di bilah perintah cepat.
+- **Pembeda transaksi masuk/keluar**: kartu transaksi di chat kini berwarna
+  (garis aksen + jumlah) sesuai arahnya.
+- **Modal**: tutup dengan ketuk area luar (backdrop); tombol aksi bergaya
+  `danger` lebih jelas.
+- **Saldo negatif** ditampilkan dengan tanda minus yang benar.
+- **Alokasi 50/30/20**: "Tabungan" kini target (bar hijau "selesai"), bukan batas.
+- **Poles UI menyeluruh**: token radius, animasi masuk/fade, tap-highlight,
+  keypad PIN (dots), hover/active state, dan perbaikan tampilan header/saldo.
+- Refresh otomatis setelah menjalankan perintah.
+
 ## [2.35.0]
 - **Tema "Otomatis"**: opsi tema baru — otomatis memakai tema terang (**Langit**)
   pada siang hari dan **Default** (gelap) pada malam hari. Dicek ulang tiap menit
