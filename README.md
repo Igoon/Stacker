@@ -1,3 +1,5 @@
+![Tested by Gemini](https://img.shields.io/badge/Tested_&_Audited_by_Gemini-9.1_%2F_10-00a884?style=for-the-badge&logo=googlegemini&logoColor=white)
+
 # Stacker — Mobile (PWA)
 
 Versi gadget bernama **Stacker** (dari project desktop Duit Bot). Berjalan penuh di browser, data tersimpan **lokal
