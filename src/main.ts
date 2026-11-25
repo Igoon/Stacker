@@ -561,8 +561,8 @@ document.getElementById("histClose")!.onclick = () => {
   histModal.hidden = true;
 };
 
-document.getElementById("histClear")!.onclick = () => {
-  if (!window.confirm("Hapus semua riwayat perintah?")) return;
+document.getElementById("histClear")!.onclick = async () => {
+  if (!(await askConfirm("Hapus semua riwayat perintah?", { title: "Hapus riwayat", okText: "Hapus" }))) return;
   recentCommands = [];
   try {
     localStorage.removeItem(RECENT_KEY);
@@ -1173,17 +1173,19 @@ async function send(): Promise<void> {
   const isReset = /^reset\s+(transaksi|laporan|semua|kategori|akun)$/i.test(text);
   if (/^reset\s+semua$/i.test(text)) {
     if (
-      !window.confirm(
+      !(await askConfirm(
         "Reset TOTAL: hapus semua data (transaksi, akun, kategori, anggaran, utang, " +
-          "berulang, pengaturan). Backup JSON diunduh otomatis. Lanjut?"
-      )
+          "berulang, pengaturan). Backup JSON diunduh otomatis. Lanjut?",
+        { title: "Reset total", okText: "Reset" }
+      ))
     )
       return;
   } else if (isReset) {
     if (
-      !window.confirm(
-        "Lanjut hapus? Backup JSON diunduh otomatis (bisa dibatalkan dengan `undo`)."
-      )
+      !(await askConfirm(
+        "Lanjut hapus? Backup JSON diunduh otomatis (bisa dibatalkan dengan `undo`).",
+        { title: "Reset data", okText: "Reset" }
+      ))
     )
       return;
   }
@@ -2194,9 +2196,10 @@ async function doEncryptedExport(pass: string): Promise<void> {
 async function doImport(text: string, pass?: string): Promise<void> {
   if (
     pass === undefined &&
-    !window.confirm(
-      `Restore akan MENGGANTI semua data di perangkat ini.\n\n${describeBackup(text)}\n\nData lama bisa dikembalikan dengan \`undo\`. Lanjut?`
-    )
+    !(await askConfirm(
+      `Restore akan MENGGANTI semua data di perangkat ini.\n\n${describeBackup(text)}\n\nData lama bisa dikembalikan dengan \`undo\`. Lanjut?`,
+      { title: "Restore backup", okText: "Restore" }
+    ))
   ) {
     return;
   }
@@ -2366,6 +2369,7 @@ for (const m of document.querySelectorAll<HTMLElement>(".modal")) {
   m.addEventListener("click", (e) => {
     if (e.target !== m) return;
     if (m.id === "pinModal") closePinModal(true);
+    else if (m.id === "confirmModal") closeConfirmModal(false);
     else if (m.id === "promptModal") closePromptModal(null);
     else m.hidden = true;
   });
@@ -2376,6 +2380,7 @@ window.addEventListener("keydown", (e) => {
   const top = open[open.length - 1];
   if (!top) return;
   if (top.id === "pinModal") closePinModal(true);
+  else if (top.id === "confirmModal") closeConfirmModal(false);
   else if (top.id === "promptModal") closePromptModal(null);
   else top.hidden = true;
 });
@@ -2464,19 +2469,21 @@ async function wipeAllData(): Promise<void> {
 
 wipeDataBtn.onclick = async () => {
   if (!ready) return;
-  const sure = window.confirm(
+  const sure = await askConfirm(
     "Hapus SEMUA data di perangkat ini?\n\n" +
       "Meliputi transaksi, akun, kategori, anggaran, utang, pengaturan, PIN, " +
       "cache, dan izin folder auto-backup. Tidak bisa dibatalkan.\n\n" +
-      "Disarankan backup dulu lewat tombol ⬇ Backup."
+      "Disarankan backup dulu lewat tombol ⬇ Backup.",
+    { title: "Hapus semua data", okText: "Lanjut" }
   );
   if (!sure) return;
   if (pinSet && !(await verifyPinForWipe())) return;
   if (
-    !window.confirm(
+    !(await askConfirm(
       "Konfirmasi terakhir: semua data lokal akan dihapus permanen. " +
-        "Setelah ini kamu bisa hapus ikon dari home screen untuk uninstall total. Lanjut?"
-    )
+        "Setelah ini kamu bisa hapus ikon dari home screen untuk uninstall total. Lanjut?",
+      { title: "Konfirmasi terakhir", okText: "Hapus permanen" }
+    ))
   ) {
     return;
   }
@@ -2694,6 +2701,39 @@ document.getElementById("storeBack")!.onclick = () => showInfoPane(infoModal);
 document.getElementById("aboutBack")!.onclick = () => showInfoPane(infoModal);
 document.getElementById("resetBack")!.onclick = () => showInfoPane(infoModal);
 
+// ---------- Modal Konfirmasi Kustom (pengganti window.confirm) ----------
+const confirmModal = document.getElementById("confirmModal")!;
+const confirmTitleEl = document.getElementById("confirmTitle")!;
+const confirmMsgEl = document.getElementById("confirmMsg")!;
+const confirmCancelBtn = document.getElementById("confirmCancel") as HTMLButtonElement;
+const confirmOkBtn = document.getElementById("confirmOk") as HTMLButtonElement;
+let confirmResolve: ((ok: boolean) => void) | null = null;
+
+function closeConfirmModal(ok: boolean): void {
+  confirmModal.hidden = true;
+  const resolve = confirmResolve;
+  confirmResolve = null;
+  resolve?.(ok);
+}
+
+confirmCancelBtn.onclick = () => closeConfirmModal(false);
+confirmOkBtn.onclick = () => closeConfirmModal(true);
+
+function askConfirm(
+  msg: string,
+  opts: { title?: string; okText?: string; danger?: boolean } = {}
+): Promise<boolean> {
+  confirmTitleEl.textContent = opts.title ?? "Konfirmasi";
+  confirmMsgEl.textContent = msg;
+  confirmOkBtn.textContent = opts.okText ?? "Lanjut";
+  confirmOkBtn.classList.toggle("danger", opts.danger ?? true);
+  confirmModal.hidden = false;
+  confirmOkBtn.focus();
+  return new Promise((resolve) => {
+    confirmResolve = resolve;
+  });
+}
+
 // ---------- Modal Input Kustom (pengganti window.prompt) ----------
 const promptModal = document.getElementById("promptModal")!;
 const promptTitleEl = document.getElementById("promptTitle")!;
@@ -2842,10 +2882,11 @@ async function runReset(kind: "transaksi" | "kategori" | "akun" | "semua"): Prom
       if ((typed?.value ?? "").toUpperCase() !== "RESET") return;
     }
   } else if (
-    !window.confirm(
+    !(await askConfirm(
       `Reset ${kind}? Backup JSON diunduh otomatis.` +
-        (kind === "kategori" ? " Transaksi lama tetap tersimpan." : "")
-    )
+        (kind === "kategori" ? " Transaksi lama tetap tersimpan." : ""),
+      { title: `Reset ${kind}`, okText: "Reset" }
+    ))
   ) {
     return;
   }
@@ -2963,7 +3004,7 @@ async function refreshCatList(): Promise<void> {
     const del = document.createElement("button");
     del.textContent = "Hapus";
     del.onclick = async () => {
-      if (!window.confirm(`Hapus kategori "${c.nama}"? Anggarannya ikut terhapus.`)) return;
+      if (!(await askConfirm(`Hapus kategori "${c.nama}"? Anggarannya ikut terhapus.`, { title: "Hapus kategori", okText: "Hapus" }))) return;
       const res = await runCmd(`kategori hapus ${c.nama}`);
       showToast(res.text || `Kategori ${c.nama} dihapus.`);
       await refreshCatList();
@@ -3091,7 +3132,7 @@ async function refreshBudgetList(): Promise<void> {
     const del = document.createElement("button");
     del.textContent = "Hapus";
     del.onclick = async () => {
-      if (!window.confirm(`Hapus anggaran "${b.kategori}"?`)) return;
+      if (!(await askConfirm(`Hapus anggaran "${b.kategori}"?`, { title: "Hapus anggaran", okText: "Hapus" }))) return;
       const res = await runCmd(`anggaran hapus ${b.kategori}`);
       showToast(res.text || `Anggaran ${b.kategori} dihapus.`);
       await refreshBudgetList();
@@ -3467,7 +3508,7 @@ async function refreshAccList(): Promise<void> {
     const del = document.createElement("button");
     del.textContent = "Hapus";
     del.onclick = async () => {
-      if (!window.confirm(`Hapus akun "${a.nama}"? Transaksinya dipindah ke akun lain.`)) return;
+      if (!(await askConfirm(`Hapus akun "${a.nama}"? Transaksinya dipindah ke akun lain.`, { title: "Hapus akun", okText: "Hapus" }))) return;
       const res = await runCmd(`akun hapus ${a.nama}`);
       showToast(res.text || `Akun ${a.nama} dihapus.`);
       await refreshAccList();
@@ -3616,7 +3657,7 @@ async function refreshRecList(): Promise<void> {
     const del = document.createElement("button");
     del.textContent = "Hapus";
     del.onclick = async () => {
-      if (!window.confirm(`Hapus transaksi berulang "${b.catatan}"?`)) return;
+      if (!(await askConfirm(`Hapus transaksi berulang "${b.catatan}"?`, { title: "Hapus berulang", okText: "Hapus" }))) return;
       const res = await runCmd(`berulang hapus ${b.id}`);
       showToast(res.text || "Berulang dihapus.");
       await refreshRecList();
@@ -3732,7 +3773,7 @@ async function refreshDebtList(): Promise<void> {
     const del = document.createElement("button");
     del.textContent = "Hapus";
     del.onclick = async () => {
-      if (!window.confirm(`Hapus ${d.arah} "${d.nama}" (#${d.id})?`)) return;
+      if (!(await askConfirm(`Hapus ${d.arah} "${d.nama}" (#${d.id})?`, { title: `Hapus ${d.arah}`, okText: "Hapus" }))) return;
       const res = await runCmd(`${d.arah} hapus ${d.id}`);
       showToast(res.text || "Dihapus.");
       await refreshDebtList();
@@ -3862,7 +3903,7 @@ async function runSearch(): Promise<void> {
     del.type = "button";
     del.textContent = t.transfer_id ? "Hapus (2 baris)" : "Hapus";
     del.onclick = async () => {
-      if (!window.confirm(`Hapus transaksi #${t.id} (${t.kategori} ${fmtRp(t.jumlah)})?`)) return;
+      if (!(await askConfirm(`Hapus transaksi #${t.id} (${t.kategori} ${fmtRp(t.jumlah)})?`, { title: "Hapus transaksi", okText: "Hapus" }))) return;
       const res = await call({ type: "delete", txId: t.id });
       const ids = Array.isArray(res.ids) ? (res.ids as number[]) : [t.id];
       removeTxRows(ids);
@@ -3899,6 +3940,34 @@ document.getElementById("searchResetForm")!.onclick = () => {
   searchListEl.replaceChildren();
 };
 document.getElementById("searchRun")!.onclick = () => void runSearch();
+const searchDateChips = document.getElementById("searchDateChips");
+if (searchDateChips) {
+  const fmtIso = (d: Date): string =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  for (const btn of searchDateChips.querySelectorAll<HTMLButtonElement>("button[data-range]")) {
+    btn.onclick = () => {
+      const now = new Date();
+      const range = btn.dataset.range;
+      if (range === "today") {
+        const t = fmtIso(now);
+        searchFromEl.value = t;
+        searchToEl.value = t;
+      } else if (range === "week") {
+        const dow = (now.getDay() + 6) % 7;
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow);
+        const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+        searchFromEl.value = fmtIso(start);
+        searchToEl.value = fmtIso(end);
+      } else if (range === "month") {
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        searchFromEl.value = fmtIso(start);
+        searchToEl.value = fmtIso(end);
+      }
+      void runSearch();
+    };
+  }
+}
 document.getElementById("searchExportCsv")!.onclick = async () => {
   const r = await call({
     type: "exportcsv",
@@ -3979,6 +4048,14 @@ document.getElementById("editTxCancel")!.onclick = () => {
   editingTx = null;
   editTxModal.hidden = true;
 };
+for (const el of [editTxJumlah, editTxTanggal, editTxNote]) {
+  el.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      document.getElementById("editTxSave")!.click();
+    }
+  });
+}
 
 document.getElementById("editTxSave")!.onclick = async () => {
   if (!editingTx) return;
@@ -4199,7 +4276,7 @@ async function refreshGoalList(): Promise<void> {
     const del = document.createElement("button");
     del.textContent = "Hapus";
     del.onclick = async () => {
-      if (!window.confirm(`Hapus target "${g.nama}"?`)) return;
+      if (!(await askConfirm(`Hapus target "${g.nama}"?`, { title: "Hapus target", okText: "Hapus" }))) return;
       const res = await runCmd(`target hapus ${g.nama}`);
       showToast(res.text || "Dihapus.");
       await refreshGoalList();

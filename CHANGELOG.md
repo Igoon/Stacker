@@ -3,28 +3,30 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.39.0]
+- **Modal konfirmasi kustom (`#confirmModal`)**: menggantikan seluruh `window.confirm()` bawaan browser (hapus transaksi/kategori/akun/anggaran/berulang/utang/target, reset data, dan restore) agar 100% konsisten dengan tema aktif.
+- **Chip filter tanggal cepat di Cari**: tombol satu ketukan **Hari ini**, **Minggu ini**, dan **Bulan ini** langsung mengisi rentang tanggal dan menjalankan pencarian.
+- **Pintasan `Enter` di modal Ubah transaksi**: tekan `Enter` pada kolom nominal, tanggal, atau catatan untuk langsung menyimpan perubahan.
+- **Tambahan uji otomatis (`src/smoke.ts`)**: mencakup deteksi duplikat transaksi, parameter bulan di `dashboardData`, serta sinkronisasi `@akun` pada `bayar utang` dan `target isi`.
+
 ## [2.38.2]
 - **Pembaruan teks `help` & petunjuk menu**: menambahkan keterangan autocomplete `@akun`, opsi `[@akun]` pada `bayar utang/piutang` dan `target isi`, serta menyelaraskan ikon petunjuk menu dari `ℹ →` menjadi `☰ →` di seluruh pesan bot dan notifikasi UI.
 
 ## [2.38.1]
-- **Kartu transaksi 2 baris yang lebih ringkas & informatif**: menampilkan **catatan** sebagai judul utama (atau kategori jika tanpa catatan) serta **kategori, akun, tanggal ringkas** (*Hari ini*, *Kemarin*, atau *22 Nov*), dan `#id` dalam satu baris bawah bersama tombol ikon kompak **Ubah (✏️)** dan **Hapus (🗑️)**.
+- **Kartu transaksi 2 baris yang lebih ringkas & informatif**: menampilkan **catatan** sebagai judul utama (atau kategori jika tanpa catatan) serta **kategori, akun, tanggal ringkas** (*Hari ini*, *Kemarin*, atau *22 Nov*), dan `#id` dalam satu baris bawah bersama tombol ikon kompak **Ubah (`✎`)** dan **Hapus (`✕`)**.
 
-## [2.38.0]
+## [2.37.0]
 - **Cari transaksi interaktif**: tombol **Ubah** dan **Hapus** langsung pada setiap hasil pencarian.
 - **Modal input kustom**: menggantikan seluruh `window.prompt()` bawaan browser (ubah nama akun, sesuaikan saldo, ubah berulang, bayar utang, isi target) agar konsisten dengan tema aktif.
 - **Sinkron saldo akun untuk Utang & Target**: opsi centang *Sekalian potong/tambah saldo akun* saat membayar utang/piutang atau mengisi target (juga mendukung `@akun` lewat chat).
 - **3 transaksi terakhir saat app dibuka**: langsung menampilkan 3 transaksi terbaru di layar awal agar mudah dicek/diubah.
-- **Bar akses cepat lebih efektif**: mengganti tombol duplikat dengan **📊 Dashboard**, **🔍 Cari**, **Saldo**, **Transfer**, **Target**, dan **Berulang**.
-
-## [2.37.1]
-- **Header 1 baris + Undo/Redo melayang**: header lebih ringkas dengan tombol menu `☰` sejajar pil saldo; tombol **Undo/Redo** kini muncul otomatis sebagai pil melayang hanya saat ada riwayat aksi yang bisa dibatalkan/diulangi.
-
-## [2.37.0]
+- **Bar akses cepat lebih efektif**: mengganti tombol duplikat dengan `📊 Dashboard`, `🔍 Cari`, `Saldo`, `Transfer`, `Target`, dan `Berulang`.
 - **Edit transaksi cepat**: tombol **Ubah** langsung di kartu transaksi pada chat untuk mengedit nominal, tanggal, kategori, akun, dan catatan tanpa mengetik perintah.
 - **Navigasi bulan di Dashboard**: tombol `<` dan `>` di Ringkasan untuk melihat grafik, alokasi, dan pengeluaran bulan-bulan sebelumnya.
 - **Export CSV langsung dari UI**: tombol **Export CSV** di modal **Cari transaksi** (sesuai filter aktif) dan di **Backup & penyimpanan** (semua transaksi).
 - **Autocomplete `@akun`**: ketik `@` di kolom chat untuk memunculkan saran nama akun secara otomatis.
 - **Peringatan transaksi duplikat**: deteksi transaksi identik dalam 2 menit terakhir dengan pengingat cepat untuk `undo` jika tidak sengaja dobel.
+- **Header 1 baris + Undo/Redo melayang**: header lebih ringkas dengan tombol menu `☰` sejajar pil saldo; tombol **Undo/Redo** kini muncul otomatis sebagai pil melayang hanya saat ada riwayat aksi yang bisa dibatalkan/diulangi.
 - **Optimasi UI & perbaikan bug**: akses cepat **Dashboard** & **Cari** di bar bawah, form filter Cari 2 kolom yang lebih ringkas, pembeda warna kartu pemasukan/pengeluaran, *backdrop click* penutup modal, animasi halus, serta perbaikan bug slider wallpaper, format Rupiah negatif, sinkronisasi header dari modal, tema terang, dan notifikasi transaksi berulang saat boot.
 
 ## [2.35.0]

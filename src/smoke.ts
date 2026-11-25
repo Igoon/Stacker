@@ -1135,5 +1135,44 @@ await check("skor kesehatan 0-100 & faktor", async () => {
   assert(r.text.includes("/100"), "perintah skor jalan");
 });
 
+
+await check("peringatan duplikat transaksi dalam 2 menit", async () => {
+  const r1 = await handleMessage("kopi duplikat 23rb bsi");
+  assert(r1.txs?.length === 1, "tx pertama masuk");
+  const r2 = await handleMessage("kopi duplikat 23rb bsi");
+  assert(r2.text.includes("Mirip transaksi #"), "peringatan duplikat muncul");
+  await handleMessage(`hapus #${r1.txs![0].id} #${r2.txs![0].id}`);
+});
+
+await check("dashboardData menerima parameter periode bulan", async () => {
+  const d = dashboardData("2026-01");
+  assert.equal(d.ym, "2026-01", "ym sesuai parameter");
+  assert(d.label.toLowerCase().includes("januari"), "label bulan sesuai");
+});
+
+await check("bayar utang dengan @akun memotong saldo akun", async () => {
+  const bsi = dbmod.getAccountByName("BSI")!;
+  const before = dbmod.accountBalance(bsi.id);
+  await handleMessage("utang 50rb ke cindy");
+  const r = await handleMessage("bayar utang cindy 20rb @bsi");
+  assert(r.txs?.length === 1, "transaksi pengeluaran dibuat");
+  assert.equal(before - dbmod.accountBalance(bsi.id), 20_000, "saldo BSI terpotong 20rb");
+  assert.equal(dbmod.debtTotals().utang, 30_000, "sisa utang 30rb");
+  await handleMessage("undo");
+  for (const d of dbmod.listDebts(false)) dbmod.deleteDebt(d.id);
+});
+
+await check("target isi dengan @akun memotong saldo akun", async () => {
+  const bsi = dbmod.getAccountByName("BSI")!;
+  const before = dbmod.accountBalance(bsi.id);
+  await handleMessage("target UjiAkun 1jt");
+  const r = await handleMessage("target isi UjiAkun 100rb @bsi");
+  assert(r.txs?.length === 1, "transaksi tabungan dibuat");
+  assert.equal(before - dbmod.accountBalance(bsi.id), 100_000, "saldo BSI terpotong 100rb");
+  assert.equal(dbmod.getGoalByName("UjiAkun")!.terkumpul, 100_000, "terkumpul 100rb");
+  await handleMessage("undo");
+  await handleMessage("target hapus UjiAkun");
+});
+
 console.log(`\n${pass} ok, ${fail} fail`);
 if (fail > 0) process.exit(1);

@@ -473,6 +473,11 @@
           <select id="searchCat"></select>
         </label>
       </div>
+      <div class="search-chips" id="searchDateChips">
+        <button type="button" data-range="today">Hari ini</button>
+        <button type="button" data-range="week">Minggu ini</button>
+        <button type="button" data-range="month">Bulan ini</button>
+      </div>
       <div class="form-row">
         <label>Dari tanggal
           <input id="searchFrom" type="date" />
@@ -574,6 +579,17 @@
     <div class="modal-actions">
       <button id="histClear">Hapus riwayat</button>
       <button id="histClose">Tutup</button>
+    </div>
+  </div>
+</div>
+
+<div id="confirmModal" class="modal" hidden>
+  <div class="modal-box">
+    <h3 id="confirmTitle">Konfirmasi</h3>
+    <p id="confirmMsg" class="info-lines"></p>
+    <div class="modal-actions">
+      <button id="confirmCancel" type="button">Batal</button>
+      <button id="confirmOk" type="button">Lanjut</button>
     </div>
   </div>
 </div>
