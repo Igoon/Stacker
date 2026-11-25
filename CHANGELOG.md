@@ -3,6 +3,9 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.40.0]
+- **Modularisasi kode inti**: memecah `src/main.ts` dan `src/bot.ts` menjadi modul terfokus (`src/ui/icons.ts`, `src/ui/format.ts`, `src/ui/sound.ts`, `src/ui/dialogs.ts`, `src/bot/help.ts`, `src/bot/analytics.ts`) tanpa mengubah perilaku publik agar lebih bersih, ringan dirawat, dan aman dikembangkan.
+
 ## [2.39.0]
 - **Modal konfirmasi kustom (`#confirmModal`)**: menggantikan seluruh `window.confirm()` bawaan browser (hapus transaksi/kategori/akun/anggaran/berulang/utang/target, reset data, dan restore) agar 100% konsisten dengan tema aktif.
 - **Chip filter tanggal cepat di Cari**: tombol satu ketukan **Hari ini**, **Minggu ini**, dan **Bulan ini** langsung mengisi rentang tanggal dan menjalankan pencarian.

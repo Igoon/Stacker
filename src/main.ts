@@ -2,6 +2,30 @@
 import "./style.css";
 import { startsWithCommand } from "./commands";
 import { shortRp } from "./chart";
+import { catIconSvg, ICON_OPTIONS } from "./ui/icons";
+import {
+  daysSince,
+  fmtDate,
+  fmtRp,
+  fmtShortRp,
+  isNewer,
+  saveFile,
+  timeStr,
+  todayStr,
+  txMetaText,
+  txTitle,
+} from "./ui/format";
+import {
+  haptic,
+  initAudioUnlock,
+  isHapticOn,
+  isSoundOn,
+  playTing,
+  setHapticOn,
+  setSoundOn,
+  unlockAudio,
+} from "./ui/sound";
+import { createDialogController } from "./ui/dialogs";
 import {
   addHistoryEntry,
   HISTORY_LIMIT,
@@ -51,19 +75,6 @@ let swReloading = false;
 let pendingUpdateCheck = false;
 let checkUpdateWhenReady: (() => void) | null = null;
 let latestVersion = "";
-
-// true bila `remote` lebih baru dari `local` (semver sederhana x.y.z).
-function isNewer(remote: string, local: string): boolean {
-  const a = remote.split(/[.\-+]/).map((x) => parseInt(x, 10) || 0);
-  const b = local.split(/[.\-+]/).map((x) => parseInt(x, 10) || 0);
-  const n = Math.max(a.length, b.length);
-  for (let i = 0; i < n; i++) {
-    const x = a[i] ?? 0;
-    const y = b[i] ?? 0;
-    if (x !== y) return x > y;
-  }
-  return false;
-}
 
 // Service worker: cache app shell. Kalau SW baru mengambil alih, tampilkan bar
 // "Muat ulang" — jangan reload otomatis supaya input user tak hilang.
@@ -411,42 +422,6 @@ const isStandalone =
     window.matchMedia("(display-mode: standalone)").matches) ||
   (navigator as unknown as { standalone?: boolean }).standalone === true;
 
-function daysSince(iso: string): number {
-  const t = new Date(iso).getTime();
-  return Number.isFinite(t) ? Math.max(0, Math.floor((Date.now() - t) / 86_400_000)) : 0;
-}
-function fmtDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString("id-ID", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  } catch {
-    return iso.slice(0, 10);
-  }
-}
-
-// Getar singkat (opsional).
-const HAPTIC_KEY = "stacker-haptic";
-function readHaptic(): boolean {
-  try {
-    const v = localStorage.getItem(HAPTIC_KEY);
-    return v === null ? true : v === "1";
-  } catch {
-    return true;
-  }
-}
-let hapticOn = readHaptic();
-function haptic(pattern: number | number[] = 12): void {
-  if (!hapticOn) return;
-  try {
-    navigator.vibrate?.(pattern);
-  } catch {
-    // abaikan
-  }
-}
-
 // Onboarding: chip contoh perintah saat belum ada transaksi.
 for (const c of ["makan siang 50rb", "gaji 5jt", "kopi 18rb", "ringkasan"]) {
   const b = document.createElement("button");
@@ -629,12 +604,6 @@ let lastSaldoNum = NaN;
 let lastMasuk = 0;
 let lastKeluar = 0;
 
-// Format ringkas untuk header (mis. 10.000.000 -> "Rp10jt").
-function fmtShortRp(n: number): string {
-  if (!Number.isFinite(n)) return "-";
-  return (n < 0 ? "-" : "") + "Rp" + shortRp(n);
-}
-
 function toggleSaldo(): void {
   if (!hideSaldo) return;
   saldoRevealed = !saldoRevealed;
@@ -740,121 +709,10 @@ document.addEventListener("visibilitychange", () => {
 });
 applyPanic();
 
-// Bunyi pengingat singkat (Web Audio, tanpa aset & tanpa jaringan).
-const SOUND_KEY = "stacker-sound";
-function readSound(): boolean {
-  try {
-    const v = localStorage.getItem(SOUND_KEY);
-    return v === null ? true : v === "1";
-  } catch {
-    return true;
-  }
-}
-let soundOn = readSound();
-let audioCtx: AudioContext | null = null;
-function unlockAudio(): void {
-  try {
-    if (!audioCtx) {
-      const Ctx =
-        window.AudioContext ??
-        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (Ctx) audioCtx = new Ctx();
-    }
-    if (audioCtx && audioCtx.state === "suspended") void audioCtx.resume();
-  } catch {
-    // Web Audio tak tersedia; abaikan.
-  }
-}
-// Bel "tiiing": fundamental cerah + partial inharmonik (khas bel) + decay
-// panjang, plus transien singkat saat dipukul.
-function playTing(): void {
-  const ctx = audioCtx;
-  if (!soundOn || !ctx || ctx.state !== "running") return;
-  try {
-    const t0 = ctx.currentTime + 0.005;
-    const fund = 1174.66; // D6 — nyaring tapi tidak memekakkan
-    const partials: { r: number; g: number; d: number }[] = [
-      { r: 1, g: 0.22, d: 1.6 },
-      { r: 2.0, g: 0.12, d: 1.2 },
-      { r: 2.76, g: 0.08, d: 0.9 },
-      { r: 5.4, g: 0.05, d: 0.6 },
-      { r: 8.93, g: 0.03, d: 0.4 },
-      { r: 13.34, g: 0.015, d: 0.25 },
-    ];
-    const master = ctx.createGain();
-    master.gain.value = 0.5;
-    master.connect(ctx.destination);
-    for (const p of partials) {
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.type = "sine";
-      o.frequency.value = fund * p.r;
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(p.g, t0 + 0.004);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + p.d);
-      o.connect(g).connect(master);
-      o.start(t0);
-      o.stop(t0 + p.d + 0.05);
-    }
-    // Transien "tik" (noise) singkat untuk serangan bel.
-    const len = Math.ceil(ctx.sampleRate * 0.03);
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) {
-      data[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 3;
-    }
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    const hp = ctx.createBiquadFilter();
-    hp.type = "highpass";
-    hp.frequency.value = 3000;
-    const ng = ctx.createGain();
-    ng.gain.value = 0.06;
-    src.connect(hp).connect(ng).connect(master);
-    src.start(t0);
-  } catch {
-    // abaikan
-  }
-}
-for (const ev of ["pointerdown", "keydown", "touchstart"] as const) {
-  window.addEventListener(ev, unlockAudio, { passive: true });
-}
+initAudioUnlock();
 
 function setSub(text: string): void {
   subEl.textContent = text;
-}
-
-// Simpan file ke perangkat. Di iOS/Android, `<a download>` sering cuma membuka
-// preview — pakai Web Share API bila tersedia supaya bisa "Simpan ke Files"
-// atau dibagikan langsung.
-function downloadBlob(blob: Blob, name: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
-}
-
-function saveFile(name: string, content: string): void {
-  const isJson = /\.json$/i.test(name);
-  const type = isJson ? "application/json" : "text/csv";
-  const body = isJson ? content : "\ufeff" + content;
-  const blob = new Blob([body], { type });
-  try {
-    const share = navigator as Navigator & {
-      canShare?: (data?: ShareData) => boolean;
-      share?: (data?: ShareData) => Promise<void>;
-    };
-    const f = new File([blob], name, { type });
-    if (share.canShare && share.canShare({ files: [f] }) && share.share) {
-      void share.share({ files: [f], title: name }).catch(() => downloadBlob(blob, name));
-      return;
-    }
-  } catch {
-    // jatuh ke unduhan biasa
-  }
-  downloadBlob(blob, name);
 }
 
 function removeTxRows(ids: number[]): void {
@@ -873,88 +731,6 @@ function clearTxRows(): void {
     el.remove();
     if (host && !host.querySelector(".tx")) host.remove();
   });
-}
-
-const CAT_ICON_SVG: Record<string, string> = {
-  makanan:
-    '<path d="M5 3v6a2 2 0 0 0 4 0V3"/><path d="M7 3v18"/><path d="M18 3c-1.7 0-3 2.2-3 5s1.3 4 3 4 3-1 3-4-1.3-5-3-5z"/><path d="M18 12v9"/>',
-  transportasi:
-    '<rect x="4" y="4" width="16" height="11" rx="2"/><path d="M4 10h16"/><circle cx="8" cy="18" r="1.5"/><circle cx="16" cy="18" r="1.5"/>',
-  belanja: '<path d="M6 7h12l-1 13H7L6 7z"/><path d="M9 7a3 3 0 0 1 6 0"/>',
-  tagihan: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6"/><path d="M9 12h6"/>',
-  kesehatan: '<path d="M12 20s-7-4.5-7-9a4 4 0 0 1 7-2 4 4 0 0 1 7 2c0 4.5-7 9-7 9z"/>',
-  hiburan: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M10 9l5 3-5 3z"/>',
-  gaji: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/><circle cx="16" cy="14" r="1"/>',
-  tabungan: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/>',
-  investasi: '<path d="M4 20V12"/><path d="M10 20V6"/><path d="M16 20v-6"/><path d="M2 20h20"/>',
-  transfer:
-    '<path d="M4 8h13"/><path d="M13 4l4 4-4 4"/><path d="M20 16H7"/><path d="M11 12l-4 4 4 4"/>',
-};
-const CAT_ICON_DEFAULT =
-  '<path d="M20.6 12.6 12.6 20.6a2 2 0 0 1-2.8 0l-6.4-6.4A2 2 0 0 1 3 12.8V5a2 2 0 0 1 2-2h7.8a2 2 0 0 1 1.4.6l6.4 6.4a2 2 0 0 1 0 2.6z"/><circle cx="7.5" cy="7.5" r="1.2"/>';
-const ICON_OPTIONS: [string, string][] = [
-  ["makanan", "Makanan"],
-  ["transportasi", "Transportasi"],
-  ["belanja", "Belanja"],
-  ["tagihan", "Tagihan"],
-  ["kesehatan", "Kesehatan"],
-  ["hiburan", "Hiburan"],
-  ["gaji", "Gaji"],
-  ["tabungan", "Tabungan"],
-  ["investasi", "Investasi"],
-  ["transfer", "Transfer"],
-  ["tag", "Lainnya"],
-];
-function catIconSvg(name: string, iconId?: string): string {
-  let inner: string | undefined;
-  const id = iconId?.toLowerCase().trim();
-  if (id === "tag") inner = CAT_ICON_DEFAULT;
-  else if (id) inner = CAT_ICON_SVG[id];
-  if (!inner) inner = CAT_ICON_SVG[name.toLowerCase().trim()];
-  if (!inner) inner = CAT_ICON_DEFAULT;
-  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
-}
-
-function fmtTxDate(iso?: string | null): string {
-  if (!iso) return "";
-  const now = new Date();
-  const today = todayStr();
-  if (iso === today) return "Hari ini";
-  const yest = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  const yestIso = `${yest.getFullYear()}-${String(yest.getMonth() + 1).padStart(2, "0")}-${String(
-    yest.getDate()
-  ).padStart(2, "0")}`;
-  if (iso === yestIso) return "Kemarin";
-  const parts = iso.split("-").map(Number);
-  if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return iso;
-  const d = new Date(parts[0], parts[1] - 1, parts[2]);
-  const sameYear = parts[0] === now.getFullYear();
-  try {
-    return d.toLocaleDateString("id-ID", {
-      day: "numeric",
-      month: "short",
-      ...(sameYear ? {} : { year: "2-digit" }),
-    });
-  } catch {
-    return iso.slice(5);
-  }
-}
-
-function txTitle(tx: Tx): string {
-  const note = (tx.catatan ?? "").trim();
-  if (note && note.toLowerCase() !== tx.kategori.toLowerCase()) return note;
-  return tx.kategori;
-}
-
-function txMetaText(tx: Tx): string {
-  const parts: string[] = [];
-  const title = txTitle(tx);
-  if (title.toLowerCase() !== tx.kategori.toLowerCase()) parts.push(tx.kategori);
-  if (tx.akun) parts.push(tx.akun);
-  const dt = fmtTxDate(tx.tanggal);
-  if (dt) parts.push(dt);
-  parts.push(`#${tx.id}`);
-  return parts.join(" · ");
 }
 
 function addBubble(
@@ -1566,8 +1342,8 @@ document.getElementById("openWall")!.onclick = () => {
   hideSaldoEl.checked = hideSaldo;
   panicOnEl.checked = panicOn;
   panicIdleEl.value = String(panicIdle);
-  soundNoticeEl.checked = soundOn;
-  hapticNoticeEl.checked = hapticOn;
+  soundNoticeEl.checked = isSoundOn();
+  hapticNoticeEl.checked = isHapticOn();
   wallModal.hidden = false;
 };
 
@@ -1614,28 +1390,20 @@ panicIdleEl.onchange = () => {
 };
 
 soundNoticeEl.onchange = () => {
-  soundOn = soundNoticeEl.checked;
-  try {
-    localStorage.setItem(SOUND_KEY, soundOn ? "1" : "0");
-  } catch {
-    // abaikan
-  }
-  if (soundOn) {
+  const on = soundNoticeEl.checked;
+  setSoundOn(on);
+  if (on) {
     unlockAudio();
     playTing();
   }
-  showToast(soundOn ? 'Bunyi pengingat aktif ("ting").' : "Bunyi pengingat dimatikan.");
+  showToast(on ? 'Bunyi pengingat aktif ("ting").' : "Bunyi pengingat dimatikan.");
 };
 
 hapticNoticeEl.onchange = () => {
-  hapticOn = hapticNoticeEl.checked;
-  try {
-    localStorage.setItem(HAPTIC_KEY, hapticOn ? "1" : "0");
-  } catch {
-    // abaikan
-  }
-  if (hapticOn) haptic(30);
-  showToast(hapticOn ? "Getar aktif." : "Getar dimatikan.");
+  const on = hapticNoticeEl.checked;
+  setHapticOn(on);
+  if (on) haptic(30);
+  showToast(on ? "Getar aktif." : "Getar dimatikan.");
 };
 
 document.getElementById("wallClose")!.onclick = () => {
@@ -2253,20 +2021,6 @@ let storageText = "";
 let bundleHash = "";
 let aiHosts = "tidak ada (AI mati)";
 
-const todayStr = (): string => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate()
-  ).padStart(2, "0")}`;
-};
-const timeStr = (): string => {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(
-    2,
-    "0"
-  )}${String(d.getSeconds()).padStart(2, "0")}`;
-};
-
 const RETAIN_KEY = "stacker-retain";
 function readRetain(): number {
   const n = Number(localStorage.getItem(RETAIN_KEY));
@@ -2701,170 +2455,11 @@ document.getElementById("storeBack")!.onclick = () => showInfoPane(infoModal);
 document.getElementById("aboutBack")!.onclick = () => showInfoPane(infoModal);
 document.getElementById("resetBack")!.onclick = () => showInfoPane(infoModal);
 
-// ---------- Modal Konfirmasi Kustom (pengganti window.confirm) ----------
-const confirmModal = document.getElementById("confirmModal")!;
-const confirmTitleEl = document.getElementById("confirmTitle")!;
-const confirmMsgEl = document.getElementById("confirmMsg")!;
-const confirmCancelBtn = document.getElementById("confirmCancel") as HTMLButtonElement;
-const confirmOkBtn = document.getElementById("confirmOk") as HTMLButtonElement;
-let confirmResolve: ((ok: boolean) => void) | null = null;
-
-function closeConfirmModal(ok: boolean): void {
-  confirmModal.hidden = true;
-  const resolve = confirmResolve;
-  confirmResolve = null;
-  resolve?.(ok);
-}
-
-confirmCancelBtn.onclick = () => closeConfirmModal(false);
-confirmOkBtn.onclick = () => closeConfirmModal(true);
-
-function askConfirm(
-  msg: string,
-  opts: { title?: string; okText?: string; danger?: boolean } = {}
-): Promise<boolean> {
-  confirmTitleEl.textContent = opts.title ?? "Konfirmasi";
-  confirmMsgEl.textContent = msg;
-  confirmOkBtn.textContent = opts.okText ?? "Lanjut";
-  confirmOkBtn.classList.toggle("danger", opts.danger ?? true);
-  confirmModal.hidden = false;
-  confirmOkBtn.focus();
-  return new Promise((resolve) => {
-    confirmResolve = resolve;
-  });
-}
-
-// ---------- Modal Input Kustom (pengganti window.prompt) ----------
-const promptModal = document.getElementById("promptModal")!;
-const promptTitleEl = document.getElementById("promptTitle")!;
-const promptHintEl = document.getElementById("promptHint")!;
-const promptLabel1Text = document.getElementById("promptLabel1Text")!;
-const promptInputEl = document.getElementById("promptInput") as HTMLInputElement;
-const promptRow2El = document.getElementById("promptRow2")!;
-const promptLabel2Text = document.getElementById("promptLabel2Text")!;
-const promptInput2El = document.getElementById("promptInput2") as HTMLInputElement;
-const promptAccWrap = document.getElementById("promptAccWrap")!;
-const promptSyncAcc = document.getElementById("promptSyncAcc") as HTMLInputElement;
-const promptSyncLabel = document.getElementById("promptSyncLabel")!;
-const promptAccRow = document.getElementById("promptAccRow")!;
-const promptAccSel = document.getElementById("promptAccSel") as HTMLSelectElement;
-const promptMsgEl = document.getElementById("promptMsg")!;
-
-interface PromptResult {
-  value: string;
-  value2?: string;
-  account?: string;
-}
-let promptResolve: ((res: PromptResult | null) => void) | null = null;
-let promptValidator: ((res: PromptResult) => string | null) | null = null;
-
-function closePromptModal(res: PromptResult | null): void {
-  promptModal.hidden = true;
-  const resolve = promptResolve;
-  promptResolve = null;
-  promptValidator = null;
-  resolve?.(res);
-}
-
-promptSyncAcc.onchange = () => {
-  promptAccRow.hidden = !promptSyncAcc.checked;
-};
-
-document.getElementById("promptCancel")!.onclick = () => closePromptModal(null);
-
-function submitPromptModal(): void {
-  const res: PromptResult = {
-    value: promptInputEl.value.trim(),
-    value2: promptRow2El.hidden ? undefined : promptInput2El.value.trim(),
-    account: !promptAccWrap.hidden && promptSyncAcc.checked ? promptAccSel.value : undefined,
-  };
-  if (promptValidator) {
-    const err = promptValidator(res);
-    if (err) {
-      promptMsgEl.hidden = false;
-      promptMsgEl.textContent = err;
-      return;
-    }
-  }
-  closePromptModal(res);
-}
-
-document.getElementById("promptOk")!.onclick = submitPromptModal;
-promptInputEl.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    submitPromptModal();
-  }
-});
-promptInput2El.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    submitPromptModal();
-  }
-});
-
-async function askModalPrompt(opts: {
-  title: string;
-  hint?: string;
-  label?: string;
-  placeholder?: string;
-  defaultValue?: string;
-  inputMode?: string;
-  label2?: string;
-  placeholder2?: string;
-  defaultValue2?: string;
-  inputMode2?: string;
-  syncAccountLabel?: string;
-  validate?: (res: PromptResult) => string | null;
-}): Promise<PromptResult | null> {
-  promptTitleEl.textContent = opts.title;
-  promptHintEl.textContent = opts.hint ?? "";
-  promptHintEl.hidden = !opts.hint;
-  promptLabel1Text.textContent = opts.label ?? "Nilai";
-  promptInputEl.placeholder = opts.placeholder ?? "";
-  promptInputEl.value = opts.defaultValue ?? "";
-  promptInputEl.inputMode = opts.inputMode ?? "text";
-
-  if (opts.label2) {
-    promptRow2El.hidden = false;
-    promptLabel2Text.textContent = opts.label2;
-    promptInput2El.placeholder = opts.placeholder2 ?? "";
-    promptInput2El.value = opts.defaultValue2 ?? "";
-    promptInput2El.inputMode = opts.inputMode2 ?? "text";
-  } else {
-    promptRow2El.hidden = true;
-    promptInput2El.value = "";
-  }
-
-  if (opts.syncAccountLabel) {
+const { askConfirm, closeConfirmModal, askModalPrompt, closePromptModal } =
+  createDialogController(async () => {
     const r = await call({ type: "listacc" });
-    const accs = (Array.isArray(r.accounts) ? r.accounts : []) as AccRow[];
-    promptAccSel.replaceChildren();
-    for (const a of accs) {
-      const o = document.createElement("option");
-      o.value = a.nama;
-      o.textContent = a.nama;
-      promptAccSel.appendChild(o);
-    }
-    promptSyncLabel.textContent = opts.syncAccountLabel;
-    promptSyncAcc.checked = false;
-    promptAccRow.hidden = true;
-    promptAccWrap.hidden = accs.length === 0;
-  } else {
-    promptAccWrap.hidden = true;
-    promptSyncAcc.checked = false;
-    promptAccRow.hidden = true;
-  }
-
-  promptMsgEl.hidden = true;
-  promptValidator = opts.validate ?? null;
-  promptModal.hidden = false;
-  promptInputEl.focus();
-  promptInputEl.select();
-  return new Promise((resolve) => {
-    promptResolve = resolve;
+    return (Array.isArray(r.accounts) ? r.accounts : []) as { nama: string }[];
   });
-}
 
 // Reset data (jalur utama lewat menu; chat `reset ...` tetap ada sebagai pintasan).
 async function runReset(kind: "transaksi" | "kategori" | "akun" | "semua"): Promise<void> {
@@ -3055,11 +2650,6 @@ document.getElementById("catSave")!.onclick = async () => {
 };
 
 // ---------- Manajemen anggaran (UI) ----------
-function fmtRp(n: number): string {
-  const v = Math.round(n);
-  return (v < 0 ? "-" : "") + "Rp" + Math.abs(v).toLocaleString("id-ID");
-}
-
 async function refreshBudgetCats(): Promise<void> {
   const r = await call({ type: "listcat" });
   const cats = (Array.isArray(r.categories) ? r.categories : []) as CatRow[];
