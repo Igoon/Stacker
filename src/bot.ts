@@ -77,7 +77,7 @@ import {
   previousPeriod,
   type Period,
 } from "./dates";
-import { toCSV } from "./csv";
+import { parseCSV, toCSV } from "./csv";
 import {
   buildDailyRange,
   buildDonutSvg,
@@ -133,7 +133,7 @@ const TIPE_AKUN = ["bank", "ewallet", "cash"];
 const ALIAS_TARGETS = [
   "transfer", "hapus", "ubah", "laporan", "ringkasan", "grafik", "csv", "cari",
   "lihat", "riwayat", "saldo", "akun", "kategori", "anggaran", "berulang",
-  "utang", "piutang", "bayar", "target", "pin", "backup", "ai", "versi", "help",
+  "utang", "piutang", "bayar", "target", "tag", "pin", "backup", "ai", "versi", "help",
   "undo", "alias",
 ];
 const ALIAS_TARGET_SET = new Set(ALIAS_TARGETS);
@@ -424,6 +424,32 @@ export function deleteTxWithUndo(id: number): { removed: number; ids: number[] }
     rememberSnapshot(exportJson());
   }
   return res;
+}
+
+// Import transaksi dari CSV (bisa dibatalkan lewat undo).
+export function importCsvWithUndo(csvText: string): { imported: number; skipped: number } {
+  const { rows, skipped } = parseCSV(csvText);
+  if (!rows.length) return { imported: 0, skipped };
+  const before = currentState();
+  const fallbackAcc = getAccountByName("Cash") ?? listAccounts()[0];
+  let imported = 0;
+  for (const r of rows) {
+    const acc = (r.akun ? getAccountByName(r.akun) : undefined) ?? fallbackAcc;
+    addTx({
+      tanggal: r.tanggal,
+      tipe: r.tipe,
+      kategori: r.kategori,
+      jumlah: r.jumlah,
+      catatan: r.catatan || undefined,
+      account_id: acc?.id ?? null,
+    });
+    imported++;
+  }
+  if (imported > 0) {
+    pushUndo(before, `import CSV (${imported} tx)`);
+    rememberSnapshot(exportJson());
+  }
+  return { imported, skipped };
 }
 
 // Restore dari UI juga harus bisa di-undo (import mengganti seluruh DB).
@@ -1204,6 +1230,72 @@ async function handleMessageInner(input: string): Promise<Reply> {
         `Ringkasan ${label}\n\nMasuk (${rupiah(tMasuk)})\n${fmt(masuk) || "  -"}\n\n` +
         `Keluar (${rupiah(tKeluar)})\n${fmt(keluar) || "  -"}\n\nSelisih: ${rupiahSigned(tMasuk - tKeluar)}` +
         trLine,
+    };
+  }
+
+  if (low === "tag" || /^tag\s+(?:list|daftar)$/i.test(text)) {
+    const tagMap = new Map<string, { count: number; masuk: number; keluar: number }>();
+    for (const t of listAll()) {
+      if (t.transfer_id || !t.catatan) continue;
+      const tags = new Set(
+        (t.catatan.match(/#([a-zA-Z0-9_-]{2,30})/g) ?? []).map((x) => x.toLowerCase())
+      );
+      for (const tg of tags) {
+        const cur = tagMap.get(tg) ?? { count: 0, masuk: 0, keluar: 0 };
+        cur.count += 1;
+        if (t.tipe === "masuk") cur.masuk += t.jumlah;
+        else cur.keluar += t.jumlah;
+        tagMap.set(tg, cur);
+      }
+    }
+    if (tagMap.size === 0) {
+      return { text: "Belum ada #tag. Tambahkan tag di catatan, mis. `makan 50rb #liburan`." };
+    }
+    const rows = [...tagMap.entries()]
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 25)
+      .map(([tg, v]) => {
+        const parts: string[] = [];
+        if (v.keluar > 0) parts.push(`-${rupiah(v.keluar)}`);
+        if (v.masuk > 0) parts.push(`+${rupiah(v.masuk)}`);
+        return `  ${tg} (${v.count}×): ${parts.join(" · ") || "Rp0"}`;
+      });
+    return {
+      text: `Daftar #tag:
+${rows.join("\n")}
+
+Lihat detail: \`tag #nama\``,
+    };
+  }
+
+  if ((m = text.match(/^tag\s+#?([a-zA-Z0-9_-]{2,30})$/i))) {
+    const tag = "#" + m[1].toLowerCase();
+    const re = new RegExp(`(?<![a-zA-Z0-9_-])${escapeRe(tag)}(?![a-zA-Z0-9_-])`, "i");
+    const matched = listAll().filter((t) => !t.transfer_id && t.catatan && re.test(t.catatan));
+    if (!matched.length) return { text: `Tidak ada transaksi dengan tag ${tag}.` };
+    const masuk = matched.filter((t) => t.tipe === "masuk").reduce((a, t) => a + t.jumlah, 0);
+    const keluar = matched.filter((t) => t.tipe === "keluar").reduce((a, t) => a + t.jumlah, 0);
+    const byCat = new Map<string, number>();
+    for (const t of matched.filter((x) => x.tipe === "keluar")) {
+      byCat.set(t.kategori, (byCat.get(t.kategori) ?? 0) + t.jumlah);
+    }
+    const catLines = [...byCat.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([k, v]) => `  ${k}: ${rupiah(v)}`);
+    const latest = [...matched].reverse().slice(0, 10).map(txLine);
+    return {
+      text:
+        `Tag ${tag} (${matched.length} transaksi)
+` +
+        `Masuk: ${rupiah(masuk)} · Keluar: ${rupiah(keluar)} · Net: ${rupiahSigned(masuk - keluar)}` +
+        (catLines.length ? `
+
+Keluar per kategori:
+${catLines.join("\n")}` : "") +
+        `
+
+Terbaru:
+${latest.join("\n")}`,
     };
   }
 

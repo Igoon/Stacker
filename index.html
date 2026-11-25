@@ -64,6 +64,7 @@
     <button id="send">&#10148;</button>
   </footer>
   <input type="file" id="importFile" accept="application/json,.json" hidden />
+  <input type="file" id="importCsvFile" accept=".csv,text/csv" hidden />
 </div>
 
 <div id="lock" class="lock" hidden>
@@ -248,6 +249,7 @@
     <div class="info-actions">
       <button id="export">Backup JSON (lengkap)</button>
       <button id="exportCsvAll">Export transaksi ke CSV (Excel)</button>
+      <button id="importCsvBtn">Import transaksi dari CSV</button>
       <button id="import">Restore dari file JSON</button>
       <button id="exportEnc">Backup terenkripsi (kata sandi)</button>
       <button id="pickDir">Pilih folder auto-backup</button>

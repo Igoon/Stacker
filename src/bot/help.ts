@@ -53,7 +53,9 @@ export const HELP =
   "  anggaran | anggaran Makanan 2jt | anggaran Makanan 500rb mingguan\n" +
   "  anggaran rollover Makanan | anggaran no-rollover Makanan\n" +
   "  anggaran hapus Makanan\n\n" +
-  "Cari:\n" +
+  "Cari & Tag:\n" +
+  "  makan 50rb #liburan         (tambahkan #tag di catatan)\n" +
+  "  tag | tag #liburan          (daftar tag / rekap per tag)\n" +
   "  cari kopi\n" +
   "  cari jimpitan bsi\n" +
   "  cari kopi september 50          (50 = jumlah hasil)\n" +

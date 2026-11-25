@@ -3,6 +3,11 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.41.0]
+- **Dukungan `#tag` lintas kategori**: tambahkan `#tag` pada catatan transaksi (mis. `makan 50rb #liburan`, `tiket 200rb #liburan`), lalu ketik `tag` untuk melihat daftar tag atau `tag #liburan` untuk rekap total dan rincian per kategori.
+- **Import transaksi dari CSV**: tombol baru di **☰ → Backup & penyimpanan → Import transaksi dari CSV** mendukung file CSV ekspor Stacker maupun spreadsheet (pemisah koma/titik koma, otomatis melewati baris ringkasan `selisih`, dan bisa dibatalkan lewat `undo`).
+- **Uji otomatis tambahan (`src/smoke.ts`)**: pengujian lengkap untuk `#tag` lintas kategori dan `importCsvWithUndo`.
+
 ## [2.40.0]
 - **Modularisasi kode inti**: memecah `src/main.ts` dan `src/bot.ts` menjadi modul terfokus (`src/ui/icons.ts`, `src/ui/format.ts`, `src/ui/sound.ts`, `src/ui/dialogs.ts`, `src/bot/help.ts`, `src/bot/analytics.ts`) tanpa mengubah perilaku publik agar lebih bersih, ringan dirawat, dan aman dikembangkan.
 

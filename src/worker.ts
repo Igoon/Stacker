@@ -31,6 +31,7 @@ import {
   detectSubscriptions,
   deleteTxWithUndo,
   handleMessage,
+  importCsvWithUndo,
   importJsonWithUndo,
   redoCount,
   redoLabel,
@@ -156,6 +157,11 @@ interface DashMsg {
   id: number;
   period?: string;
 }
+interface ImportCsvMsg {
+  type: "importcsv";
+  id: number;
+  csv: string;
+}
 interface ExportCsvMsg {
   type: "exportcsv";
   id: number;
@@ -210,6 +216,7 @@ type InMsg =
   | SetFirstUseMsg
   | DashMsg
   | ExportCsvMsg
+  | ImportCsvMsg
   | MarkBackupMsg;
 
 let mini: MiniDb;
@@ -457,6 +464,15 @@ async function onMessage(msg: InMsg): Promise<void> {
         if (poolRef) await poolRef.wipeFiles();
         poolRef = null;
         reply(msg.id, { ok: true });
+      } catch (e) {
+        reply(msg.id, { ok: false, error: (e as Error).message });
+      }
+      break;
+    }
+    case "importcsv": {
+      try {
+        const res = importCsvWithUndo(msg.csv);
+        reply(msg.id, { ok: res.imported > 0, ...res, error: res.imported === 0 ? "Tidak ada baris transaksi valid di file CSV." : undefined });
       } catch (e) {
         reply(msg.id, { ok: false, error: (e as Error).message });
       }

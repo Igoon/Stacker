@@ -1076,6 +1076,39 @@ document.getElementById("import")!.onclick = () => {
   document.getElementById("importFile")!.click();
 };
 
+document.getElementById("importCsvBtn")!.onclick = () => {
+  document.getElementById("importCsvFile")!.click();
+};
+
+document.getElementById("importCsvFile")!.addEventListener("change", async (e) => {
+  const inputEl = e.target as HTMLInputElement;
+  const file = inputEl.files?.[0];
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) {
+    showToast("File CSV terlalu besar (maks 10 MB).");
+    inputEl.value = "";
+    return;
+  }
+  const text = await file.text();
+  inputEl.value = "";
+  const ok = await askConfirm(
+    `Import transaksi dari "${file.name}"?\n\nTransaksi baru akan ditambahkan ke data saat ini (bisa dibatalkan dengan \`undo\`).`,
+    { title: "Import CSV", okText: "Import", danger: false }
+  );
+  if (!ok) return;
+  const r = await call({ type: "importcsv", csv: text });
+  if (r.ok) {
+    const imp = Number(r.imported ?? 0);
+    const skp = Number(r.skipped ?? 0);
+    const msg = `Berhasil import ${imp} transaksi dari CSV${skp > 0 ? ` (${skp} baris dilewati)` : ""}. Ketik \`undo\` untuk batalkan.`;
+    showToast(msg);
+    addBubble(msg, "bot");
+    void refresh();
+  } else {
+    showToast("Gagal import CSV: " + String(r.error ?? "format tidak dikenali"));
+  }
+});
+
 document.getElementById("importFile")!.addEventListener("change", async (e) => {
   const inputEl = e.target as HTMLInputElement;
   const file = inputEl.files?.[0];

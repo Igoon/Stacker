@@ -12,7 +12,7 @@ const mini = createMiniDb(sqlite3, oo1db as never);
 const { initDb } = await import("./db");
 initDb(mini);
 
-const { handleMessage, deleteTxWithUndo, importJsonWithUndo, aiEnabled, budgetOverview, dashboardData, undoLabel, redoLabel, detectSubscriptions } =
+const { handleMessage, deleteTxWithUndo, importCsvWithUndo, importJsonWithUndo, aiEnabled, budgetOverview, dashboardData, undoLabel, redoLabel, detectSubscriptions } =
   await import("./bot");
 const dbmod = await import("./db");
 const { parseLocal } = await import("./parser");
@@ -1172,6 +1172,33 @@ await check("target isi dengan @akun memotong saldo akun", async () => {
   assert.equal(dbmod.getGoalByName("UjiAkun")!.terkumpul, 100_000, "terkumpul 100rb");
   await handleMessage("undo");
   await handleMessage("target hapus UjiAkun");
+});
+
+
+await check("tag lintas kategori: daftar & rekap #tag", async () => {
+  const t1 = await handleMessage("makan siang 50rb #liburan");
+  const t2 = await handleMessage("tiket kereta 200rb #liburan");
+  const list = await handleMessage("tag");
+  assert(list.text.includes("#liburan"), "daftar tag memuat #liburan");
+  const detail = await handleMessage("tag #liburan");
+  assert(detail.text.includes("2 transaksi"), "jumlah transaksi tag benar");
+  assert(detail.text.includes("Rp250.000"), "total keluar lintas kategori benar");
+  await handleMessage(`hapus #${t1.txs![0].id} #${t2.txs![0].id}`);
+});
+
+await check("import CSV menambah transaksi & bisa di-undo", async () => {
+  const before = count();
+  const sampleCsv = [
+    "id,tanggal,tipe,akun,kategori,jumlah,catatan",
+    "1,2026-10-01,keluar,BSI,Makanan,45000,nasi padang #csvtest",
+    "2,2026-10-02,masuk,BSI,Gaji,1000000,bonus #csvtest",
+    ",,,,selisih,955000,Rp955.000",
+  ].join("\r\n");
+  const res = importCsvWithUndo(sampleCsv);
+  assert.equal(res.imported, 2, "2 baris diimport, baris selisih dilewati");
+  assert.equal(count(), before + 2, "jumlah transaksi bertambah 2");
+  await handleMessage("undo");
+  assert.equal(count(), before, "import CSV bisa dibatalkan dengan undo");
 });
 
 console.log(`\n${pass} ok, ${fail} fail`);
