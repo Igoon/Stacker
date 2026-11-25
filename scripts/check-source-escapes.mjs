@@ -45,8 +45,10 @@ function controlHits(text) {
     if (c === 10) line++;
     else if (c === 9) tabs.push(line);
     else if (c === 13) {
-      crs.push(line);
+      // CRLF adalah akhir baris normal (Windows checkout); hanya CR tunggal
+      // yang menandakan "\r" ter-escape menjadi karakter kontrol.
       if (text.charCodeAt(i + 1) === 10) i++;
+      else crs.push(line);
     }
   }
   return { tabs, crs };
