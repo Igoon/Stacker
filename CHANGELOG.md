@@ -3,6 +3,11 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.41.1]
+- **Perombakan mekanisme update PWA berbasis *build hash***: `version.json` kini menyertakan *build hash* unik per build dan `sw.js` melaporkan build aktif (`GET_CACHE`), sehingga perbaikan di nomor versi yang sama tetap terdeteksi otomatis.
+- **Tombol *Periksa pembaruan* lebih andal**: bila server sudah punya versi/build baru tetapi Service Worker tertahan cache, sistem menyegarkan cache *app shell* secara aman (database transaksi di OPFS tetap 100% utuh) lalu memuat ulang.
+- **Info build & contoh `#tag` di `help`**: menampilkan *build hash* ringkas di **☰ → Tentang** serta menambahkan contoh `#tag` di bagian atas `help` (`Catat transaksi`).
+
 ## [2.41.0]
 - **Dukungan `#tag` lintas kategori**: tambahkan `#tag` pada catatan transaksi (mis. `makan 50rb #liburan`, `tiket 200rb #liburan`), lalu ketik `tag` untuk melihat daftar tag atau `tag #liburan` untuk rekap total dan rincian per kategori.
 - **Import transaksi dari CSV**: tombol baru di **☰ → Backup & penyimpanan → Import transaksi dari CSV** mendukung file CSV ekspor Stacker maupun spreadsheet (pemisah koma/titik koma, otomatis melewati baris ringkasan `selisih`, dan bisa dibatalkan lewat `undo`).

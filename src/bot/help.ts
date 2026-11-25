@@ -8,6 +8,7 @@ export const HELP =
   "  parkir 5rb sama kopi 18rb   (banyak sekaligus)\n" +
   "  gopay makan 50rb            (akun di depan)\n" +
   "  makan 50rb @bca             (akun pakai @; ketik @ untuk saran akun)\n" +
+  "  makan 50rb #liburan         (beri #tag lintas kategori; rekap: tag)\n" +
   "  kemarin makan 50rb          (tanggal relatif)\n" +
   "  tgl 3 bayar kos 1jt\n" +
   "  3 september jajan 20rb\n" +

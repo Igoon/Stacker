@@ -75,6 +75,45 @@ let swReloading = false;
 let pendingUpdateCheck = false;
 let checkUpdateWhenReady: (() => void) | null = null;
 let latestVersion = "";
+let activeBuild = "";
+let latestBuild = "";
+
+function getActiveBuild(): Promise<string> {
+  if (activeBuild) return Promise.resolve(activeBuild);
+  const ctrl = navigator.serviceWorker?.controller;
+  if (!ctrl) return Promise.resolve("");
+  return new Promise((resolve) => {
+    const ch = new MessageChannel();
+    const timer = window.setTimeout(() => resolve(""), 800);
+    ch.port1.onmessage = (ev: MessageEvent<{ build?: string }>) => {
+      window.clearTimeout(timer);
+      activeBuild = String(ev.data?.build ?? "");
+      resolve(activeBuild);
+    };
+    try {
+      ctrl.postMessage({ type: "GET_CACHE" }, [ch.port2]);
+    } catch {
+      window.clearTimeout(timer);
+      resolve("");
+    }
+  });
+}
+
+async function fetchRemoteVersion(): Promise<{ version: string; build: string; notes: string[] } | null> {
+  try {
+    const res = await fetch(`./version.json?t=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const v = (await res.json()) as { version?: string; build?: string; notes?: string[] };
+    const version = String(v.version ?? "");
+    const build = String(v.build ?? "");
+    const notes = Array.isArray(v.notes) ? v.notes.map(String) : [];
+    if (version) latestVersion = version;
+    if (build) latestBuild = build;
+    return { version, build, notes };
+  } catch {
+    return null;
+  }
+}
 
 // Service worker: cache app shell. Kalau SW baru mengambil alih, tampilkan bar
 // "Muat ulang" — jangan reload otomatis supaya input user tak hilang.
@@ -93,36 +132,36 @@ if ("serviceWorker" in navigator) {
     if (!bar) return;
     const title = document.getElementById("updateTitle");
     const list = document.getElementById("updateNotes");
-    let ver = "";
-    try {
-      const res = await fetch(`./version.json?t=${Date.now()}`, { cache: "no-store" });
-      if (res.ok) {
-        const v = (await res.json()) as { version?: string; notes?: string[] };
-        ver = String(v.version ?? "");
-        if (ver) latestVersion = ver;
-        // Hanya tampilkan bila server benar-benar lebih baru (hindari notif
-        // palsu saat versi sama, atau saat server rollback ke versi lama).
-        if (ver && appVersion && !isNewer(ver, appVersion)) {
-          bar.hidden = true;
-          return;
-        }
-        if (list && Array.isArray(v.notes) && v.notes.length > 0) {
-          list.replaceChildren();
-          for (const n of v.notes.slice(0, 5)) {
-            const li = document.createElement("li");
-            li.textContent = n;
-            list.appendChild(li);
-          }
-          list.hidden = false;
-        }
+    const curBuild = await getActiveBuild();
+    const remote = await fetchRemoteVersion();
+    const ver = remote?.version ?? "";
+    const build = remote?.build ?? "";
+    const newerVer = !!(ver && appVersion && isNewer(ver, appVersion));
+    const newerBuild = !!(build && curBuild && build !== curBuild);
+
+    if (remote && ver && appVersion && !newerVer && !newerBuild) {
+      bar.hidden = true;
+      return;
+    }
+    if (list && remote && remote.notes.length > 0) {
+      list.replaceChildren();
+      for (const n of remote.notes.slice(0, 5)) {
+        const li = document.createElement("li");
+        li.textContent = n;
+        list.appendChild(li);
       }
-    } catch {
-      // Offline / version.json tak tersedia: pakai teks umum.
+      list.hidden = false;
     }
     if (title) {
-      title.textContent = ver
-        ? `Versi baru ${ver}${appVersion ? ` — kamu di v${appVersion}` : ""}`
-        : `Versi baru tersedia${appVersion ? ` (kamu di v${appVersion})` : ""}`;
+      if (newerVer) {
+        title.textContent = `Versi baru ${ver}${appVersion ? ` — kamu di v${appVersion}` : ""}`;
+      } else if (newerBuild && ver) {
+        title.textContent = `Pembaruan tersedia (build baru v${ver})`;
+      } else {
+        title.textContent = ver
+          ? `Versi baru ${ver}${appVersion ? ` — kamu di v${appVersion}` : ""}`
+          : `Versi baru tersedia${appVersion ? ` (kamu di v${appVersion})` : ""}`;
+      }
     }
     bar.hidden = false;
   };
@@ -236,8 +275,29 @@ async function forceUpdate(silent = false, target = ""): Promise<void> {
     showToast(target ? `Memperbarui ke v${target}…` : "Memperbarui…");
     w.postMessage({ type: "SKIP_WAITING" });
     window.setTimeout(() => window.location.reload(), 1200);
-  } else if (!silent) {
-    showToast("Sudah versi terbaru.");
+    return;
+  }
+  const curBuild = await getActiveBuild();
+  const remote = await fetchRemoteVersion();
+  const newerVer = !!(remote?.version && appVersion && isNewer(remote.version, appVersion));
+  const newerBuild = !!(remote?.build && curBuild && remote.build !== curBuild);
+  if (newerVer || newerBuild) {
+    showToast(
+      remote?.version ? `Menyegarkan cache ke v${remote.version}…` : "Menyegarkan cache aplikasi…"
+    );
+    try {
+      for (const k of await caches.keys()) {
+        if (k.startsWith("stacker-")) await caches.delete(k);
+      }
+      await reg.unregister();
+    } catch {
+      // abaikan; tetap muat ulang
+    }
+    window.location.reload();
+    return;
+  }
+  if (!silent) {
+    showToast("Sudah versi & build terbaru.");
   }
 }
 
@@ -247,33 +307,25 @@ let autoUpdateTried = false;
 async function maybeAutoUpdate(): Promise<void> {
   if (autoUpdateTried) return;
   autoUpdateTried = true;
-  let ver = "";
+  const curBuild = await getActiveBuild();
+  const remote = await fetchRemoteVersion();
+  if (!remote || !remote.version || !appVersion) return;
+  const newerVer = isNewer(remote.version, appVersion);
+  const newerBuild = !!(remote.build && curBuild && remote.build !== curBuild);
+  if (!newerVer && !newerBuild) return;
+  const updateKey = remote.build ? `${remote.version}-${remote.build}` : remote.version;
   try {
-    const res = await fetch(`./version.json?t=${Date.now()}`, { cache: "no-store" });
-    if (!res.ok) return;
-    ver = String(((await res.json()) as { version?: string }).version ?? "");
-    if (ver) latestVersion = ver;
-  } catch {
-    return; // offline
-  }
-  if (!ver || !appVersion || !isNewer(ver, appVersion)) return;
-  try {
-    if (sessionStorage.getItem("stacker-auto-updated") === ver) return;
-    sessionStorage.setItem("stacker-auto-updated", ver);
+    if (sessionStorage.getItem("stacker-auto-updated") === updateKey) return;
+    sessionStorage.setItem("stacker-auto-updated", updateKey);
   } catch {
     // sessionStorage bisa diblokir; tetap coba.
   }
-  await forceUpdate(true, ver);
+  await forceUpdate(true, remote.version);
 }
 
 // Ambil versi terbaru dari server untuk ditampilkan di Info/Tentang.
 async function refreshLatestVersion(): Promise<void> {
-  try {
-    const res = await fetch(`./version.json?t=${Date.now()}`, { cache: "no-store" });
-    if (res.ok) latestVersion = String(((await res.json()) as { version?: string }).version ?? "");
-  } catch {
-    // offline / tak tersedia
-  }
+  await Promise.all([getActiveBuild(), fetchRemoteVersion()]);
 }
 
 let ready = false;
@@ -2426,12 +2478,13 @@ function renderInfo(): void {
   ]
     .filter((x) => x !== "")
     .join("\n");
+  const buildDiff = !!(latestBuild && activeBuild && latestBuild !== activeBuild);
   aboutLines.textContent = [
-    `Versi: v${appVersion || "-"}`,
-    `Server: v${latestVersion || "-"}${
+    `Versi: v${appVersion || "-"}${activeBuild ? ` (${activeBuild})` : ""}`,
+    `Server: v${latestVersion || "-"}${latestBuild ? ` (${latestBuild})` : ""}${
       latestVersion && appVersion
-        ? isNewer(latestVersion, appVersion)
-          ? " (update tersedia — ketuk Muat ulang)"
+        ? isNewer(latestVersion, appVersion) || buildDiff
+          ? " (update tersedia — ketuk Periksa pembaruan)"
           : " (terbaru)"
         : ""
     }`,

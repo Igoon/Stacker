@@ -88,7 +88,7 @@ try {
   }
   await writeFile(
     join(dist, "version.json"),
-    JSON.stringify({ version: String(pkg.version ?? ""), notes }, null, 2),
+    JSON.stringify({ version: String(pkg.version ?? ""), build: hash, notes }, null, 2),
     "utf8"
   );
 } catch (e) {
