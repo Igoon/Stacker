@@ -51,6 +51,25 @@ async function unlockUi(page: Page, pin: string): Promise<void> {
   await submitPad(page, "#lockPad");
 }
 
+async function confirmOk(page: Page): Promise<void> {
+  await expect(page.locator("#confirmModal")).toBeVisible();
+  await page.locator("#confirmOk").click();
+}
+
+async function confirmCancel(page: Page): Promise<void> {
+  await expect(page.locator("#confirmModal")).toBeVisible();
+  await page.locator("#confirmCancel").click();
+}
+
+async function promptSubmit(page: Page, val: string, val2?: string): Promise<void> {
+  await expect(page.locator("#promptModal")).toBeVisible();
+  await page.locator("#promptInput").fill(val);
+  if (val2 !== undefined) {
+    await page.locator("#promptInput2").fill(val2);
+  }
+  await page.locator("#promptOk").click();
+}
+
 test("catat transaksi, saldo akurat, undo mengembalikan", async ({ page }) => {
   await boot(page);
 
@@ -89,7 +108,8 @@ test("grafik SVG & laporan banding tampil di chat", async ({ page }) => {
   expect(box?.height ?? 0).toBeGreaterThan(80);
 
   await chat(page, "laporan banding");
-  await expect(page.locator("#chat .bubble").filter({ hasText: "Banding" })).toBeVisible();
+  // Batasi ke bubble bot: bubble pengguna "laporan banding" juga memuat kata tersebut.
+  await expect(page.locator("#chat .bubble").filter({ hasText: /^Banding/ })).toBeVisible();
 
   await chat(page, "grafik");
   await expect(page.locator("#chat .bubble.pre").last()).toBeVisible();
@@ -193,12 +213,12 @@ test("reset transaksi minta konfirmasi dulu", async ({ page }) => {
   await chat(page, "kopi 15rb");
   await expect(page.locator("#chat .tx")).toHaveCount(1);
 
-  page.once("dialog", (d) => d.dismiss());
   await chat(page, "reset transaksi");
+  await confirmCancel(page);
   await expect(page.locator("#chat .tx")).toHaveCount(1, { timeout: 3000 });
 
-  page.once("dialog", (d) => d.accept());
   await chat(page, "reset transaksi");
+  await confirmOk(page);
   await expect(page.locator("#chat .bubble").filter({ hasText: "Semua transaksi dihapus" })).toBeVisible();
   await expect(page.locator("#chat .tx")).toHaveCount(0);
 });
@@ -208,10 +228,10 @@ test("menu Reset data menjalankan reset transaksi", async ({ page }) => {
   await chat(page, "kopi 15rb");
   await expect(page.locator("#chat .tx")).toHaveCount(1);
 
-  page.once("dialog", (d) => d.accept());
   await page.locator("#info").click();
   await page.locator("#openReset").click();
   await page.locator("#resetTxBtn").click();
+  await confirmOk(page);
   await expect(
     page.locator("#chat .bubble").filter({ hasText: "Semua transaksi dihapus" })
   ).toBeVisible();
@@ -223,8 +243,8 @@ test("reset semua minta konfirmasi & mengosongkan data", async ({ page }) => {
   await chat(page, "kopi 15rb");
   await expect(page.locator("#saldoTot")).toHaveText(/-Rp15rb/);
 
-  page.once("dialog", (d) => d.accept());
   await chat(page, "reset semua");
+  await confirmOk(page);
   await expect(page.locator("#chat .bubble").filter({ hasText: "Reset total" })).toBeVisible();
   await expect(page.locator("#saldoTot")).toHaveText(/Rp0/);
   await expect(page.locator("#chat .tx")).toHaveCount(0);
@@ -274,8 +294,8 @@ test("restore minta konfirmasi dan bisa di-undo", async ({ page }) => {
   await page.locator("#storeBack").click();
   await chat(page, "teh 5rb");
 
-  page.once("dialog", (d) => d.accept());
   await page.locator("#importFile").setInputFiles(path!);
+  await confirmOk(page);
   await expect(page.locator("#chat .bubble").filter({ hasText: "Backup dimuat" })).toBeVisible();
 
   await chat(page, "undo");
@@ -304,8 +324,8 @@ test("backup kunci menghasilkan file terenkripsi", async ({ page }) => {
   expect(raw).not.toContain("transactions");
 
   // Sandi salah tidak boleh menutup modal; bisa coba lagi tanpa pilih file ulang.
-  page.once("dialog", (d) => d.accept());
   await page.locator("#importFile").setInputFiles((await file.path())!);
+  await confirmOk(page);
   await expect(page.locator("#passModal")).toBeVisible();
   await page.locator("#passInput").fill("sandi-salah");
   await page.locator("#passOk").click();
@@ -313,6 +333,7 @@ test("backup kunci menghasilkan file terenkripsi", async ({ page }) => {
   await expect(page.locator("#passMsg")).toContainText("salah");
   await page.locator("#passInput").fill("sandi-panjang-2026");
   await page.locator("#passOk").click();
+  // Konfirmasi restore sudah diberikan sebelum modal sandi; tidak ada dialog kedua.
   await expect(page.locator("#chat .bubble").filter({ hasText: "Backup dimuat" })).toBeVisible();
 });
 
@@ -453,27 +474,25 @@ test("saldo tersamar default & ketuk untuk lihat", async ({ page }) => {
   await expect(page.locator("#saldoTot")).toContainText("-Rp15rb");
 });
 
-test("samarkan nominal transaksi di chat (toggle Tampilan)", async ({ page }) => {
+test("samarkan saldo di header (toggle Tampilan)", async ({ page }) => {
   await boot(page);
   await chat(page, "kopi 15rb");
   await expect(page.locator("#chat")).toContainText("Rp15.000");
 
   await page.locator("#info").click();
   await page.locator("#openWall").click();
-  await page.locator("#hideChat").check();
+  await page.locator("#hideSaldo").check();
   await page.locator("#wallClose").click();
 
-  await expect(page.locator("#chat")).not.toContainText("Rp15.000");
-  await expect(page.locator("#chat")).toContainText("Rp••••");
-
-  await chat(page, "teh 5rb");
-  await expect(page.locator("#chat")).not.toContainText("Rp5.000");
+  // Nominal transaksi di chat tetap terlihat; hanya saldo header yang disamarkan.
+  await expect(page.locator("#chat")).toContainText("Rp15.000");
+  await expect(page.locator("#saldoTot")).toContainText("••••");
 
   await page.locator("#info").click();
   await page.locator("#openWall").click();
-  await page.locator("#hideChat").uncheck();
+  await page.locator("#hideSaldo").uncheck();
   await page.locator("#wallClose").click();
-  await expect(page.locator("#chat")).toContainText("Rp15.000");
+  await expect(page.locator("#saldoTot")).toContainText("-Rp15rb");
 });
 
 test("menu Kategori, Anggaran, dan Ringkasan", async ({ page }) => {
@@ -526,20 +545,20 @@ test("menu Akun: tambah multi-kata, sesuaikan, hapus", async ({ page }) => {
   await page.locator("#accSave").click();
   await expect(page.locator("#accList")).toContainText("Rumah Tangga");
 
-  page.once("dialog", (d) => void d.accept("2jt"));
   await page
     .locator("#accList .cat-item")
     .filter({ hasText: "Rumah Tangga" })
     .getByText("Sesuaikan")
     .click();
+  await promptSubmit(page, "2jt");
   await expect(page.locator("#accList")).toContainText("Rp2.000.000");
 
-  page.once("dialog", (d) => void d.accept());
   await page
     .locator("#accList .cat-item")
     .filter({ hasText: "Rumah Tangga" })
     .getByText("Hapus")
     .click();
+  await confirmOk(page);
   await expect(page.locator("#accList")).not.toContainText("Rumah Tangga");
   await page.locator("#accBack").click();
 });
@@ -562,16 +581,13 @@ test("menu Berulang: tambah, nonaktif/aktif, ubah, hapus", async ({ page }) => {
   await item.getByText("Aktifkan").click();
   await expect(item.locator(".cat-badge")).toHaveText("aktif");
 
-  page.once("dialog", (d) => {
-    void d.accept("400rb");
-    page.once("dialog", (d2) => void d2.accept("10"));
-  });
   await item.getByText("Ubah").click();
+  await promptSubmit(page, "400rb", "10");
   await expect(item).toContainText("tiap tgl 10");
   await expect(item).toContainText("Rp400.000");
 
-  page.once("dialog", (d) => void d.accept());
   await item.getByText("Hapus").click();
+  await confirmOk(page);
   await expect(page.locator("#recList")).not.toContainText("listrik");
   await page.locator("#recBack").click();
 });
@@ -589,13 +605,13 @@ test("menu Utang/Piutang: tambah, bayar sebagian, lunas", async ({ page }) => {
   await expect(item).toContainText("sisa Rp100.000");
   await expect(page.locator("#debtTotals")).toContainText("Utang saya: Rp100.000");
 
-  page.once("dialog", (d) => void d.accept("40rb"));
   await item.getByText("Bayar").click();
+  await promptSubmit(page, "40rb");
   await expect(item).toContainText("sisa Rp60.000");
   await expect(item).toContainText("dari Rp100.000");
 
-  page.once("dialog", (d) => void d.accept("60rb"));
   await item.getByText("Bayar").click();
+  await promptSubmit(page, "60rb");
   await expect(page.locator("#debtList")).not.toContainText("budi");
 
   await page.locator("#debtBack").click();
@@ -662,13 +678,13 @@ test("menu Target: tambah, isi, hapus", async ({ page }) => {
   const item = page.locator("#goalList .cat-item").filter({ hasText: "Liburan" });
   await expect(item).toContainText("Rp5.000.000");
 
-  page.once("dialog", (d) => void d.accept("1jt"));
   await item.getByText("Isi").click();
+  await promptSubmit(page, "1jt");
   await expect(item).toContainText("Rp1.000.000");
   await expect(item).toContainText("20%");
 
-  page.once("dialog", (d) => void d.accept());
   await item.getByText("Hapus").click();
+  await confirmOk(page);
   await expect(page.locator("#goalList .cat-item")).toHaveCount(0);
   await page.locator("#goalBack").click();
 });
@@ -957,10 +973,11 @@ test("hapus semua data membersihkan storage dan mereset app", async ({ page }) =
     localStorage.setItem("stacker-wallpaper", JSON.stringify({ kind: "default" }))
   );
 
-  page.on("dialog", (d) => void d.accept());
   await page.locator("#info").click();
   await page.locator("#openReset").click();
   await page.locator("#wipeData").click();
+  await confirmOk(page);
+  await confirmOk(page);
 
   // Reload otomatis: app kembali bersih dan localStorage dibersihkan.
   await expect(page.locator("#sub")).toHaveText(/^v\d/, { timeout: 60_000 });
@@ -975,10 +992,10 @@ test("hapus semua data wajib PIN bila PIN aktif", async ({ page }) => {
   await unlockUi(page, "1234");
   await expect(page.locator("#lock")).toBeHidden();
 
-  page.on("dialog", (d) => void d.accept());
   await page.locator("#info").click();
   await page.locator("#openReset").click();
   await page.locator("#wipeData").click();
+  await confirmOk(page);
   await expect(page.locator("#pinModal")).toBeVisible();
 
   // PIN salah ditolak; modal tetap terbuka.
@@ -987,10 +1004,33 @@ test("hapus semua data wajib PIN bila PIN aktif", async ({ page }) => {
   await expect(page.locator("#pinMsg")).toContainText("salah");
   await expect(page.locator("#pinModal")).toBeVisible();
 
-  // PIN benar -> lanjut hapus.
+  // PIN benar -> konfirmasi terakhir -> lanjut hapus.
   await tapPad(page, "#pinPad", "1234");
   await submitPad(page, "#pinPad");
+  await confirmOk(page);
   await expect(page.locator("#sub")).toHaveText(/^v\d/, { timeout: 60_000 });
   await expect(page.locator("#lock")).toBeHidden();
   await expect(page.locator("#saldoTot")).toHaveText(/Rp0/);
+});
+
+test("autocomplete #tag & filter #tag di modal Cari", async ({ page }) => {
+  await boot(page);
+  await chat(page, "makan siang 50rb #liburan");
+  await chat(page, "kopi 20rb #kerja");
+
+  // Autocomplete #tag saat mengetik #
+  await page.locator("#input").fill("tiket 100rb #lib");
+  await expect(page.locator("#suggest")).toBeVisible();
+  await page.locator("#suggest button", { hasText: "#liburan" }).click();
+  await expect(page.locator("#input")).toHaveValue("tiket 100rb #liburan ");
+
+  // Filter #tag di modal Cari
+  await page.locator("#quickSearch").click();
+  await expect(page.locator("#searchModal")).toBeVisible();
+  await page.locator("#searchTag").selectOption("#liburan");
+  await page.locator("#searchRun").click();
+  await expect(page.locator("#searchSummary")).toContainText("1 transaksi ditemukan");
+  await expect(page.locator("#searchList")).toContainText("#liburan");
+  await expect(page.locator("#searchList")).not.toContainText("#kerja");
+  await page.locator("#searchBack").click();
 });

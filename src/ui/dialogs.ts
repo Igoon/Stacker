@@ -59,7 +59,9 @@ export function createDialogController(
     confirmOkBtn.textContent = opts.okText ?? "Lanjut";
     confirmOkBtn.classList.toggle("danger", opts.danger ?? true);
     confirmModal.hidden = false;
-    confirmOkBtn.focus();
+    // Fokus ditunda: bila modal dibuka dari handler keydown Enter, fokus segera
+    // membuat Enter yang sama menekan tombol OK (konfirmasi tak pernah tampil).
+    requestAnimationFrame(() => confirmOkBtn.focus());
     return new Promise((resolve) => {
       confirmResolve = resolve;
     });

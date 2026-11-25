@@ -3,6 +3,13 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.42.0]
+- **Perbaikan Enter vs modal konfirmasi**: fokus tombol OK ditunda sehingga Enter yang memicu konfirmasi tidak langsung menyetujuinya (reset/restore/hapus aman kembali).
+- **Autocomplete #tag tahan balapan**: daftar tag disegarkan ulang (bounded) hingga transaksi terakhir tersimpan, dan tag langsung diingat setelah pesan terkirim.
+- **Autocomplete `#tag` saat mengetik**: ketik `#` di kolom chat untuk memunculkan saran tag yang pernah dipakai (seperti `@akun`) sehingga input di HP lebih cepat dan bebas typo.
+- **Filter & Export CSV per `#tag` di modal Cari**: dropdown **Tag (#)** baru di modal **Cari transaksi** memungkinkan filter, edit/hapus cepat, dan export CSV khusus satu tag.
+- **Sinkronisasi penuh E2E Playwright (`e2e/app.spec.ts`)**: seluruh tes disesuaikan dengan modal kustom `#confirmModal` dan `#promptModal` serta dilengkapi uji otomatis untuk autocomplete dan filter `#tag`.
+
 ## [2.41.1]
 - **Perombakan mekanisme update PWA berbasis *build hash***: `version.json` kini menyertakan *build hash* unik per build dan `sw.js` melaporkan build aktif (`GET_CACHE`), sehingga perbaikan di nomor versi yang sama tetap terdeteksi otomatis.
 - **Tombol *Periksa pembaruan* lebih andal**: bila server sudah punya versi/build baru tetapi Service Worker tertahan cache, sistem menyegarkan cache *app shell* secara aman (database transaksi di OPFS tetap 100% utuh) lalu memuat ulang.

@@ -499,8 +499,20 @@ function showToast(msg: string): void {
 }
 
 let cachedAccountNames: string[] = [];
+let cachedTagNames: string[] = [];
+let tagRefreshPending = false;
+let tagResuggested = false;
+let tagSyncAttempts = 0;
 
-// Saran perintah dari riwayat + autocomplete @akun saat mengetik.
+/** Tambahkan #tag dari teks ke cache agar autocomplete langsung tersedia. */
+function rememberTagsFrom(text: string): void {
+  for (const raw of text.match(/#[a-zA-Z0-9_-]{2,30}/g) ?? []) {
+    const tag = raw.toLowerCase();
+    if (!cachedTagNames.includes(tag)) cachedTagNames.unshift(tag);
+  }
+}
+
+// Saran perintah dari riwayat + autocomplete @akun & #tag saat mengetik.
 function updateSuggest(): void {
   const raw = input.value;
   suggestEl.replaceChildren();
@@ -518,6 +530,46 @@ function updateSuggest(): void {
         b.onclick = () => {
           const cut = raw.slice(0, raw.length - atMatch[1].length - 1);
           input.value = `${cut}@${acc} `;
+          input.focus();
+          suggestEl.hidden = true;
+        };
+        suggestEl.appendChild(b);
+      }
+      suggestEl.hidden = false;
+      return;
+    }
+  }
+  const tagMatch = raw.match(/(?:^|\s)#([a-zA-Z0-9_-]*)$/);
+  if (tagMatch && !tagRefreshPending && !tagResuggested) {
+    // Sinkronkan daftar tag, lalu render ulang saran. Bila worker belum
+    // selesai menyimpan transaksi terakhir, ulangi beberapa kali (bounded).
+    tagRefreshPending = true;
+    void refresh().then(() => {
+      tagRefreshPending = false;
+      tagResuggested = true;
+      updateSuggest();
+      tagResuggested = false;
+      if (cachedTagNames.length === 0 && tagSyncAttempts < 4) {
+        tagSyncAttempts += 1;
+        setTimeout(() => {
+          if (/(?:^|\s)#[a-zA-Z0-9_-]*$/.test(input.value)) updateSuggest();
+        }, 250 * tagSyncAttempts);
+      }
+    });
+  }
+  if (tagMatch && cachedTagNames.length > 0) {
+    const prefix = tagMatch[1].toLowerCase();
+    const tagMatches = cachedTagNames
+      .filter((t) => !prefix || t.slice(1).toLowerCase().includes(prefix))
+      .slice(0, 8);
+    if (tagMatches.length > 0) {
+      for (const tg of tagMatches) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = tg;
+        b.onclick = () => {
+          const cut = raw.slice(0, raw.length - tagMatch[1].length - 1);
+          input.value = `${cut}${tg} `;
           input.focus();
           suggestEl.hidden = true;
         };
@@ -942,6 +994,9 @@ async function refresh(): Promise<Record<string, unknown>> {
       .map((a) => String(a.nama ?? ""))
       .filter(Boolean);
   }
+  if (Array.isArray(r.tagNames)) {
+    cachedTagNames = (r.tagNames as string[]).map(String).filter(Boolean);
+  }
   chipsEl.hidden = txCount > 0;
   const hasUndo = !!r.canUndo;
   const hasRedo = !!r.canRedo;
@@ -1032,7 +1087,10 @@ async function send(): Promise<void> {
   }
   if (r.ok) {
     addBubble(r.text ?? "", "bot", r.txs, r.file, r.svg, r.pre);
-    if (Array.isArray(r.txs) && r.txs.length > 0) haptic(14);
+    if (Array.isArray(r.txs) && r.txs.length > 0) {
+      haptic(14);
+      rememberTagsFrom(text);
+    }
     if (/^Dibatalkan\b/.test(r.text ?? "")) haptic([10, 40, 10]);
     if (isReset && r.file) {
       const f = r.file as { name: string; content: string };
@@ -1059,6 +1117,8 @@ let histIndex = -1;
 let histDraft = "";
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
+    // Cegah Enter yang sama mengaktifkan tombol yang difokuskan modal.
+    e.preventDefault();
     void send();
     return;
   }
@@ -1088,6 +1148,7 @@ input.addEventListener("keydown", (e) => {
 });
 input.addEventListener("input", () => {
   histIndex = -1;
+  tagSyncAttempts = 0;
   updateSuggest();
 });
 
@@ -2171,6 +2232,7 @@ const searchModal = document.getElementById("searchModal")!;
 const searchQEl = document.getElementById("searchQ") as HTMLInputElement;
 const searchAccEl = document.getElementById("searchAcc") as HTMLSelectElement;
 const searchCatEl = document.getElementById("searchCat") as HTMLSelectElement;
+const searchTagEl = document.getElementById("searchTag") as HTMLSelectElement;
 const searchFromEl = document.getElementById("searchFrom") as HTMLInputElement;
 const searchToEl = document.getElementById("searchTo") as HTMLInputElement;
 const searchMinEl = document.getElementById("searchMin") as HTMLInputElement;
@@ -3494,9 +3556,14 @@ document.getElementById("debtSave")!.onclick = async () => {
 interface SearchRow extends Tx {}
 
 async function refreshSearchOptions(): Promise<void> {
-  const [a, c] = await Promise.all([call({ type: "listacc" }), call({ type: "listcat" })]);
+  const [a, c, tg] = await Promise.all([
+    call({ type: "listacc" }),
+    call({ type: "listcat" }),
+    call({ type: "listtags" }),
+  ]);
   const accs = (Array.isArray(a.accounts) ? a.accounts : []) as AccRow[];
   const cats = (Array.isArray(c.categories) ? c.categories : []) as CatRow[];
+  const tags = (Array.isArray(tg.tags) ? tg.tags : []) as string[];
 
   const prevAcc = searchAccEl.value;
   searchAccEl.replaceChildren();
@@ -3525,6 +3592,20 @@ async function refreshSearchOptions(): Promise<void> {
     searchCatEl.appendChild(o);
   }
   if (prevCat) searchCatEl.value = prevCat;
+
+  const prevTag = searchTagEl.value;
+  searchTagEl.replaceChildren();
+  const noneT = document.createElement("option");
+  noneT.value = "";
+  noneT.textContent = "(semua tag)";
+  searchTagEl.appendChild(noneT);
+  for (const x of tags) {
+    const o = document.createElement("option");
+    o.value = x;
+    o.textContent = x;
+    searchTagEl.appendChild(o);
+  }
+  if (prevTag) searchTagEl.value = prevTag;
 }
 
 async function runSearch(): Promise<void> {
@@ -3533,6 +3614,7 @@ async function runSearch(): Promise<void> {
     q: searchQEl.value.trim(),
     accountId: searchAccEl.value ? Number(searchAccEl.value) : undefined,
     kategori: searchCatEl.value || undefined,
+    tag: searchTagEl.value || undefined,
     from: searchFromEl.value || undefined,
     to: searchToEl.value || undefined,
     minRaw: searchMinEl.value.trim() || undefined,
@@ -3608,6 +3690,7 @@ document.getElementById("searchResetForm")!.onclick = () => {
   searchQEl.value = "";
   searchAccEl.value = "";
   searchCatEl.value = "";
+  searchTagEl.value = "";
   searchFromEl.value = "";
   searchToEl.value = "";
   searchMinEl.value = "";
@@ -3650,6 +3733,7 @@ document.getElementById("searchExportCsv")!.onclick = async () => {
     q: searchQEl.value.trim(),
     accountId: searchAccEl.value ? Number(searchAccEl.value) : undefined,
     kategori: searchCatEl.value || undefined,
+    tag: searchTagEl.value || undefined,
     from: searchFromEl.value || undefined,
     to: searchToEl.value || undefined,
     minRaw: searchMinEl.value.trim() || undefined,

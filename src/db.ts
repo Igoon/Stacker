@@ -285,6 +285,22 @@ export function listRange(from: string, to: string): Tx[] {
 
 const MAX_SEARCH = 10000;
 
+export function listTags(): string[] {
+  const counts = new Map<string, number>();
+  for (const t of listAll()) {
+    if (t.transfer_id || !t.catatan) continue;
+    const tags = new Set(
+      (t.catatan.match(/#[a-zA-Z0-9_-]{2,30}/g) ?? []).map((x) => x.toLowerCase())
+    );
+    for (const tg of tags) {
+      counts.set(tg, (counts.get(tg) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([tg]) => tg);
+}
+
 export function searchTx(
   query: string,
   opts: {
@@ -292,6 +308,7 @@ export function searchTx(
     from?: string;
     to?: string;
     kategori?: string;
+    tag?: string;
     tipe?: "masuk" | "keluar";
     min?: number;
     max?: number;
@@ -339,7 +356,23 @@ export function searchTx(
     args.push(opts.max);
   }
 
+  const tagNorm = opts.tag?.trim().toLowerCase();
+  const tagPrefixed = tagNorm ? (tagNorm.startsWith("#") ? tagNorm : "#" + tagNorm) : "";
+  if (tagPrefixed) {
+    const like = `%${tagPrefixed.replace(/[\\%_]/g, (c) => "\\" + c)}%`;
+    where.push(`LOWER(t.catatan) LIKE ? ESCAPE '\\'`);
+    args.push(like);
+  }
+
   const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  if (tagPrefixed) {
+    const escaped = tagPrefixed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`(?<![a-zA-Z0-9_-])${escaped}(?![a-zA-Z0-9_-])`, "i");
+    const rows = db
+      .prepare(`${TX_SELECT} ${clause} ORDER BY t.tanggal DESC, t.id DESC LIMIT ?`)
+      .all(...args, Math.min(MAX_SEARCH, limit * 5)) as Tx[];
+    return rows.filter((t) => !!t.catatan && re.test(t.catatan)).slice(0, limit);
+  }
   args.push(limit);
   return db
     .prepare(`${TX_SELECT} ${clause} ORDER BY t.tanggal DESC, t.id DESC LIMIT ?`)

@@ -8,6 +8,7 @@ import {
   saldo,
   rupiah,
   rupiahSigned,
+  listTags,
   listTx,
   countTx,
   accountBalances,
@@ -122,6 +123,10 @@ interface ListDebtMsg {
   type: "listdebt";
   id: number;
 }
+interface ListTagsMsg {
+  type: "listtags";
+  id: number;
+}
 interface SearchMsg {
   type: "search";
   id: number;
@@ -130,6 +135,7 @@ interface SearchMsg {
   from?: string;
   to?: string;
   kategori?: string;
+  tag?: string;
   tipe?: string;
   minRaw?: string;
   maxRaw?: string;
@@ -170,6 +176,7 @@ interface ExportCsvMsg {
   from?: string;
   to?: string;
   kategori?: string;
+  tag?: string;
   minRaw?: string;
   maxRaw?: string;
 }
@@ -209,6 +216,7 @@ type InMsg =
   | ListAccMsg
   | ListRecurringMsg
   | ListDebtMsg
+  | ListTagsMsg
   | SearchMsg
   | SubsMsg
   | ListGoalsMsg
@@ -326,6 +334,7 @@ function state() {
     })),
     txCount: n,
     recentTxs: listTx(3).map((t) => ({ ...t, rupiah: rupiah(t.jumlah) })),
+    tagNames: listTags(),
     pinSet: !!getSetting("pin_hash"),
     lastBackupAt: lastBackup,
     notices,
@@ -395,6 +404,9 @@ async function onMessage(msg: InMsg): Promise<void> {
     case "listgoals":
       reply(msg.id, { ok: true, goals: listGoals() });
       break;
+    case "listtags":
+      reply(msg.id, { ok: true, tags: listTags() });
+      break;
     case "search": {
       const amt = (s?: string): number | undefined => {
         if (!s || !s.trim()) return undefined;
@@ -408,6 +420,7 @@ async function onMessage(msg: InMsg): Promise<void> {
           from: msg.from || undefined,
           to: msg.to || undefined,
           kategori: msg.kategori || undefined,
+          tag: msg.tag || undefined,
           tipe: msg.tipe === "masuk" || msg.tipe === "keluar" ? msg.tipe : undefined,
           min: amt(msg.minRaw),
           max: amt(msg.maxRaw),
@@ -439,6 +452,7 @@ async function onMessage(msg: InMsg): Promise<void> {
         from: msg.from || undefined,
         to: msg.to || undefined,
         kategori: msg.kategori || undefined,
+        tag: msg.tag || undefined,
         min: amt(msg.minRaw),
         max: amt(msg.maxRaw),
         limit: 10000,

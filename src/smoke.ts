@@ -1183,6 +1183,9 @@ await check("tag lintas kategori: daftar & rekap #tag", async () => {
   const detail = await handleMessage("tag #liburan");
   assert(detail.text.includes("2 transaksi"), "jumlah transaksi tag benar");
   assert(detail.text.includes("Rp250.000"), "total keluar lintas kategori benar");
+  assert(dbmod.listTags().includes("#liburan"), "listTags memuat #liburan");
+  const filtered = dbmod.searchTx("", { tag: "#liburan" });
+  assert.equal(filtered.length, 2, "searchTx filter tag menemukan 2 transaksi");
   await handleMessage(`hapus #${t1.txs![0].id} #${t2.txs![0].id}`);
 });
 
