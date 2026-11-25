@@ -31,7 +31,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify (typecheck + smoke)
+      - name: Verify (escape, typecheck, smoke)
         run: npm run verify
 
       - name: Build

@@ -12,7 +12,8 @@
     "smoke": "tsx src/smoke.ts",
     "e2e": "playwright test",
     "test:offline": "node scripts/check-offline.mjs",
-    "verify": "npm run typecheck && npm run smoke"
+    "check:escapes": "node scripts/check-source-escapes.mjs",
+    "verify": "npm run check:escapes && npm run typecheck && npm run smoke"
   },
   "dependencies": {
     "@sqlite.org/sqlite-wasm": "3.54.1-build1"
