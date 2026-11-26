@@ -42,7 +42,7 @@
 }
 
 /* Perbaiki kontrol native (date picker, select, scrollbar) di tema terang */
-[data-theme="sky"] {
+[data-theme="glass-light"] {
   color-scheme: light;
 }
 
@@ -1577,4 +1577,84 @@ header .top-right {
 .search-chips button:hover {
   border-color: var(--accent);
   background: var(--surface-3);
+}
+
+/* ---------- v2.43.0 3D Glass Themes (Glass Light & Glass Dark) ---------- */
+[data-theme="glass-light"] header,
+[data-theme="glass-light"] footer,
+[data-theme="glass-light"] .modal-box,
+[data-theme="glass-light"] .dash-card,
+[data-theme="glass-light"] .undo-bar,
+[data-theme="glass-light"] .suggest,
+[data-theme="glass-light"] .toast {
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border-color: rgba(255, 255, 255, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 8px 24px rgba(15, 23, 42, 0.10);
+}
+
+[data-theme="glass-light"] .bubble,
+[data-theme="glass-light"] .tx {
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+[data-theme="glass-light"] .bubble.out {
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    0 4px 14px rgba(0, 122, 99, 0.22);
+}
+
+[data-theme="glass-dark"] header,
+[data-theme="glass-dark"] footer,
+[data-theme="glass-dark"] .modal-box,
+[data-theme="glass-dark"] .dash-card,
+[data-theme="glass-dark"] .undo-bar,
+[data-theme="glass-dark"] .suggest,
+[data-theme="glass-dark"] .toast {
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 10px 28px rgba(0, 0, 0, 0.38);
+}
+
+[data-theme="glass-dark"] .bubble,
+[data-theme="glass-dark"] .tx {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    0 6px 18px rgba(0, 0, 0, 0.28);
+}
+
+[data-theme="glass-dark"] .bubble.out {
+  border-color: rgba(0, 196, 154, 0.32);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 6px 18px rgba(0, 0, 0, 0.30);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-theme="glass-light"],
+  [data-theme="glass-dark"] {
+    --surface: #f4f8fd;
+  }
+  [data-theme="glass-dark"] {
+    --surface: #13222b;
+  }
+  [data-theme="glass-light"] header,
+  [data-theme="glass-light"] footer,
+  [data-theme="glass-light"] .modal-box,
+  [data-theme="glass-dark"] header,
+  [data-theme="glass-dark"] footer,
+  [data-theme="glass-dark"] .modal-box {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }

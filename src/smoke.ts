@@ -930,17 +930,32 @@ await check("reset akun/kategori/semua + backup", async () => {
   assert.equal(dbmod.getSetting("cmd_aliases"), null, "settings direset");
 });
 
-function relativeLuminance(hex: string): number {
-  const raw = hex.replace("#", "");
-  const full =
-    raw.length === 3
-      ? raw
-          .split("")
-          .map((c) => c + c)
-          .join("")
-      : raw;
-  const rgb = [0, 2, 4].map((i) => {
-    const c = parseInt(full.slice(i, i + 2), 16) / 255;
+function relativeLuminance(color: string): number {
+  // Mendukung hex (#rgb/#rrggbb) dan rgb()/rgba() karena tema Glass memakai
+  // warna semi-transparan. Alpha diabaikan (lapisan tetap cukup pekat).
+  let parts: number[] | null = null;
+  const m = color.trim().match(/^rgba?\(([^)]+)\)$/i);
+  if (m) {
+    parts = m[1]
+      .split(",")
+      .slice(0, 3)
+      .map((x) => Number(x.trim()));
+  } else {
+    const raw = color.replace("#", "");
+    const full =
+      raw.length === 3
+        ? raw
+            .split("")
+            .map((c) => c + c)
+            .join("")
+        : raw;
+    parts = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16));
+  }
+  if (!parts || parts.some((n) => !Number.isFinite(n))) {
+    return Number.NaN;
+  }
+  const rgb = parts.map((n) => {
+    const c = n / 255;
     return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
   });
   return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];

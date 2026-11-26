@@ -4,7 +4,8 @@ export type ThemeId =
   | "teal"
   | "forest"
   | "ocean"
-  | "sky"
+  | "glass-light"
+  | "glass-dark"
   | "plum"
   | "sand"
   | "night"
@@ -133,40 +134,70 @@ export const THEMES: readonly Theme[] = [
     },
   },
   {
-    id: "sky",
-    label: "Langit",
-    wallpaper: "linear-gradient(170deg,#f4f8fd,#dbe7f5)",
-    metaColor: "#e6eef8",
+    id: "glass-light",
+    label: "Glass Light",
+    wallpaper:
+      "radial-gradient(circle at 15% 18%, rgba(56, 189, 248, 0.24), transparent 45%), " +
+      "radial-gradient(circle at 85% 82%, rgba(16, 185, 129, 0.20), transparent 48%), " +
+      "linear-gradient(160deg, #eef6fc 0%, #dcebf7 52%, #e6f4f0 100%)",
+    metaColor: "#e6f1fa",
     vars: {
-      "--bg": "#eef4fb",
-      "--app-bg": "#e6eef8",
-      "--surface": "#ffffff",
-      "--surface-2": "#f4f8fd",
-      "--surface-3": "#e8eff8",
-      "--surface-4": "#d8e3f0",
-      "--border": "#d3deeb",
-      "--text": "#0f1e2e",
-      "--muted": "#46586b",
-      "--accent": "#1f6fd0",
-      "--accent-2": "#0ea5e9",
-      "--bubble-out": "#1f6fd0",
+      "--bg": "#eaf3fa",
+      "--app-bg": "#dfedf7",
+      "--surface": "rgba(255, 255, 255, 0.72)",
+      "--surface-2": "rgba(255, 255, 255, 0.62)",
+      "--surface-3": "rgba(241, 248, 255, 0.78)",
+      "--surface-4": "rgba(219, 234, 248, 0.86)",
+      "--border": "rgba(255, 255, 255, 0.68)",
+      "--text": "#0d1b2a",
+      "--muted": "#455a6e",
+      "--accent": "#007a63",
+      "--accent-2": "#0284c7",
+      "--bubble-out": "rgba(0, 122, 99, 0.90)",
       "--bubble-out-text": "#ffffff",
       "--on-accent": "#ffffff",
       "--danger": "#d92d4a",
       "--danger-text": "#7a1424",
-      "--danger-bg": "#fde2e6",
-      "--danger-bg-hover": "#fbc9d1",
+      "--danger-bg": "rgba(253, 226, 230, 0.85)",
+      "--danger-bg-hover": "rgba(251, 201, 209, 0.92)",
       "--warning": "#b45309",
-      "--code-bg": "#eef4fb",
-      "--editor-bg": "#f7fafd",
-      "--chart-1": "#1f6fd0",
-      "--chart-2": "#0ea5e9",
+      "--code-bg": "rgba(232, 242, 252, 0.78)",
+      "--editor-bg": "rgba(255, 255, 255, 0.78)",
+      "--chart-1": "#007a63",
+      "--chart-2": "#0284c7",
       "--chart-3": "#e11d48",
       "--chart-4": "#d97706",
       "--chart-5": "#7c3aed",
       "--chart-6": "#059669",
       "--chart-7": "#ea580c",
       "--chart-8": "#c026d3",
+    },
+  },
+  {
+    id: "glass-dark",
+    label: "Glass Dark",
+    wallpaper:
+      "radial-gradient(circle at 18% 15%, rgba(0, 168, 132, 0.24), transparent 44%), " +
+      "radial-gradient(circle at 84% 85%, rgba(56, 189, 248, 0.18), transparent 46%), " +
+      "linear-gradient(160deg, #071016 0%, #0d1f26 52%, #08181a 100%)",
+    metaColor: "#081218",
+    vars: {
+      "--bg": "#081218",
+      "--app-bg": "#0b171e",
+      "--surface": "rgba(20, 35, 44, 0.68)",
+      "--surface-2": "rgba(26, 44, 55, 0.60)",
+      "--surface-3": "rgba(35, 58, 72, 0.72)",
+      "--surface-4": "rgba(48, 76, 94, 0.82)",
+      "--border": "rgba(255, 255, 255, 0.14)",
+      "--text": "#eef5f8",
+      "--muted": "#9cb3bf",
+      "--accent": "#00c49a",
+      "--accent-2": "#38bdf8",
+      "--bubble-out": "rgba(0, 118, 95, 0.78)",
+      "--bubble-out-text": "#d8fff1",
+      "--on-accent": "#051a15",
+      "--code-bg": "rgba(14, 27, 35, 0.76)",
+      "--editor-bg": "rgba(18, 32, 41, 0.78)",
     },
   },
   {

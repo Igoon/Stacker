@@ -3,6 +3,9 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.43.0]
+- **Tema 3D Glass (`Glass Light` & `Glass Dark`)**: menggantikan tema *Langit* dengan sepasang tema *glassmorphism* modern — *specular border*, bayangan lembut, dan `backdrop-filter` selektif pada elemen statis/melayang (scroll chat tetap ringan 60fps).
+- **Tema Otomatis** kini berganti antara *Glass Light* (siang 06:00-18:00) dan *Glass Dark* (malam), dengan migrasi otomatis pengaturan lama `sky` → `glass-light`.
 ## [2.42.0]
 - **Perbaikan Enter vs modal konfirmasi**: fokus tombol OK ditunda sehingga Enter yang memicu konfirmasi tidak langsung menyetujuinya (reset/restore/hapus aman kembali).
 - **Autocomplete #tag tahan balapan**: daftar tag disegarkan ulang (bounded) hingga transaksi terakhir tersimpan, dan tag langsung diingat setelah pesan terkirim.

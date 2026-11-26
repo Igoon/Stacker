@@ -1302,21 +1302,23 @@ const WALL_PRESETS: WallPreset[] = THEMES.map((theme) => ({
 const WALL_KEY = "stacker-wallpaper";
 const THEME_KEY = "stacker-theme";
 
-// "auto" = tema otomatis: terang (Langit) saat siang, Default (gelap) saat malam.
+// "auto" = tema otomatis: Glass Light saat siang, Glass Dark saat malam.
 type ThemePref = ThemeId | "auto";
-const AUTO_LIGHT_THEME: ThemeId = "sky";
+const AUTO_LIGHT_THEME: ThemeId = "glass-light";
+const AUTO_DARK_THEME: ThemeId = "glass-dark";
 const AUTO_DAY_START = 6; // 06:00
 const AUTO_DAY_END = 18; // 18:00
 
 function resolveAutoTheme(now = new Date()): ThemeId {
   const h = now.getHours();
-  return h >= AUTO_DAY_START && h < AUTO_DAY_END ? AUTO_LIGHT_THEME : DEFAULT_THEME;
+  return h >= AUTO_DAY_START && h < AUTO_DAY_END ? AUTO_LIGHT_THEME : AUTO_DARK_THEME;
 }
 
 function readTheme(): ThemePref {
   try {
     const saved = localStorage.getItem(THEME_KEY);
     if (saved === "auto") return "auto";
+    if (saved === "sky") return "glass-light";
     if (isThemeId(saved)) return saved;
   } catch {
     // localStorage diblokir; lanjut ke migrasi wallpaper.
@@ -1432,16 +1434,16 @@ function syncWallControls(w: Wall): void {
   }
 }
 
-// Tombol Otomatis: terang saat siang, default saat malam.
+// Tombol Otomatis: Glass Light saat siang, Glass Dark saat malam.
 {
   const btn = document.createElement("button");
   btn.className = "swatch";
   btn.type = "button";
   btn.dataset.preset = "auto";
   btn.textContent = "Otomatis";
-  btn.title = "Tema otomatis: terang saat siang, default saat malam";
-  btn.setAttribute("aria-label", "Tema otomatis");
-  btn.style.background = "linear-gradient(90deg,#eef4fb 50%,#111b21 50%)";
+  btn.title = "Tema otomatis: Glass Light saat siang, Glass Dark saat malam";
+  btn.setAttribute("aria-label", "Tema otomatis Glass Light & Glass Dark");
+  btn.style.background = "linear-gradient(135deg,#eaf3fa 50%,#0a1b22 50%)";
   btn.onclick = () => {
     applyTheme("auto");
     if (currentWall.kind !== "image") {
