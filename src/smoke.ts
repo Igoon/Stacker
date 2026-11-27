@@ -1253,5 +1253,15 @@ await check("import CSV: duplikat, tanggal invalid, transfer dilewati", async ()
   assert.equal(badRes.skipped, 2, "2 baris dilewati");
 });
 
+await check("dates: peringatan untuk tanggal tidak valid & tanggal masa depan", async () => {
+  const rInv = await handleMessage("2026-02-30 makan 25rb");
+  assert(rInv.txs?.length === 1, "transaksi tetap tercatat");
+  assert(rInv.text.includes("tidak valid"), "peringatan tanggal tidak valid muncul");
+  const rFut = await handleMessage("2099-01-15 makan 25rb");
+  assert(rFut.txs?.length === 1, "transaksi masa depan tetap tercatat");
+  assert(rFut.text.includes("masa depan"), "peringatan tanggal masa depan muncul");
+  await handleMessage(`hapus #${rInv.txs![0].id} #${rFut.txs![0].id}`);
+});
+
 console.log(`\n${pass} ok, ${fail} fail`);
 if (fail > 0) process.exit(1);

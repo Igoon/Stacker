@@ -1986,7 +1986,7 @@ ${latest.join("\n")}`,
   }
 
   const account = resolveAccount(raw);
-  const { results, usedAI, suggested } = await resolveTransactions(raw);
+  const { results, usedAI, suggested, dateWarning } = await resolveTransactions(raw);
   if (results.length === 0) {
     return { text: "Nominal tidak kebaca. Contoh: `makan siang 50rb`" };
   }
@@ -2026,7 +2026,8 @@ ${latest.join("\n")}`,
       : "Tercatat.";
   const warns = txs.map(budgetWarn).filter((w): w is string => !!w);
   const sugNote = suggested ? `(kategori "${suggested}" ditebak dari riwayat — ubah bila salah)` : "";
-  const body = [usedAI ? `${head}\n(diproses AI)` : head, sugNote, ...dupNotes, ...warns]
+  const dateNote = dateWarning ? `⚠️ ${dateWarning}` : "";
+  const body = [usedAI ? `${head}\n(diproses AI)` : head, dateNote, sugNote, ...dupNotes, ...warns]
     .filter(Boolean)
     .join("\n");
   return { text: body, txs: txs.map(withRupiah) };
@@ -2072,15 +2073,16 @@ function suggestFromHistory(
 
 async function resolveTransactions(
   text: string
-): Promise<{ results: ParseResult[]; usedAI: boolean; suggested: string | null }> {
+): Promise<{ results: ParseResult[]; usedAI: boolean; suggested: string | null; dateWarning?: string }> {
   const local = parseLocal(text);
+  const dateWarning = local?.dateWarning;
 
   if (local && local.confidence === "high") {
-    return { results: [local.result], usedAI: false, suggested: null };
+    return { results: [local.result], usedAI: false, suggested: null, dateWarning };
   }
 
   const multi = parseLocalMulti(text);
-  if (multi) return { results: multi.map((m) => m.result), usedAI: false, suggested: null };
+  if (multi) return { results: multi.map((m) => m.result), usedAI: false, suggested: null, dateWarning };
 
   // Kategori tak dikenal? Coba tebak dari riwayat (lokal, hemat AI).
   let suggested: string | null = null;
@@ -2091,7 +2093,7 @@ async function resolveTransactions(
       suggested = s.kategori;
       // Bila satu-satunya masalah hanya kategori, selesai tanpa AI.
       if (local.reason === "kategori tak dikenal") {
-        return { results: [local.result], usedAI: false, suggested };
+        return { results: [local.result], usedAI: false, suggested, dateWarning };
       }
     }
   }
@@ -2101,11 +2103,11 @@ async function resolveTransactions(
     if (local?.result.tanggal) {
       for (const a of ai) if (!a.tanggal) a.tanggal = local.result.tanggal;
     }
-    return { results: ai, usedAI: true, suggested: null };
+    return { results: ai, usedAI: true, suggested: null, dateWarning };
   }
 
-  if (local) return { results: [local.result], usedAI: false, suggested };
-  return { results: [], usedAI: false, suggested: null };
+  if (local) return { results: [local.result], usedAI: false, suggested, dateWarning };
+  return { results: [], usedAI: false, suggested: null, dateWarning };
 }
 
 export interface SubCandidate {

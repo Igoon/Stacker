@@ -3,6 +3,9 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.43.4]
+- **Peringatan tanggal tidak valid & masa depan (`src/dates.ts`, `src/parser.ts`, `src/bot.ts`, `src/smoke.ts`)**: `extractDate()` kini mendeteksi tanggal kalender yang tidak valid (mis. `2026-02-30`, `30 februari`, `tgl 32`) maupun tanggal di masa depan dan menampilkan peringatan eksplisit di balasan bot, sekaligus membersihkan token tanggal tak valid agar angkanya tidak salah terbaca sebagai nominal.
+
 ## [2.43.3]
 - **Penguatan Import CSV (`src/csv.ts`, `src/bot.ts`, `src/db.ts`, `src/main.ts`)**: validasi tanggal kalender ketat (tidak lagi mengganti tanggal tak valid menjadi hari ini), lewati baris `Transfer` agar tak terpecah jadi transaksi biasa, eksekusi atomik dalam satu transaksi DB (`withTransaction`), dan deteksi duplikat otomatis.
 - **Keamanan PIN, Kripto & Backup (`src/pin.ts`, `src/crypto.ts`, `src/db.ts`)**: *rate-limit* percobaan PIN salah langsung di sisi worker (5× salah → jeda 30 detik), peningkatan iterasi PBKDF2 (`BACKUP_ITER = 600.000`, `PIN_ITER = 310.000`, tetap kompatibel dengan data lama), kecualikan `ai_base_url`/`ai_model` dari file backup, serta validasi struktur tabel & transaksi sebelum `importAll()`.

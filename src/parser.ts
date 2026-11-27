@@ -14,6 +14,7 @@ export interface LocalParse {
   confidence: "high" | "low";
   reason?: string;
   explicitTipe?: boolean;
+  dateWarning?: string;
 }
 
 export const MASUK = [
@@ -182,7 +183,7 @@ function parseNumber(raw: string, suffix: string): number {
 }
 
 export function parseLocal(text: string): LocalParse | null {
-  const { tanggal, cleaned } = extractDate(text);
+  const { tanggal, cleaned, warning: dateWarning } = extractDate(text);
   const low = cleaned.toLowerCase();
   // "terima kasih" bukan kata arah pemasukan.
   const dirLow = low.replace(/\bterima\s+kasih\b/g, " ");
@@ -263,7 +264,7 @@ export function parseLocal(text: string): LocalParse | null {
   else if (ambiguous) reason = "kategori ambigu";
   else if (!kategoriKetemu && !explicitTipe) reason = "kategori tak dikenal";
 
-  return { result, confidence: reason ? "low" : "high", reason, explicitTipe };
+  return { result, confidence: reason ? "low" : "high", reason, explicitTipe, dateWarning };
 }
 
 // Beberapa transaksi dalam satu pesan tanpa AI: "parkir 5rb sama kopi 18rb",

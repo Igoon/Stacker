@@ -42,16 +42,32 @@ function shiftDays(day: number): string {
 export interface ExtractDate {
   tanggal?: string;
   cleaned: string;
+  warning?: string;
 }
 
 export function extractDate(text: string): ExtractDate {
   let s = ` ${text} `;
   let tanggal: string | undefined;
+  let warning: string | undefined;
+  const todayIso = isoLocal();
+
+  const checkFuture = (t: string): string | undefined =>
+    t > todayIso ? `Tanggal ${t} berada di masa depan.` : undefined;
 
   const iso = s.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
   if (iso) {
     const t = fromParts(Number(iso[1]), Number(iso[2]), Number(iso[3]));
-    if (t) return { tanggal: t, cleaned: s.replace(iso[0], " ").trim() };
+    if (t) {
+      return {
+        tanggal: t,
+        cleaned: s.replace(iso[0], " ").trim(),
+        warning: checkFuture(t),
+      };
+    }
+    return {
+      cleaned: s.replace(iso[0], " ").trim(),
+      warning: `Tanggal "${iso[0]}" tidak valid — dicatat sebagai hari ini.`,
+    };
   }
 
   if (/\bkemarin\b/i.test(s)) {
@@ -68,6 +84,10 @@ export function extractDate(text: string): ExtractDate {
       const t = fromParts(y, BULAN_MAP[dm[2].toLowerCase()], Number(dm[1]));
       if (t) {
         tanggal = t;
+        warning = checkFuture(t);
+        s = s.replace(dm[0], " ");
+      } else {
+        warning = `Tanggal "${dm[0].trim()}" tidak valid — dicatat sebagai hari ini.`;
         s = s.replace(dm[0], " ");
       }
     } else {
@@ -77,13 +97,17 @@ export function extractDate(text: string): ExtractDate {
         const t = fromParts(now.getFullYear(), now.getMonth() + 1, Number(tm[1]));
         if (t) {
           tanggal = t;
+          warning = checkFuture(t);
+          s = s.replace(tm[0], " ");
+        } else {
+          warning = `Tanggal "${tm[0].trim()}" tidak valid — dicatat sebagai hari ini.`;
           s = s.replace(tm[0], " ");
         }
       }
     }
   }
 
-  return { tanggal, cleaned: s.trim() };
+  return { tanggal, cleaned: s.trim(), warning };
 }
 
 export interface Period {
