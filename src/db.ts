@@ -271,6 +271,14 @@ export function countTx(): number {
   return (db.prepare(`SELECT COUNT(*) AS n FROM transactions`).get() as { n: number }).n;
 }
 
+export function countTxSince(isoDate: string): number {
+  return (
+    db
+      .prepare(`SELECT COUNT(*) AS n FROM transactions WHERE substr(created_at, 1, 10) >= ?`)
+      .get(isoDate) as { n: number }
+  ).n;
+}
+
 export function activeDaysSince(from: string): number {
   return (
     db.prepare(`SELECT COUNT(DISTINCT tanggal) AS n FROM transactions WHERE tanggal >= ?`).get(from) as {
@@ -1219,6 +1227,83 @@ export function exportAll(): string {
     settings,
   };
   return JSON.stringify({ version: 2, tables });
+}
+
+export interface BackupInspect {
+  version: number | string;
+  transactions: number;
+  accounts: number;
+  categories: number;
+  budgets: number;
+  recurring: number;
+  debts: number;
+  goals: number;
+  minDate: string | null;
+  maxDate: string | null;
+}
+
+// Periksa struktur & ringkasan isi file backup JSON tanpa menimpa data DB.
+export function inspectBackup(json: string): BackupInspect {
+  const parsed = JSON.parse(json) as { version?: unknown; tables?: unknown };
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    !parsed.tables ||
+    typeof parsed.tables !== "object" ||
+    Array.isArray(parsed.tables)
+  ) {
+    throw new Error("Format backup tidak dikenali.");
+  }
+  const t = parsed.tables as Record<string, unknown[]>;
+  const tableKeys = [
+    "accounts",
+    "transactions",
+    "categories",
+    "budgets",
+    "recurring",
+    "debts",
+    "goals",
+    "settings",
+  ];
+  for (const k of tableKeys) {
+    if (t[k] !== undefined && !Array.isArray(t[k])) {
+      throw new Error(`Struktur backup rusak: tabel "${k}" tidak valid.`);
+    }
+  }
+  let minDate: string | null = null;
+  let maxDate: string | null = null;
+  const txs = t.transactions ?? [];
+  for (const row of txs) {
+    const tx = row as Record<string, unknown>;
+    if (
+      !tx ||
+      typeof tx !== "object" ||
+      typeof tx.tanggal !== "string" ||
+      typeof tx.jumlah !== "number" ||
+      !Number.isFinite(tx.jumlah) ||
+      (tx.tipe !== "masuk" && tx.tipe !== "keluar") ||
+      typeof tx.kategori !== "string"
+    ) {
+      throw new Error("Struktur backup rusak: ada baris transaksi tidak valid.");
+    }
+    if (!minDate || tx.tanggal < minDate) minDate = tx.tanggal;
+    if (!maxDate || tx.tanggal > maxDate) maxDate = tx.tanggal;
+  }
+  return {
+    version:
+      typeof parsed.version === "number" || typeof parsed.version === "string"
+        ? parsed.version
+        : "?",
+    transactions: txs.length,
+    accounts: (t.accounts ?? []).length,
+    categories: (t.categories ?? []).length,
+    budgets: (t.budgets ?? []).length,
+    recurring: (t.recurring ?? []).length,
+    debts: (t.debts ?? []).length,
+    goals: (t.goals ?? []).length,
+    minDate,
+    maxDate,
+  };
 }
 
 export function importAll(json: string): void {

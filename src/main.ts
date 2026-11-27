@@ -997,6 +997,7 @@ async function refresh(): Promise<Record<string, unknown>> {
   if (Array.isArray(r.tagNames)) {
     cachedTagNames = (r.tagNames as string[]).map(String).filter(Boolean);
   }
+  txSinceBackup = Number(r.txSinceBackup ?? 0);
   chipsEl.hidden = txCount > 0;
   const hasUndo = !!r.canUndo;
   const hasRedo = !!r.canRedo;
@@ -1190,6 +1191,24 @@ document.getElementById("import")!.onclick = () => {
   document.getElementById("importFile")!.click();
 };
 
+document.getElementById("verifyBackupBtn")!.onclick = () => {
+  document.getElementById("verifyBackupFile")!.click();
+};
+
+document.getElementById("verifyBackupFile")!.addEventListener("change", async (e) => {
+  const inputEl = e.target as HTMLInputElement;
+  const file = inputEl.files?.[0];
+  if (!file) return;
+  if (file.size > 25 * 1024 * 1024) {
+    showToast("File backup terlalu besar (maks 25 MB).");
+    inputEl.value = "";
+    return;
+  }
+  const text = await file.text();
+  inputEl.value = "";
+  await doVerifyBackup(text);
+});
+
 document.getElementById("importCsvBtn")!.onclick = () => {
   document.getElementById("importCsvFile")!.click();
 };
@@ -1222,6 +1241,20 @@ document.getElementById("importCsvFile")!.addEventListener("change", async (e) =
     showToast(msg);
     addBubble(msg, "bot");
     void refresh();
+    if (imp > 0) {
+      const wantBkp = await askConfirm(
+        `${imp} transaksi baru saja diimpor dari CSV. Buat backup JSON sekarang supaya data aman?`,
+        { title: "Cadangkan setelah impor", okText: "Backup sekarang", danger: false }
+      );
+      if (wantBkp) {
+        const b = await call({ type: "export" });
+        saveFile(`stacker-backup-${todayStr()}.json`, b.json as string);
+        lastBackupAt = todayStr();
+        txSinceBackup = 0;
+        void call({ type: "markbackup", tanggal: lastBackupAt });
+        showToast("Backup JSON siap disimpan.");
+      }
+    }
   } else {
     showToast("Gagal import CSV: " + String(r.error ?? "format tidak dikenali"));
   }
@@ -2069,9 +2102,9 @@ const passModal = document.getElementById("passModal")!;
 const passInput = document.getElementById("passInput") as HTMLInputElement;
 const passMsg = document.getElementById("passMsg")!;
 let pendingImport: string | null = null;
-let pendingAction: "import" | "encrypt" = "import";
+let pendingAction: "import" | "encrypt" | "verify" = "import";
 
-function askPass(text: string, message?: string, action: "import" | "encrypt" = "import"): void {
+function askPass(text: string, message?: string, action: "import" | "encrypt" | "verify" = "import"): void {
   pendingImport = text;
   pendingAction = action;
   passInput.value = "";
@@ -2146,6 +2179,52 @@ async function doImport(text: string, pass?: string): Promise<void> {
   void refresh();
 }
 
+async function doVerifyBackup(text: string, pass?: string): Promise<void> {
+  const r = await call({ type: "verifybackup", json: text, pass });
+  if (r.needPass) {
+    askPass(text, "Masukkan kata sandi untuk memverifikasi file backup terenkripsi.", "verify");
+    return;
+  }
+  if (pass !== undefined && !r.ok && /kata sandi salah|file rusak/i.test(r.error ?? "")) {
+    askPass(text, r.error ?? "Kata sandi salah. Coba lagi.", "verify");
+    return;
+  }
+  const out = document.getElementById("verifyBackupResult");
+  showInfoPane(storeModal);
+  if (!r.ok || !r.info) {
+    const errMsg = "Verifikasi gagal: " + String(r.error ?? "file backup tidak valid.");
+    if (out) {
+      out.textContent = errMsg;
+      out.hidden = false;
+    }
+    showToast(errMsg);
+    return;
+  }
+  const info = r.info as {
+    version: number | string;
+    transactions: number;
+    accounts: number;
+    categories: number;
+    budgets: number;
+    recurring: number;
+    debts: number;
+    goals: number;
+    minDate: string | null;
+    maxDate: string | null;
+  };
+  const range =
+    info.minDate && info.maxDate ? ` · rentang ${info.minDate} s/d ${info.maxDate}` : "";
+  const summary =
+    `Backup valid ✓ (${r.encrypted ? "terenkripsi" : "JSON"} v${info.version}): ` +
+    `${info.transactions} transaksi, ${info.accounts} akun, ${info.categories} kategori, ` +
+    `${info.budgets} anggaran, ${info.goals} target${range}. Data perangkat tidak diubah.`;
+  if (out) {
+    out.textContent = summary;
+    out.hidden = false;
+  }
+  showToast("File backup valid ✓");
+}
+
 document.getElementById("passCancel")!.onclick = () => {
   pendingImport = null;
   pendingAction = "import";
@@ -2159,6 +2238,7 @@ document.getElementById("passOk")!.onclick = () => {
   pendingAction = "import";
   passModal.hidden = true;
   if (action === "encrypt") void doEncryptedExport(passInput.value);
+  else if (action === "verify" && text) void doVerifyBackup(text, passInput.value);
   else if (text) void doImport(text, passInput.value);
 };
 
@@ -2169,6 +2249,7 @@ passInput.addEventListener("keydown", (e) => {
 // ---------- Info, storage permanen, auto-backup folder ----------
 let appVersion = "";
 let txCount = 0;
+let txSinceBackup = 0;
 let lastBackupAt: string | null = null;
 let persisted = false;
 let folder: FolderHandle | null = null;
@@ -2538,7 +2619,7 @@ function renderInfo(): void {
     ? "PIN: aktif."
     : "PIN: nonaktif. PIN hanya mengunci tampilan — data tetap tersimpan di perangkat.";
   storeLines.textContent = [
-    `Backup terakhir: ${lastBackupAt ?? "belum pernah"}`,
+    `Backup terakhir: ${lastBackupAt ?? "belum pernah"}${txSinceBackup > 0 ? ` (${txSinceBackup} transaksi baru)` : ""}`,
     `Auto-backup: ${
       folder
         ? folder.name + (folderNeedsPermission ? " - izin perlu diperbarui" : " - aktif")

@@ -3,6 +3,11 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.45.0]
+- **Verifikasi file backup tanpa menimpa data (`src/db.ts`, `src/worker.ts`, `index.html`, `src/main.ts`)**: tombol baru **Verifikasi file backup** di **☰ → Backup & penyimpanan** memeriksa struktur JSON maupun `.enc.json` terenkripsi serta menampilkan jumlah transaksi, akun, kategori, anggaran, target, dan rentang tanggal tanpa mengubah database aktif.
+- **Pengingat backup bertingkat (7 & 30 hari) + jumlah transaksi baru**: menampilkan pengingat lembut setelah 7 hari, peringatan tegas setelah 30 hari, serta jumlah transaksi baru sejak `last_backup_at` baik di notifikasi maupun di panel Backup & penyimpanan.
+- **Pemicu pintar & panduan iOS**: menawarkan backup JSON otomatis setelah impor CSV berhasil, serta memperjelas panduan iPhone/iPad (pasang ke Home Screen + bagikan backup ke Files/iCloud Drive via Share Sheet).
+
 ## [2.44.0]
 - **Pemetaan kelompok 50/30/20 per kategori (`src/db.ts`, `src/bot/analytics.ts`, `src/bot.ts`, `index.html`, `src/main.ts`)**: kolom baru `kelompok` (`kebutuhan` / `keinginan` / `tabungan` / otomatis) di tabel `categories` dengan migrasi skema aman, pilihan **Kelompok (50/30/20)** di form **☰ → Kategori**, dan perintah chat `kategori kelompok <nama> <kebutuhan|keinginan|tabungan|auto>`.
 - **Tabungan tercatat vs sisa belum dialokasikan**: Alokasi 50/30/20 kini menghitung `Tabungan` dari kategori berkelompok `tabungan` yang benar-benar dicatat, dan menampilkan `Belum dialokasikan` secara terpisah.

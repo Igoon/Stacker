@@ -1267,5 +1267,46 @@ await check("dates: peringatan untuk tanggal tidak valid & tanggal masa depan", 
   await handleMessage(`hapus #${rInv.txs![0].id} #${rFut.txs![0].id}`);
 });
 
+await check("kategori kelompok: pemetaan 50/30/20 kustom & roundtrip backup", async () => {
+  await handleMessage("kategori tambah keluar KosKustom | koskustom");
+  await handleMessage("kategori kelompok KosKustom kebutuhan");
+  await handleMessage("kategori tambah keluar EmasKustom | emaskustom");
+  await handleMessage("kategori kelompok EmasKustom tabungan");
+
+  const t1 = await handleMessage("koskustom 500rb");
+  const t2 = await handleMessage("emaskustom 1jt");
+  const alloc = dashboardData().alloc;
+  assert(alloc.needs >= 500_000, "KosKustom masuk needs");
+  assert(alloc.savings >= 1_000_000, "EmasKustom masuk savings tercatat");
+
+  const snap = dbmod.exportAll();
+  assert(snap.includes('"kelompok":"kebutuhan"'), "kelompok ikut export backup");
+  dbmod.importAll(snap);
+  assert.equal(dbmod.getCategoryByName("KosKustom")?.kelompok, "kebutuhan", "kelompok bertahan setelah restore");
+  assert.equal(dbmod.getCategoryByName("EmasKustom")?.kelompok, "tabungan", "kelompok tabungan bertahan");
+
+  await handleMessage(`hapus #${t1.txs![0].id} #${t2.txs![0].id}`);
+  await handleMessage("kategori hapus KosKustom");
+  await handleMessage("kategori hapus EmasKustom");
+});
+
+await check("backup: inspectBackup valid & tolak file rusak tanpa ubah DB", async () => {
+  const before = count();
+  const snap = dbmod.exportAll();
+  const info = dbmod.inspectBackup(snap);
+  assert.equal(info.transactions, before, "inspectBackup hitung transaksi akurat");
+  assert(info.accounts >= 1, "inspectBackup hitung akun");
+  assert.equal(count(), before, "inspectBackup tidak mengubah DB");
+
+  let threw = false;
+  try {
+    dbmod.inspectBackup('{"version":2,"tables":{"transactions":"bukan-array"}}');
+  } catch {
+    threw = true;
+  }
+  assert(threw, "inspectBackup menolak struktur tabel rusak");
+  assert(dbmod.countTxSince("2000-01-01") >= 0, "countTxSince mengembalikan angka valid");
+});
+
 console.log(`\n${pass} ok, ${fail} fail`);
 if (fail > 0) process.exit(1);

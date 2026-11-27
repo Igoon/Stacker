@@ -11,6 +11,8 @@ import {
   listTags,
   listTx,
   countTx,
+  countTxSince,
+  inspectBackup,
   accountBalances,
   getSetting,
   setSetting,
@@ -74,6 +76,12 @@ interface EncExportMsg {
 }
 interface ImportMsg {
   type: "import";
+  id: number;
+  json: string;
+  pass?: string;
+}
+interface VerifyBackupMsg {
+  type: "verifybackup";
   id: number;
   json: string;
   pass?: string;
@@ -204,6 +212,7 @@ type InMsg =
   | ExportMsg
   | EncExportMsg
   | ImportMsg
+  | VerifyBackupMsg
   | GetAiMsg
   | SetAiMsg
   | PinCheckMsg
@@ -282,21 +291,30 @@ function state() {
     budgetNoticeShown = true;
   }
 
-  // Pengingat backup: makin lama makin penting, terutama di iOS (storage bisa
-  // dibersihkan). Cukup sekali per pembukaan app.
+  // Pengingat backup bertingkat: 7 hari (lembut), 30 hari (tegas) + jumlah
+  // transaksi baru sejak backup terakhir. Cukup sekali per pembukaan app.
   const n = countTx();
   const lastBackup = getSetting("last_backup_at");
+  const txSinceBackup = lastBackup ? countTxSince(lastBackup) : n;
   if (n > 0 && !backupNoticeShown) {
     if (!lastBackup) {
       notices.push(
-        "Belum pernah backup. Buka Info → Backup & penyimpanan (atau ketik `backup`) supaya data aman."
+        `Belum pernah backup (${n} transaksi belum dicadangkan). Buka ☰ → Backup & penyimpanan (atau ketik \`backup\`) supaya data aman.`
       );
       backupNoticeShown = true;
     } else {
       const ts = new Date(lastBackup + "T00:00:00").getTime();
       const days = Math.floor((Date.now() - ts) / 86_400_000);
-      if (Number.isFinite(days) && days >= 14) {
-        notices.push(`Backup terakhir ${days} hari lalu. Buka Info → Backup & penyimpanan atau ketik \`backup\`.`);
+      const txNote = txSinceBackup > 0 ? ` (${txSinceBackup} transaksi baru sejak itu)` : "";
+      if (Number.isFinite(days) && days >= 30) {
+        notices.push(
+          `⚠️ Backup terakhir sudah ${days} hari lalu${txNote}. Segera cadangkan lewat ☰ → Backup & penyimpanan atau ketik \`backup\`.`
+        );
+        backupNoticeShown = true;
+      } else if (Number.isFinite(days) && days >= 7) {
+        notices.push(
+          `Pengingat backup: terakhir ${days} hari lalu${txNote}. Buka ☰ → Backup & penyimpanan atau ketik \`backup\`.`
+        );
         backupNoticeShown = true;
       }
     }
@@ -340,6 +358,7 @@ function state() {
     tagNames: listTags(),
     pinSet: !!getSetting("pin_hash"),
     lastBackupAt: lastBackup,
+    txSinceBackup,
     notices,
   };
 }
@@ -545,6 +564,28 @@ async function onMessage(msg: InMsg): Promise<void> {
       try {
         const res = importCsvWithUndo(msg.csv);
         reply(msg.id, { ok: res.imported > 0, ...res, error: res.imported === 0 ? "Tidak ada baris transaksi valid di file CSV." : undefined });
+      } catch (e) {
+        reply(msg.id, { ok: false, error: (e as Error).message });
+      }
+      break;
+    }
+    case "verifybackup": {
+      try {
+        let json = msg.json;
+        const encrypted = isEncrypted(json);
+        if (encrypted) {
+          if (!msg.pass) {
+            reply(msg.id, {
+              ok: false,
+              needPass: true,
+              error: "File backup terenkripsi. Masukkan kata sandi untuk verifikasi.",
+            });
+            break;
+          }
+          json = await decryptJson(json, msg.pass);
+        }
+        const info = inspectBackup(json);
+        reply(msg.id, { ok: true, encrypted, info });
       } catch (e) {
         reply(msg.id, { ok: false, error: (e as Error).message });
       }

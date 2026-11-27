@@ -64,6 +64,7 @@
     <button id="send">&#10148;</button>
   </footer>
   <input type="file" id="importFile" accept="application/json,.json" hidden />
+  <input type="file" id="verifyBackupFile" accept="application/json,.json" hidden />
   <input type="file" id="importCsvFile" accept=".csv,text/csv" hidden />
 </div>
 
@@ -251,15 +252,17 @@
       <button id="exportCsvAll">Export transaksi ke CSV (Excel)</button>
       <button id="importCsvBtn">Import transaksi dari CSV</button>
       <button id="import">Restore dari file JSON</button>
+      <button id="verifyBackupBtn">Verifikasi file backup (tanpa menimpa)</button>
       <button id="exportEnc">Backup terenkripsi (kata sandi)</button>
       <button id="pickDir">Pilih folder auto-backup</button>
       <button id="backupNow">Backup ke folder sekarang</button>
       <button id="clearDir">Matikan auto-backup</button>
     </div>
     <p class="info-note">Restore akan mengganti seluruh data di perangkat ini (bisa dibatalkan dengan <code>undo</code>).</p>
+    <p id="verifyBackupResult" class="info-note" hidden></p>
     <p class="info-note">
       Auto-backup menulis ke folder pilihan (Chrome/Edge/Android), tanpa mengirim data. Bila browser meminta izin lagi, klik "Izinkan folder tersimpan" (folder tidak perlu dipilih ulang).
-      Di iPhone/iPad, gunakan Backup JSON (file) karena folder auto-backup tidak didukung.
+      Di iPhone/iPad, pasang ke Layar Utama (Home Screen) agar data tidak dihapus Safari, lalu gunakan Backup JSON (bagikan ke Files / iCloud Drive).
     </p>
     <div class="modal-actions">
       <button id="storeBack">Kembali</button>
