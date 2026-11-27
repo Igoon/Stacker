@@ -3,12 +3,16 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.43.1]
+- **Perbaikan akurasi parser (`src/parser.ts`)**: batas kata untuk satuan `k`/`rb`/`jt` (`5 kopi` dan `10 kg` tidak lagi terbaca ribuan), buang tanda baca penutup angka (`50.000.`), kenali pemisah ribuan sebelum dikali satuan (`1.500rb` → `1.500.000`), abaikan nomor HP/rekening diawali `0`, dan batas atas nominal aman (maks 1 triliun) beserta uji unit baru.
+- **Penguatan keamanan & ketahanan worker (`src/worker.ts`)**: status kunci `unlocked` di sisi worker saat PIN aktif, cegah `pinset` menimpa PIN yang sudah ada, status `wiped` setelah hapus total, balasan eksplisit untuk pesan tak dikenal, serta *fallback* `onmessage` dan pesan ramah saat boot gagal (mis. dua tab terbuka).
+- **Perbaikan Service Worker (`public/sw.js`)**: tangani galat `cache.put()` secara aman dan kembalikan `Response.error()` bila cache kosong dan jaringan mati.
+
 ## [2.43.0]
-- **Tema 3D Glass (`Glass Light` & `Glass Dark`)**: menggantikan tema *Langit* dengan sepasang tema *glassmorphism* modern — *specular border*, bayangan lembut, dan `backdrop-filter` selektif pada elemen statis/melayang (scroll chat tetap ringan 60fps).
-- **Tema Otomatis** kini berganti antara *Glass Light* (siang 06:00-18:00) dan *Glass Dark* (malam), dengan migrasi otomatis pengaturan lama `sky` → `glass-light`.
+- **Tema 3D Glass (`Glass Light` & `Glass Dark`)**: menggantikan tema *Langit* dengan sepasang tema *glassmorphism* modern lengkap dengan *specular border*, bayangan lembut, dan `backdrop-filter` selektif pada elemen statis/melayang (scroll chat tetap ringan 60fps).
+- **Tema Otomatis kini berganti antara `Glass Light` & `Glass Dark`**: otomatis memakai *Glass Light* saat siang (06:00–18:00) dan *Glass Dark* saat malam, serta migrasi otomatis dari pengaturan `sky` lama ke `glass-light`.
+
 ## [2.42.0]
-- **Perbaikan Enter vs modal konfirmasi**: fokus tombol OK ditunda sehingga Enter yang memicu konfirmasi tidak langsung menyetujuinya (reset/restore/hapus aman kembali).
-- **Autocomplete #tag tahan balapan**: daftar tag disegarkan ulang (bounded) hingga transaksi terakhir tersimpan, dan tag langsung diingat setelah pesan terkirim.
 - **Autocomplete `#tag` saat mengetik**: ketik `#` di kolom chat untuk memunculkan saran tag yang pernah dipakai (seperti `@akun`) sehingga input di HP lebih cepat dan bebas typo.
 - **Filter & Export CSV per `#tag` di modal Cari**: dropdown **Tag (#)** baru di modal **Cari transaksi** memungkinkan filter, edit/hapus cepat, dan export CSV khusus satu tag.
 - **Sinkronisasi penuh E2E Playwright (`e2e/app.spec.ts`)**: seluruh tes disesuaikan dengan modal kustom `#confirmModal` dan `#promptModal` serta dilengkapi uji otomatis untuk autocomplete dan filter `#tag`.

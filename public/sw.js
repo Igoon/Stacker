@@ -77,11 +77,13 @@ self.addEventListener("fetch", (e) => {
         }
         const network = fetch(req)
           .then((res) => {
-            if (res.ok) c.put(req, res.clone());
+            if (res.ok) {
+              void c.put(req, res.clone()).catch(() => undefined);
+            }
             return res;
           })
           .catch(() => hit);
-        return hit || network;
+        return hit || (await network) || Response.error();
       })
     );
     return;

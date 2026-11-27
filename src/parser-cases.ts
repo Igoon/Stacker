@@ -36,4 +36,10 @@ export const PARSER_CASES: ParserCase[] = [
   // Imbuhan tetap cocok setelah batas kanan diperketat.
   { input: "kopinya 10rb", tipe: "keluar", kategori: "Makanan", jumlah: 10_000, confidence: "high" },
   { input: "makanan 50rb", tipe: "keluar", kategori: "Makanan", jumlah: 50_000, confidence: "high" },
+  // Edge cases v2.43.1: batas kata satuan k, tanda baca penutup, ribuan+satuan, nomor HP.
+  { input: "beli 5 kopi 20rb", tipe: "keluar", kategori: "Makanan", jumlah: 20_000, confidence: "low" },
+  { input: "beras 10 kg 150rb", tipe: "keluar", kategori: "Lainnya", jumlah: 150_000, confidence: "low" },
+  { input: "makan 50.000.", tipe: "keluar", kategori: "Makanan", jumlah: 50_000, confidence: "high" },
+  { input: "gaji 1.500rb", tipe: "masuk", kategori: "Gaji", jumlah: 1_500_000, confidence: "high" },
+  { input: "pulsa 08123456789 50rb", tipe: "keluar", kategori: "Tagihan", jumlah: 50_000, confidence: "high" },
 ];

@@ -231,6 +231,8 @@ let mini: MiniDb;
 // Referensi untuk wipe bersih: tutup koneksi lalu kosongkan file OPFS.
 let dbRef: { close(): void } | null = null;
 let poolRef: { wipeFiles(): Promise<void> } | null = null;
+let unlocked = true;
+let wiped = false;
 
 async function boot(): Promise<void> {
   const sqlite3 = await (
@@ -247,6 +249,7 @@ async function boot(): Promise<void> {
   dbRef = db;
   poolRef = poolUtil;
   initDb(mini);
+  unlocked = !getSetting("pin_hash");
 }
 
 function reply(id: number, payload: unknown): void {
@@ -342,6 +345,14 @@ function state() {
 }
 
 async function onMessage(msg: InMsg): Promise<void> {
+  if (wiped) {
+    reply(msg.id, { ok: false, error: "Data sudah dihapus. Muat ulang halaman untuk mulai baru." });
+    return;
+  }
+  if (!unlocked && msg.type !== "pincheck" && msg.type !== "state") {
+    reply(msg.id, { ok: false, locked: true, error: "Aplikasi terkunci. Masukkan PIN terlebih dahulu." });
+    return;
+  }
   switch (msg.type) {
     case "chat": {
       const r = await handleMessage(msg.text);
@@ -349,6 +360,24 @@ async function onMessage(msg: InMsg): Promise<void> {
       break;
     }
     case "state":
+      if (!unlocked) {
+        reply(msg.id, {
+          ok: true,
+          locked: true,
+          version: APP_VERSION,
+          pinSet: true,
+          saldo: 0,
+          saldoRupiah: "Rp0",
+          monthMasuk: 0,
+          monthKeluar: 0,
+          txCount: 0,
+          accounts: [],
+          recentTxs: [],
+          tagNames: [],
+          notices: [],
+        });
+        break;
+      }
       reply(msg.id, state());
       break;
     case "delete": {
@@ -472,6 +501,7 @@ async function onMessage(msg: InMsg): Promise<void> {
     case "wipe": {
       // Hapus total: tutup DB dulu (WAJIB sebelum wipeFiles), lalu kosongkan
       // seluruh file OPFS SAH pool. UI akan reload dan DB dibuka ulang bersih.
+      wiped = true;
       try {
         dbRef?.close();
         dbRef = null;
@@ -479,7 +509,10 @@ async function onMessage(msg: InMsg): Promise<void> {
         poolRef = null;
         reply(msg.id, { ok: true });
       } catch (e) {
-        reply(msg.id, { ok: false, error: (e as Error).message });
+        reply(msg.id, {
+          ok: false,
+          error: `Gagal menghapus semua file lokal (${(e as Error).message}). Muat ulang halaman dan coba lagi.`,
+        });
       }
       break;
     }
@@ -514,11 +547,19 @@ async function onMessage(msg: InMsg): Promise<void> {
       break;
     }
     case "pincheck": {
-      reply(msg.id, await checkPin(msg.pin));
+      const res = await checkPin(msg.pin);
+      if (res.ok) unlocked = true;
+      reply(msg.id, res);
       break;
     }
     case "pinset": {
-      reply(msg.id, await setPin(msg.pin));
+      if (getSetting("pin_hash")) {
+        reply(msg.id, { ok: false, error: "PIN sudah aktif. Gunakan menu Ubah PIN." });
+        break;
+      }
+      const res = await setPin(msg.pin);
+      if (res.ok) unlocked = true;
+      reply(msg.id, res);
       break;
     }
     case "pinchange": {
@@ -526,7 +567,9 @@ async function onMessage(msg: InMsg): Promise<void> {
       break;
     }
     case "pindel": {
-      reply(msg.id, await removePin(msg.pin));
+      const res = await removePin(msg.pin);
+      if (res.ok) unlocked = true;
+      reply(msg.id, res);
       break;
     }
     case "getai":
@@ -543,6 +586,7 @@ async function onMessage(msg: InMsg): Promise<void> {
       break;
     }
     default:
+      reply((msg as { id: number }).id, { ok: false, error: "Perintah worker tidak dikenal." });
       break;
   }
 }
@@ -560,7 +604,16 @@ boot()
   })
   .catch((e) => {
     console.error("[worker] boot gagal:", e);
-    (self as unknown as Worker).postMessage({ id: -1, type: "error", message: (e as Error).message });
+    const rawMsg = (e as Error).message || String(e);
+    const friendly = /NoModificationAllowed|SyncAccessHandle|lock|OPFS/i.test(rawMsg)
+      ? "Tab atau jendela Stacker lain masih terbuka. Tutup tab lain lalu muat ulang halaman ini."
+      : rawMsg;
+    self.onmessage = (ev: MessageEvent<{ id?: number }>) => {
+      if (ev.data && typeof ev.data.id === "number") {
+        reply(ev.data.id, { ok: false, error: friendly });
+      }
+    };
+    (self as unknown as Worker).postMessage({ id: -1, type: "error", message: friendly });
   });
 
 export type { MiniDb };

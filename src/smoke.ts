@@ -1219,5 +1219,14 @@ await check("import CSV menambah transaksi & bisa di-undo", async () => {
   assert.equal(count(), before, "import CSV bisa dibatalkan dengan undo");
 });
 
+await check("parser: tolak nomor telepon, angka > 1T, dan batas kata k", async () => {
+  assert.equal(parseLocal("08123456789"), null, "nomor HP tanpa satuan diabaikan");
+  assert.equal(parseLocal("beli 99999999999999"), null, "angka > 1 triliun ditolak");
+  const rKopi = parseLocal("5 kopi");
+  assert.equal(rKopi?.result.jumlah, 5, "5 kopi bukan 5000");
+  const rKg = parseLocal("10 kg");
+  assert.equal(rKg?.result.jumlah, 10, "10 kg bukan 10000");
+});
+
 console.log(`\n${pass} ok, ${fail} fail`);
 if (fail > 0) process.exit(1);

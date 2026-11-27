@@ -159,16 +159,26 @@ function wordsToNumber(text: string): { value: number; matched: boolean } {
   return { value: parseIdNumber(tokens), matched: true };
 }
 
+const MAX_AMOUNT = 1_000_000_000_000; // 1 triliun
+
 function parseNumber(raw: string, suffix: string): number {
+  const clean = raw.replace(/[.,]+$/, "");
+  if (!clean) return NaN;
   const s = suffix.toLowerCase();
   const mult = MULT[s] ?? 1;
-  if (mult > 1) {
-    return Math.round(parseFloat(raw.replace(",", ".")) * mult);
+  // Abaikan nomor telepon / rekening panjang yang diawali 0 tanpa satuan.
+  if (mult === 1 && /^0\d{5,}$/.test(clean.replace(/[.,]/g, ""))) {
+    return NaN;
   }
-  if (/^\d{1,3}([.,]\d{3})+$/.test(raw)) {
-    return parseInt(raw.replace(/[.,]/g, ""), 10);
+  let base: number;
+  if (/^\d{1,3}([.,]\d{3})+$/.test(clean)) {
+    base = parseInt(clean.replace(/[.,]/g, ""), 10);
+  } else {
+    base = parseFloat(clean.replace(",", "."));
   }
-  return Math.round(parseFloat(raw.replace(",", ".")));
+  const val = Math.round(base * mult);
+  if (!Number.isSafeInteger(val) || val <= 0 || val > MAX_AMOUNT) return NaN;
+  return val;
 }
 
 export function parseLocal(text: string): LocalParse | null {
@@ -177,7 +187,7 @@ export function parseLocal(text: string): LocalParse | null {
   // "terima kasih" bukan kata arah pemasukan.
   const dirLow = low.replace(/\bterima\s+kasih\b/g, " ");
 
-  const numRe = /(\d[\d.,]*)\s*(jt|juta|rb|ribu|k)?/gi;
+  const numRe = /(\d[\d.,]*)(?:\s*(jt|juta|rb|ribu|k)(?![a-zA-Z]))?/gi;
   let found = [...cleaned.matchAll(numRe)]
     .map((m) => ({ raw: m[1], suffix: m[2] ?? "", value: parseNumber(m[1], m[2] ?? "") }))
     .filter((x) => Number.isFinite(x.value) && x.value > 0);
@@ -185,7 +195,7 @@ export function parseLocal(text: string): LocalParse | null {
   if (found.length === 0) {
     const wn = wordsToNumber(cleaned);
     // Angka kata tanpa skala ("beli dua") bukan nominal transaksi.
-    if (wn.matched && wn.value >= 1000) found = [{ raw: "", suffix: "", value: wn.value }];
+    if (wn.matched && wn.value >= 1000 && wn.value <= MAX_AMOUNT && Number.isSafeInteger(wn.value)) found = [{ raw: "", suffix: "", value: wn.value }];
   }
 
   if (found.length === 0) return null;
