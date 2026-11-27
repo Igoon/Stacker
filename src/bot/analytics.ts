@@ -4,11 +4,12 @@ import {
   activeDaysSince,
   debtTotals,
   getBudget,
-  listAll,
+  getSetting,
   listBudgets,
   ringkasRange,
   rupiah,
   saldo,
+  searchTx,
   type Budget,
   type Tx,
 } from "../db";
@@ -57,7 +58,7 @@ export function budgetOverview(): BudgetRow[] {
       const w = budgetWindow(b);
       const spent = w ? spentIn(b.kategori, w) : 0;
       const carry = budgetCarry(b);
-      const effective = budgetEffective(b);
+      const effective = Math.max(0, b.jumlah + carry);
       const pct = effective > 0 ? Math.round((spent / effective) * 100) : 0;
       return {
         kategori: b.kategori,
@@ -144,11 +145,14 @@ export function computeHealth(): Health {
   const per = parsePeriod("");
   const rows = per ? ringkasRange(per.from, per.to) : [];
   const income = rows.filter((r) => r.tipe === "masuk").reduce((a, b) => a + b.total, 0);
-  const expenses = rows.filter((r) => r.tipe === "keluar").reduce((a, b) => a + b.total, 0);
+  // Pengeluaran hidup: kecualikan kategori tabungan/investasi agar menabung tidak menurunkan skor.
+  const livingExpenses = rows
+    .filter((r) => r.tipe === "keluar" && catGroup(r.kategori) !== "savings")
+    .reduce((a, b) => a + b.total, 0);
   const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 
   // 1) Rasio tabungan (target >= 30%).
-  const rate = income > 0 ? (income - expenses) / income : 0;
+  const rate = income > 0 ? (income - livingExpenses) / income : 0;
   const savingsScore = income > 0 ? clamp((rate / 0.3) * 100) : 50;
   const savingsDetail = income > 0 ? `${Math.round(rate * 100)}% dari pemasukan` : "belum ada pemasukan";
 
@@ -164,17 +168,39 @@ export function computeHealth(): Health {
   const debtScore = clamp((1 - dti) * 100);
   const debtDetail = utang > 0 ? `utang ${rupiah(utang)}` : "tanpa utang";
 
-  // 4) Dana darurat (dalam bulan biaya).
+  // 4) Dana darurat (dalam bulan biaya: rata-rata hingga 3 bulan selesai terakhir).
+  const past3 = lastMonths(4).slice(0, 3);
+  const pastExp = past3
+    .map((p) =>
+      ringkasRange(p.from, p.to)
+        .filter((r) => r.tipe === "keluar" && catGroup(r.kategori) !== "savings")
+        .reduce((a, b) => a + b.total, 0)
+    )
+    .filter((x) => x > 0);
+  const baseExpense =
+    pastExp.length > 0
+      ? pastExp.reduce((a, b) => a + b, 0) / pastExp.length
+      : livingExpenses;
   const saldoNow = saldo();
-  const months = expenses > 0 ? saldoNow / expenses : saldoNow > 0 ? 3 : 0;
-  const bufferScore = clamp((months / 3) * 100);
-  const bufferDetail = `${months.toFixed(1)}× biaya bulanan`;
+  const hasBase = baseExpense > 0;
+  const months = hasBase ? saldoNow / baseExpense : 0;
+  const bufferScore = hasBase ? clamp((months / 3) * 100) : saldoNow > 0 ? 50 : 0;
+  const bufferDetail = hasBase ? `${months.toFixed(1)}× biaya bulanan` : "belum ada data biaya";
 
-  // 5) Konsistensi mencatat (hari aktif 30 hari terakhir).
-  const from = isoLocal(new Date(Date.now() - 29 * 86_400_000));
+  // 5) Konsistensi mencatat (memperhitungkan tanggal pertama pakai untuk pengguna baru).
+  const firstUse = getSetting("first_use_at");
+  let windowDays = 30;
+  if (firstUse) {
+    const t0 = new Date(firstUse).getTime();
+    if (Number.isFinite(t0)) {
+      const elapsed = Math.floor((Date.now() - t0) / 86_400_000) + 1;
+      if (elapsed > 0 && elapsed < 30) windowDays = elapsed;
+    }
+  }
+  const from = isoLocal(new Date(Date.now() - (windowDays - 1) * 86_400_000));
   const days = activeDaysSince(from);
-  const consistencyScore = clamp((days / 30) * 100);
-  const consistencyDetail = `${days} hari aktif/30`;
+  const consistencyScore = clamp((days / windowDays) * 100);
+  const consistencyDetail = `${days} hari aktif/${windowDays}`;
 
   const factors: HealthFactor[] = [
     { key: "savings", label: "Rasio tabungan", score: savingsScore, weight: 30, detail: savingsDetail },
@@ -237,7 +263,9 @@ export function dashboardData(periodArg = ""): {
     .filter((a) => (a.saldo ?? 0) !== 0)
     .map((a) => ({ nama: a.nama, saldo: a.saldo ?? 0 }));
   const tFrom = parsePeriod("hari ini")?.from ?? "";
-  const txsToday = tFrom ? listAll().filter((t) => t.tanggal === tFrom) : [];
+  const txsToday = tFrom
+    ? searchTx("", { from: tFrom, to: tFrom, limit: 500 }).filter((t) => !t.transfer_id)
+    : [];
   const today = {
     keluar: txsToday.filter((t) => t.tipe === "keluar").reduce((a, t) => a + t.jumlah, 0),
     masuk: txsToday.filter((t) => t.tipe === "masuk").reduce((a, t) => a + t.jumlah, 0),
@@ -260,17 +288,24 @@ export function dashboardData(periodArg = ""): {
   };
   const trend = lastMonths(6).map(monthNet);
   const trendSvg = trend.length ? buildTrendSvg(trend) : "";
-  const nets = lastMonths(3).map((p) => {
-    const m = monthNet(p);
-    return m.masuk - m.keluar;
-  });
+  // Rata-rata net 3 bulan selesai terakhir (kecualikan bulan berjalan agar tidak bias).
+  const nets = lastMonths(4)
+    .slice(0, 3)
+    .map((p) => {
+      const m = monthNet(p);
+      return m.masuk - m.keluar;
+    });
   const avg3Net = nets.length ? Math.round(nets.reduce((a, b) => a + b, 0) / nets.length) : 0;
 
-  // Proyeksi net bulan ini (run-rate dari hari yang sudah berjalan).
+  // Proyeksi net hanya untuk bulan berjalan (mulai hari ke-3 agar tidak melonjak 30x di tgl 1).
   const iso = isoLocal();
+  const curYm = iso.slice(0, 7);
   const dayN = Number(iso.slice(8, 10)) || 1;
   const dim = per ? Number(per.to.slice(8, 10)) || 31 : 31;
-  const projNet = Math.round(((masuk - keluar) / dayN) * dim);
+  const projNet =
+    ym === curYm && dayN >= 3
+      ? Math.round(((masuk - keluar) / dayN) * dim)
+      : masuk - keluar;
 
   return {
     ym,
@@ -299,14 +334,14 @@ export function budgetWarn(t: Tx): string | null {
   if (t.tipe !== "keluar") return null;
   const b = getBudget(t.kategori);
   if (!b) return null;
-  const limit = budgetEffective(b);
+  const carry = budgetCarry(b);
+  const limit = Math.max(0, b.jumlah + carry);
   if (limit <= 0) return null;
   const cur = budgetWindow(b);
   if (!cur) return null;
   const spent = spentIn(b.kategori, cur);
   const prev = spent - t.jumlah;
   const per = b.periode === "mingguan" ? "minggu ini" : "bulan ini";
-  const carry = budgetCarry(b);
   const carryNote = carry !== 0 ? ` (limit ${rupiah(limit)}, carry ${carry > 0 ? "+" : "-"}${rupiah(Math.abs(carry))})` : "";
   if (prev < limit && spent >= limit) {
     return `⚠️ Anggaran ${t.kategori} tembus ${per}: ${rupiah(spent)} / ${rupiah(limit)}${carryNote}`;

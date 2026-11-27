@@ -3,6 +3,11 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.43.2]
+- **Akurasi analitik & skor kesehatan (`src/bot/analytics.ts`)**: proyeksi bulan kini hanya aktif untuk bulan berjalan mulai hari ke-3 (mencegah lonjakan 30× di tanggal 1), kategori `Tabungan`/`Investasi` dikecualikan dari pengeluaran saat menghitung rasio tabungan, dana darurat & `avg3Net` memakai rata-rata bulan selesai, skor konsistensi adil bagi pengguna baru (`first_use_at`), ringkasan hari ini memakai `searchTx` tanpa menghitung ganda transfer, dan `budgetOverview()`/`budgetWarn()` tidak lagi menghitung `carry` dua kali.
+- **Validasi & efisiensi worker (`src/worker.ts`, `src/main.ts`)**: `state()` lebih ringan (single `budgetOverview()`, `runRecurringWithUndo()` hanya bila jatuh tempo, `budgetNoticeShown` diset sekali), validasi URL/model/key pada `setai`, batas `limit` pencarian (1–500), validasi format tanggal ISO di `markbackup` & `setfirstuse`, serta peringatan UI bila filter nominal tak terbaca atau ekspor CSV terpotong di 10.000 baris.
+- **Sinkronisasi versi, privasi & aksesibilitas (`src/version.ts`, `index.html`)**: `APP_VERSION` kini langsung membaca `package.json`, klarifikasi pengiriman teks saat AI aktif di dialog **Tentang**, atribut `role="dialog" aria-modal="true"` di semua modal, serta `autocomplete="new-password"` pada kolom sandi.
+
 ## [2.43.1]
 - **Perbaikan akurasi parser (`src/parser.ts`)**: batas kata untuk satuan `k`/`rb`/`jt` (`5 kopi` dan `10 kg` tidak lagi terbaca ribuan), buang tanda baca penutup angka (`50.000.`), kenali pemisah ribuan sebelum dikali satuan (`1.500rb` → `1.500.000`), abaikan nomor HP/rekening diawali `0`, dan batas atas nominal aman (maks 1 triliun) beserta uji unit baru.
 - **Penguatan keamanan & ketahanan worker (`src/worker.ts`)**: status kunci `unlocked` di sisi worker saat PIN aktif, cegah `pinset` menimpa PIN yang sudah ada, status `wiped` setelah hapus total, balasan eksplisit untuk pesan tak dikenal, serta *fallback* `onmessage` dan pesan ramah saat boot gagal (mis. dua tab terbuka).

@@ -1168,7 +1168,8 @@ document.getElementById("exportCsvAll")!.onclick = async () => {
   }
   const f = r.file as { name: string; content: string };
   saveFile(f.name, f.content);
-  showToast(`CSV ${Number(r.count ?? 0)} transaksi siap diunduh.`);
+  const extraWarn = r.truncated ? " (maks 10.000 baris; persempit filter untuk sisanya)" : "";
+  showToast(`CSV ${Number(r.count ?? 0)} transaksi siap diunduh${extraWarn}.`);
 };
 
 document.getElementById("exportEnc")!.onclick = () => {
@@ -1273,14 +1274,18 @@ document.getElementById("aiCancel")!.onclick = () => {
 };
 
 document.getElementById("aiSave")!.onclick = async () => {
-  aiModal.hidden = true;
-  await call({
+  const r = await call({
     type: "setai",
     provider: aiProvider.value,
     model: aiModel.value.trim(),
     baseUrl: aiBase.value.trim(),
     key: aiKey.value.trim(),
   });
+  if (!r.ok) {
+    showToast(String(r.error ?? "Pengaturan AI tidak valid."));
+    return;
+  }
+  aiModal.hidden = true;
   void refresh();
 };
 

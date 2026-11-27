@@ -260,26 +260,26 @@ let backupNoticeShown = false;
 let budgetNoticeShown = false;
 
 function state() {
-  // Catat transaksi berulang yang jatuh tempo (idempotent). Bila ada yang
-  // tercatat, kirim sebagai notice sekali ke UI.
-  const rec = runRecurringWithUndo();
+  // Catat transaksi berulang hanya bila ada yang jatuh tempo.
   const notices: string[] = [];
-  if (rec.created > 0) {
-    notices.push(`Transaksi berulang otomatis dicatat (${rec.created}):\n${rec.entries.join("\n")}`);
+  if (recurringDue()) {
+    const rec = runRecurringWithUndo();
+    if (rec.created > 0) {
+      notices.push(`Transaksi berulang otomatis dicatat (${rec.created}):\n${rec.entries.join("\n")}`);
+    }
   }
 
-  // Pengingat anggaran (sekali per pembukaan app): tembus / hampir tembus.
+  // Hitung budgetOverview sekali saja (dipakai untuk pengingat & alerts).
+  const budgets = budgetOverview();
   if (!budgetNoticeShown) {
-    const bs = budgetOverview();
-    const over = bs.filter((b) => b.pct >= 100);
-    const near = bs.filter((b) => b.pct >= 80 && b.pct < 100);
+    const over = budgets.filter((b) => b.pct >= 100);
+    const near = budgets.filter((b) => b.pct >= 80 && b.pct < 100);
     if (over.length) {
       notices.push("⚠️ Anggaran tembus: " + over.map((b) => `${b.kategori} ${b.pct}%`).join(", "));
-      budgetNoticeShown = true;
     } else if (near.length) {
       notices.push("⚠️ Anggaran hampir: " + near.map((b) => `${b.kategori} ${b.pct}%`).join(", "));
-      budgetNoticeShown = true;
     }
+    budgetNoticeShown = true;
   }
 
   // Pengingat backup: makin lama makin penting, terutama di iOS (storage bisa
@@ -321,7 +321,7 @@ function state() {
     undoCount: undoCount(),
     redoCount: redoCount(),
     firstUseAt: getSetting("first_use_at"),
-    alerts: budgetOverview().filter((b) => b.pct >= 100).length + (recurringDue() ? 1 : 0),
+    alerts: budgets.filter((b) => b.pct >= 100).length + (recurringDue() ? 1 : 0),
     saldo: curSaldo,
     saldoRupiah: rupiahSigned(curSaldo),
     monthMasuk,
@@ -408,7 +408,12 @@ async function onMessage(msg: InMsg): Promise<void> {
       break;
     }
     case "markbackup": {
-      setSetting("last_backup_at", msg.tanggal ?? isoLocal());
+      const tgl = msg.tanggal ? msg.tanggal.trim() : isoLocal();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(tgl) || Number.isNaN(new Date(tgl + "T00:00:00").getTime())) {
+        reply(msg.id, { ok: false, error: "Format tanggal backup tidak valid (gunakan YYYY-MM-DD)." });
+        break;
+      }
+      setSetting("last_backup_at", tgl);
       reply(msg.id, { ok: true });
       break;
     }
@@ -437,13 +442,20 @@ async function onMessage(msg: InMsg): Promise<void> {
       reply(msg.id, { ok: true, tags: listTags() });
       break;
     case "search": {
-      const amt = (s?: string): number | undefined => {
+      const warnings: string[] = [];
+      const amt = (s: string | undefined, label: string): number | undefined => {
         if (!s || !s.trim()) return undefined;
         const p = parseLocal(s);
-        return p ? p.result.jumlah : undefined;
+        if (!p) {
+          warnings.push(`Filter ${label} ("${s.trim()}") tidak terbaca dan diabaikan.`);
+          return undefined;
+        }
+        return p.result.jumlah;
       };
+      const safeLimit = Math.min(Math.max(1, Math.floor(Number(msg.limit) || 100)), 500);
       reply(msg.id, {
         ok: true,
+        warnings,
         results: searchTx(msg.q ?? "", {
           accountId: msg.accountId,
           from: msg.from || undefined,
@@ -451,9 +463,9 @@ async function onMessage(msg: InMsg): Promise<void> {
           kategori: msg.kategori || undefined,
           tag: msg.tag || undefined,
           tipe: msg.tipe === "masuk" || msg.tipe === "keluar" ? msg.tipe : undefined,
-          min: amt(msg.minRaw),
-          max: amt(msg.maxRaw),
-          limit: msg.limit ?? 100,
+          min: amt(msg.minRaw, "nominal min"),
+          max: amt(msg.maxRaw, "nominal maks"),
+          limit: safeLimit,
         }),
       });
       break;
@@ -462,8 +474,11 @@ async function onMessage(msg: InMsg): Promise<void> {
       reply(msg.id, { ok: true, issues: checkIntegrity() });
       break;
     case "setfirstuse": {
-      // Set hanya bila belum ada (idempotent; migrasi dari localStorage).
-      if (!getSetting("first_use_at") && msg.at) setSetting("first_use_at", msg.at);
+      // Set hanya bila belum ada dan format tanggal ISO valid.
+      const at = typeof msg.at === "string" ? msg.at.trim() : "";
+      if (!getSetting("first_use_at") && /^\d{4}-\d{2}-\d{2}/.test(at) && !Number.isNaN(new Date(at).getTime())) {
+        setSetting("first_use_at", at);
+      }
       reply(msg.id, { ok: true, firstUseAt: getSetting("first_use_at") });
       break;
     }
@@ -471,21 +486,29 @@ async function onMessage(msg: InMsg): Promise<void> {
       reply(msg.id, { ok: true, ...dashboardData(msg.period ?? "") });
       break;
     case "exportcsv": {
-      const amt = (s?: string): number | undefined => {
+      const warnings: string[] = [];
+      const amt = (s: string | undefined, label: string): number | undefined => {
         if (!s || !s.trim()) return undefined;
         const p = parseLocal(s);
-        return p ? p.result.jumlah : undefined;
+        if (!p) {
+          warnings.push(`Filter ${label} ("${s.trim()}") tidak terbaca dan diabaikan.`);
+          return undefined;
+        }
+        return p.result.jumlah;
       };
-      const rows = searchTx(msg.q ?? "", {
+      const MAX_CSV = 10000;
+      const rawRows = searchTx(msg.q ?? "", {
         accountId: msg.accountId,
         from: msg.from || undefined,
         to: msg.to || undefined,
         kategori: msg.kategori || undefined,
         tag: msg.tag || undefined,
-        min: amt(msg.minRaw),
-        max: amt(msg.maxRaw),
-        limit: 10000,
-      }).reverse();
+        min: amt(msg.minRaw, "nominal min"),
+        max: amt(msg.maxRaw, "nominal maks"),
+        limit: MAX_CSV + 1,
+      });
+      const truncated = rawRows.length > MAX_CSV;
+      const rows = (truncated ? rawRows.slice(0, MAX_CSV) : rawRows).reverse();
       if (!rows.length) {
         reply(msg.id, { ok: false, error: "Tidak ada transaksi untuk diekspor." });
         break;
@@ -494,6 +517,8 @@ async function onMessage(msg: InMsg): Promise<void> {
       reply(msg.id, {
         ok: true,
         count: rows.length,
+        truncated,
+        warnings,
         file: { name: `stacker-transaksi-${range}.csv`, content: toCSV(rows) },
       });
       break;
@@ -576,12 +601,35 @@ async function onMessage(msg: InMsg): Promise<void> {
       reply(msg.id, { ok: true, config: getAiConfig() });
       break;
     case "setai": {
-      setAiConfig({
-        provider: msg.provider === "openai" ? "openai" : "gemini",
-        model: msg.model,
-        baseUrl: msg.baseUrl,
-        key: msg.key,
-      });
+      const provider = msg.provider === "openai" ? "openai" : "gemini";
+      const model = String(msg.model ?? "").trim();
+      const baseUrl = String(msg.baseUrl ?? "").trim();
+      const key = String(msg.key ?? "").trim();
+      if (model.length > 100) {
+        reply(msg.id, { ok: false, error: "Nama model terlalu panjang (maks 100 karakter)." });
+        break;
+      }
+      if (key.length > 300) {
+        reply(msg.id, { ok: false, error: "API key terlalu panjang (maks 300 karakter)." });
+        break;
+      }
+      if (baseUrl) {
+        if (baseUrl.length > 300) {
+          reply(msg.id, { ok: false, error: "Base URL terlalu panjang (maks 300 karakter)." });
+          break;
+        }
+        try {
+          const u = new URL(baseUrl);
+          if (u.protocol !== "https:" && u.protocol !== "http:") {
+            reply(msg.id, { ok: false, error: "Base URL harus diawali http:// atau https://." });
+            break;
+          }
+        } catch {
+          reply(msg.id, { ok: false, error: "Format Base URL tidak valid." });
+          break;
+        }
+      }
+      setAiConfig({ provider, model, baseUrl, key });
       reply(msg.id, { ok: true, aiEnabled: aiEnabled(), config: getAiConfig() });
       break;
     }
