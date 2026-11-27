@@ -37,7 +37,7 @@ export const HELP =
   "  kategori tambah masuk Bunga | bunga, dividen\n" +
   "  kategori tambah keluar Sedekah | sedekah, donasi\n" +
   "  kategori sisi Sedekah keduanya\n" +
-  "  kategori kelompok Kos kebutuhan   (kebutuhan/keinginan/tabungan/auto)\n" +
+  "  kategori kelompok Kos kebutuhan   (kebutuhan/keinginan/masa-depan/auto)\n" +
   "  kategori tambahkata Sedekah | infak\n" +
   "  kategori hapuskata Sedekah | zakat\n" +
   "  kategori ubah Sedekah | sedekah, donasi, zakat\n" +

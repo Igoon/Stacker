@@ -1308,5 +1308,21 @@ await check("backup: inspectBackup valid & tolak file rusak tanpa ubah DB", asyn
   assert(dbmod.countTxSince("2000-01-01") >= 0, "countTxSince mengembalikan angka valid");
 });
 
+await check("kategori kelompok: alias masa-depan/future & auto", async () => {
+  await handleMessage("kategori tambah keluar DanaKustom | danakustom");
+  const r1 = await handleMessage("kategori kelompok DanaKustom masa-depan");
+  assert(r1.text.includes("masa depan"), "balasan memakai label masa depan");
+  assert.equal(
+    dbmod.getCategoryByName("DanaKustom")?.kelompok,
+    "tabungan",
+    "alias masa-depan dipetakan ke tabungan"
+  );
+  await handleMessage("kategori kelompok DanaKustom future");
+  assert.equal(dbmod.getCategoryByName("DanaKustom")?.kelompok, "tabungan", "alias future juga valid");
+  await handleMessage("kategori kelompok DanaKustom auto");
+  assert.equal(dbmod.getCategoryByName("DanaKustom")?.kelompok, null, "auto mengosongkan kelompok");
+  await handleMessage("kategori hapus DanaKustom");
+});
+
 console.log(`\n${pass} ok, ${fail} fail`);
 if (fail > 0) process.exit(1);

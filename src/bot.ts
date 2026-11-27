@@ -844,11 +844,11 @@ async function handleMessageInner(input: string): Promise<Reply> {
     return { text: `Ikon kategori ${cat.nama} → ${ikon ?? "(otomatis)"}.` };
   }
 
-  if ((m = text.match(/^kategori\s+kelompok\s+(.+?)\s+(\S+)\s*$/i))) {
+  if ((m = text.match(/^kategori\s+kelompok\s+(.+?)\s+(masa\s+depan|\S+)\s*$/i))) {
     const name = m[1].trim();
     const cat = getCategoryByName(name);
     if (!cat) return { text: `Kategori "${name}" tidak ada.` };
-    const rawG = m[2].toLowerCase();
+    const rawG = m[2].toLowerCase().replace(/\s+/g, "-");
     const mapG: Record<string, "kebutuhan" | "keinginan" | "tabungan" | null> = {
       kebutuhan: "kebutuhan",
       needs: "kebutuhan",
@@ -856,16 +856,20 @@ async function handleMessageInner(input: string): Promise<Reply> {
       wants: "keinginan",
       tabungan: "tabungan",
       savings: "tabungan",
+      "masa-depan": "tabungan",
+      masadepan: "tabungan",
+      future: "tabungan",
       auto: null,
       otomatis: null,
       "-": null,
     };
     if (!(rawG in mapG)) {
-      return { text: "Pilihan kelompok: `kebutuhan`, `keinginan`, `tabungan`, atau `auto`." };
+      return { text: "Pilihan kelompok: `kebutuhan`, `keinginan`, `masa-depan` (tabungan), atau `auto`." };
     }
     const kelompok = mapG[rawG];
     setCategoryGroup(cat.nama, kelompok);
-    return { text: `Kelompok kategori ${cat.nama} → ${kelompok ?? "(otomatis)"}.` };
+    const label = kelompok === "tabungan" ? "masa depan" : kelompok ?? "(otomatis)";
+    return { text: `Kelompok kategori ${cat.nama} → ${label}.` };
   }
 
   if ((m = text.match(/^kategori tambahkata\s+(.+)$/i))) {
@@ -1901,11 +1905,11 @@ ${latest.join("\n")}`,
     return {
       text:
         `Alokasi 50/30/20 (bulan ini)\nPemasukan: ${rupiah(a.income)}\n\n` +
-        row("Kebutuhan", a.needs, a.targetNeeds) + "\n" +
-        row("Keinginan", a.wants, a.targetWants) + "\n" +
-        row("Tabungan ", a.savings, a.targetSavings) + "\n" +
-        `  Sisa     ${rupiahSigned(a.unallocated)} (${pctOf(a.unallocated)}%) · belum dialokasikan\n\n` +
-        "Panduan: kebutuhan ≤50%, keinginan ≤30%, tabungan ≥20%.",
+        row("Kebutuhan ", a.needs, a.targetNeeds) + "\n" +
+        row("Keinginan ", a.wants, a.targetWants) + "\n" +
+        row("Masa Depan", a.savings, a.targetSavings) + "\n" +
+        `  Sisa       ${rupiahSigned(a.unallocated)} (${pctOf(a.unallocated)}%) · belum dialokasikan\n\n` +
+        "Panduan: kebutuhan ≤50%, keinginan ≤30%, masa depan ≥20%.",
       pre: true,
     };
   }

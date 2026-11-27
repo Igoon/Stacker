@@ -234,6 +234,7 @@ kategori tambah Sosial sosial jimpitan   (tanpa |, kata pertama = nama)
 kategori tambah masuk Bunga | bunga, dividen
 kategori tambah keluar Sedekah | sedekah, donasi
 kategori sisi Sedekah keduanya
+kategori kelompok Kos kebutuhan       → petakan 50/30/20 (kebutuhan / keinginan / masa-depan / auto)
 kategori tambahkata Sedekah | infak
 kategori hapuskata Sedekah | zakat
 kategori ubah Sedekah | sedekah, donasi, zakat

@@ -3,6 +3,9 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.45.1]
+- **Istilah "Kebutuhan • Keinginan • Masa Depan" (`index.html`, `src/main.ts`, `src/bot.ts`, `src/bot/help.ts`, `README.md`, `GUIDE.md`)**: memperjelas label kelompok 20% menjadi **Masa Depan** (mencakup tabungan, investasi, dana darurat, dan pelunasan utang) di UI, Dashboard, dan perintah `alokasi`. Perintah `kategori kelompok` kini menerima `masa-depan`, `masa depan`, `masadepan`, `future`, maupun `tabungan`/`savings` sambil menjaga kompatibilitas penuh dengan data & backup lama.
+
 ## [2.45.0]
 - **Verifikasi file backup tanpa menimpa data (`src/db.ts`, `src/worker.ts`, `index.html`, `src/main.ts`)**: tombol baru **Verifikasi file backup** di **☰ → Backup & penyimpanan** memeriksa struktur JSON maupun `.enc.json` terenkripsi serta menampilkan jumlah transaksi, akun, kategori, anggaran, target, dan rentang tanggal tanpa mengubah database aktif.
 - **Pengingat backup bertingkat (7 & 30 hari) + jumlah transaksi baru**: menampilkan pengingat lembut setelah 7 hari, peringatan tegas setelah 30 hari, serta jumlah transaksi baru sejak `last_backup_at` baik di notifikasi maupun di panel Backup & penyimpanan.

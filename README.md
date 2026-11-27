@@ -72,6 +72,7 @@ ter-deploy kalau logika rusak.
   arus kas 6`, `laporan top 10`, `laporan akun <nama>`.
 - **Grafik SVG inline** (tanpa library, tanpa data keluar): `grafik komposisi`
   (donut) dan `grafik tren 6` (bar masuk/keluar).
+- **Pemetaan Kebutuhan • Keinginan • Masa Depan per kategori**: pengguna menentukan sendiri jenis setiap kategori (kebutuhan, keinginan, atau masa depan/tabungan & investasi) sehingga perhitungan skor kesehatan keuangan dan evaluasi aturan 50/30/20 menjadi lebih akurat.
 - **Anggaran rollover + cap mingguan**: carry dari periode lalu (bisa negatif),
   periode `bulanan`/`mingguan` per kategori.
 - **Utang/piutang** ledger terpisah (tidak mengubah saldo akun).

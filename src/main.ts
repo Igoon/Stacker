@@ -2821,7 +2821,8 @@ async function refreshCatList(): Promise<void> {
     left.append(ico, nm);
     const badge = document.createElement("span");
     badge.className = "cat-badge";
-    badge.textContent = c.kelompok ? `${c.tipe} · ${c.kelompok}` : c.tipe;
+    const grpLabel = c.kelompok === "tabungan" ? "masa depan" : c.kelompok;
+    badge.textContent = grpLabel ? `${c.tipe} · ${grpLabel}` : c.tipe;
     head.append(left, badge);
     const kw = document.createElement("div");
     kw.className = "cat-kw";
@@ -3177,7 +3178,7 @@ async function renderDash(): Promise<void> {
     const rows3: [string, number, number, boolean][] = [
       ["Kebutuhan (50%)", Number(alloc.needs ?? 0), Number(alloc.targetNeeds ?? 0), true],
       ["Keinginan (30%)", Number(alloc.wants ?? 0), Number(alloc.targetWants ?? 0), true],
-      ["Tabungan (20%)", Number(alloc.savings ?? 0), Number(alloc.targetSavings ?? 0), false],
+      ["Masa Depan (20%)", Number(alloc.savings ?? 0), Number(alloc.targetSavings ?? 0), false],
     ];
     for (const [label, v, t, isLimit] of rows3) {
       const row = document.createElement("div");
