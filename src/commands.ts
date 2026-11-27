@@ -6,7 +6,7 @@ export const COMMAND_WORDS: readonly string[] = [
   "alias", "pin", "backup", "reset", "akun", "kategori", "saldo", "transfer",
   "anggaran", "berulang", "utang", "piutang", "hutang", "bayar", "target", "tag", "alokasi", "skor", "laporan",
   "ringkasan", "report", "grafik", "chart", "dashboard", "csv", "export",
-  "cari", "lihat", "riwayat", "history", "list", "ai", "versi", "version",
+  "cari", "duplikat", "lihat", "riwayat", "history", "list", "ai", "versi", "version",
   "help", "bantuan", "cls", "clear", "bersihkan",
 ];
 

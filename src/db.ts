@@ -1470,3 +1470,218 @@ export function importAll(json: string): void {
     }
   });
 }
+
+export interface DuplicateGroup {
+  key: string;
+  tanggal: string;
+  jumlah: number;
+  akun: string | null;
+  catatan: string;
+  txs: Tx[];
+}
+
+// Kelompokkan transaksi non-transfer yang identik (tanggal, nominal, akun, catatan)
+// untuk ditinjau pengguna (tidak menghapus otomatis).
+export function findDuplicateGroups(): DuplicateGroup[] {
+  const map = new Map<string, Tx[]>();
+  for (const t of listAll()) {
+    if (t.transfer_id) continue;
+    const note = (t.catatan ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+    const key = `${t.tanggal}|${t.jumlah}|${t.account_id ?? ""}|${note}`;
+    const arr = map.get(key);
+    if (arr) arr.push(t);
+    else map.set(key, [t]);
+  }
+  const out: DuplicateGroup[] = [];
+  for (const [key, txs] of map.entries()) {
+    if (txs.length < 2) continue;
+    const first = txs[0];
+    out.push({
+      key,
+      tanggal: first.tanggal,
+      jumlah: first.jumlah,
+      akun: first.akun ?? null,
+      catatan: first.catatan ?? first.kategori,
+      txs,
+    });
+  }
+  return out.sort((a, b) => (a.tanggal < b.tanggal ? 1 : a.tanggal > b.tanggal ? -1 : b.txs.length - a.txs.length));
+}
+
+// Gabung kategori sumber ke tujuan secara atomik.
+export function mergeCategory(
+  fromName: string,
+  toName: string
+): { movedTx: number; movedRec: number; from: string; to: string } {
+  const src = getCategoryByName(fromName);
+  const dst = getCategoryByName(toName);
+  if (!src) throw new Error(`Kategori "${fromName}" tidak ada.`);
+  if (!dst) throw new Error(`Kategori "${toName}" tidak ada.`);
+  if (src.id === dst.id) throw new Error("Kategori sumber dan tujuan sama.");
+
+  return db.transaction(() => {
+    const movedTx = db
+      .prepare(`UPDATE transactions SET kategori = ? WHERE lower(kategori) = lower(?)`)
+      .run(dst.nama, src.nama).changes;
+    const movedRec = db
+      .prepare(`UPDATE recurring SET kategori = ? WHERE lower(kategori) = lower(?)`)
+      .run(dst.nama, src.nama).changes;
+
+    const mergedKw = [...new Set([...dst.keywords, ...src.keywords])];
+    db.prepare(`UPDATE categories SET keywords = ? WHERE id = ?`).run(
+      JSON.stringify(mergedKw),
+      dst.id
+    );
+
+    const bSrc = getBudget(src.nama);
+    if (bSrc) {
+      const bDst = getBudget(dst.nama);
+      if (bDst) {
+        db.prepare(`DELETE FROM budgets WHERE kategori = ?`).run(bSrc.kategori);
+      } else {
+        db.prepare(`UPDATE budgets SET kategori = ? WHERE kategori = ?`).run(
+          dst.nama,
+          bSrc.kategori
+        );
+      }
+    }
+
+    db.prepare(`DELETE FROM categories WHERE id = ?`).run(src.id);
+    return { movedTx, movedRec, from: src.nama, to: dst.nama };
+  });
+}
+
+// Gabung akun sumber ke tujuan secara atomik: gabung saldo_awal, bersihkan transfer
+// internal antar keduanya, pindahkan transaksi & berulang tersisa, lalu hapus sumber.
+export function mergeAccount(
+  fromName: string,
+  toName: string
+): { movedTx: number; movedRec: number; removedInternalTransfers: number; from: string; to: string } {
+  const src = getAccountByName(fromName);
+  const dst = getAccountByName(toName);
+  if (!src) throw new Error(`Akun "${fromName}" tidak ada.`);
+  if (!dst) throw new Error(`Akun "${toName}" tidak ada.`);
+  if (src.id === dst.id) throw new Error("Akun sumber dan tujuan sama.");
+
+  return db.transaction(() => {
+    // 1. Gabungkan saldo awal sumber ke tujuan.
+    db.prepare(`UPDATE accounts SET saldo_awal = saldo_awal + ? WHERE id = ?`).run(
+      src.saldo_awal,
+      dst.id
+    );
+
+    // 2. Cari & hapus transfer internal antara src <-> dst agar tidak jadi transfer ke diri sendiri.
+    const internalTids = db
+      .prepare(
+        `SELECT transfer_id FROM transactions
+         WHERE transfer_id IS NOT NULL AND account_id IN (?, ?)
+         GROUP BY transfer_id
+         HAVING COUNT(DISTINCT account_id) = 2`
+      )
+      .all(src.id, dst.id) as { transfer_id: string }[];
+    let removedInternalTransfers = 0;
+    for (const row of internalTids) {
+      db.prepare(`DELETE FROM transactions WHERE transfer_id = ?`).run(row.transfer_id);
+      removedInternalTransfers++;
+    }
+
+    // 3. Pindahkan transaksi & berulang tersisa dari src ke dst.
+    const movedTx = db
+      .prepare(`UPDATE transactions SET account_id = ? WHERE account_id = ?`)
+      .run(dst.id, src.id).changes;
+    const movedRec = db
+      .prepare(`UPDATE recurring SET account_id = ? WHERE account_id = ?`)
+      .run(dst.id, src.id).changes;
+
+    // 4. Hapus akun sumber.
+    db.prepare(`DELETE FROM accounts WHERE id = ?`).run(src.id);
+    return { movedTx, movedRec, removedInternalTransfers, from: src.nama, to: dst.nama };
+  });
+}
+
+// Edit massal transaksi dalam satu transaksi DB.
+export function bulkUpdateTx(
+  ids: number[],
+  patch: {
+    kategori?: string;
+    account_id?: number;
+    addTag?: string;
+    removeTag?: string;
+  }
+): { updated: number; skippedTransfers: number } {
+  const uniq = [...new Set(ids.filter((n) => Number.isInteger(n) && n > 0))];
+  if (!uniq.length) return { updated: 0, skippedTransfers: 0 };
+
+  const normTag = (raw?: string): string | null => {
+    if (!raw) return null;
+    const clean = raw.trim().replace(/^#/, "");
+    if (!/^[a-zA-Z0-9_-]{2,30}$/.test(clean)) return null;
+    return "#" + clean.toLowerCase();
+  };
+  const tagAdd = normTag(patch.addTag);
+  const tagRem = normTag(patch.removeTag);
+
+  return db.transaction(() => {
+    let updated = 0;
+    let skippedTransfers = 0;
+    for (const id of uniq) {
+      const cur = getTx(id);
+      if (!cur) continue;
+      if (cur.transfer_id && (patch.kategori !== undefined || patch.account_id !== undefined)) {
+        skippedTransfers++;
+        continue;
+      }
+      const next: Partial<Pick<Tx, "kategori" | "account_id" | "catatan">> = {};
+      let dirty = false;
+
+      if (patch.kategori !== undefined && cur.kategori !== patch.kategori) {
+        next.kategori = patch.kategori;
+        dirty = true;
+      }
+      if (patch.account_id !== undefined && cur.account_id !== patch.account_id) {
+        next.account_id = patch.account_id;
+        dirty = true;
+      }
+      if (tagAdd || tagRem) {
+        let note = (cur.catatan ?? "").trim();
+        if (tagAdd) {
+          const re = new RegExp(`(?<![a-zA-Z0-9_-])${tagAdd.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![a-zA-Z0-9_-])`, "i");
+          if (!re.test(note)) {
+            note = note ? `${note} ${tagAdd}` : tagAdd;
+            dirty = true;
+          }
+        }
+        if (tagRem) {
+          const re = new RegExp(`(?<![a-zA-Z0-9_-])${tagRem.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![a-zA-Z0-9_-])`, "gi");
+          const cleaned = note.replace(re, "").replace(/\s+/g, " ").trim();
+          if (cleaned !== note) {
+            note = cleaned;
+            dirty = true;
+          }
+        }
+        if (dirty) next.catatan = note || null;
+      }
+
+      if (dirty) {
+        updateTx(id, next);
+        updated++;
+      }
+    }
+    return { updated, skippedTransfers };
+  });
+}
+
+// Hapus massal transaksi dalam satu transaksi DB.
+export function bulkDeleteTx(ids: number[]): { removed: number; ids: number[] } {
+  const uniq = [...new Set(ids.filter((n) => Number.isInteger(n) && n > 0))];
+  if (!uniq.length) return { removed: 0, ids: [] };
+  return db.transaction(() => {
+    const deleted = new Set<number>();
+    for (const id of uniq) {
+      if (deleted.has(id)) continue;
+      const res = deleteTxWithIds(id);
+      for (const x of res.ids) deleted.add(x);
+    }
+    return { removed: deleted.size, ids: [...deleted] };
+  });
+}

@@ -68,6 +68,8 @@ export const HELP =
   "  ubah 3 tanggal kemarin | ubah 3 catatan makan siang | ubah 3 kategori Makanan\n" +
   "  hapus 3\n" +
   "  hapus 24 25                 (beberapa sekaligus, boleh #24)\n" +
+  "  ubah 24 25 kategori Makanan (edit massal: kategori / akun / tag / hapustag)\n" +
+  "  kategori gabung A ke B | akun gabung A ke B | duplikat\n" +
   "  undo                        (batalkan aksi terakhir)\n" +
   "  redo | ulangi               (ulangi aksi yang dibatalkan)\n" +
   "  berulang listrik 350rb tiap 5   (auto tiap bulan)\n" +

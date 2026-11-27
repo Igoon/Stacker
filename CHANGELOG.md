@@ -3,6 +3,11 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.46.0]
+- **Edit massal transaksi & 1 langkah undo (`src/db.ts`, `src/bot.ts`, `src/worker.ts`, `index.html`, `src/main.ts`, `src/style.css`)**: mode pilih banyak (checkbox + **Pilih semua**) di modal **Cari transaksi** dengan bar aksi massal (**Kategori**, **Akun**, **#Tag**, **Hapus**) lengkap dengan pratinjau konfirmasi, plus perintah chat multi-ID (`ubah 24 25 kategori Makanan`, `ubah 24 25 akun bsi`, `ubah 24 25 tag #liburan`, `ubah 24 25 hapustag #liburan`). Seluruh operasi berjalan atomik dalam 1 transaksi DB dan dapat dibatalkan dengan 1 langkah `undo`.
+- **Gabung kategori & akun**: perintah `kategori gabung <sumber> ke <tujuan>` dan `akun gabung <sumber> ke <tujuan>` serta tombol **Gabung** di menu **Kategori** dan **Akun**. Penggabungan akun otomatis menjumlahkan `saldo_awal`, membersihkan transfer internal antar keduanya, memindahkan transaksi/berulang, dan menghapus akun sumber secara atomik.
+- **Tinjau duplikat**: deteksi grup transaksi identik (`tanggal`, `nominal`, `akun`, `catatan`) lewat tombol **Tinjau duplikat** di modal **Cari** dan perintah `duplikat` tanpa menghapus otomatis.
+
 ## [2.45.1]
 - **Istilah "Kebutuhan • Keinginan • Masa Depan" (`index.html`, `src/main.ts`, `src/bot.ts`, `src/bot/help.ts`, `README.md`, `GUIDE.md`)**: memperjelas label kelompok 20% menjadi **Masa Depan** (mencakup tabungan, investasi, dana darurat, dan pelunasan utang) di UI, Dashboard, dan perintah `alokasi`. Perintah `kategori kelompok` kini menerima `masa-depan`, `masa depan`, `masadepan`, `future`, maupun `tabungan`/`savings` sambil menjaga kompatibilitas penuh dengan data & backup lama.
 

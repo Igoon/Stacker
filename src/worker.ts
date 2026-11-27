@@ -23,6 +23,7 @@ import {
   listRecurring,
   listDebts,
   debtTotals,
+  findDuplicateGroups,
   searchTx,
   listGoals,
 } from "./db";
@@ -32,6 +33,8 @@ import {
   canUndo,
   dashboardData,
   detectSubscriptions,
+  bulkDeleteTxWithUndo,
+  bulkUpdateTxWithUndo,
   deleteTxWithUndo,
   handleMessage,
   importCsvWithUndo,
@@ -64,6 +67,18 @@ interface DeleteMsg {
   type: "delete";
   id: number;
   txId: number;
+}
+interface BulkTxMsg {
+  type: "bulktx";
+  id: number;
+  action: "kategori" | "akun" | "addtag" | "removetag" | "delete";
+  ids: number[];
+  value?: string;
+  accountId?: number;
+}
+interface DuplicatesMsg {
+  type: "duplicates";
+  id: number;
 }
 interface ExportMsg {
   type: "export";
@@ -209,6 +224,8 @@ type InMsg =
   | ChatMsg
   | StateMsg
   | DeleteMsg
+  | BulkTxMsg
+  | DuplicatesMsg
   | ExportMsg
   | EncExportMsg
   | ImportMsg
@@ -402,6 +419,58 @@ async function onMessage(msg: InMsg): Promise<void> {
     case "delete": {
       const res = deleteTxWithUndo(msg.txId);
       reply(msg.id, { ok: res.removed > 0, removed: res.removed, ids: res.ids });
+      break;
+    }
+    case "bulktx": {
+      const ids = Array.isArray(msg.ids) ? msg.ids.map(Number).filter((n) => Number.isInteger(n) && n > 0) : [];
+      if (!ids.length) {
+        reply(msg.id, { ok: false, error: "Pilih minimal 1 transaksi." });
+        break;
+      }
+      if (msg.action === "delete") {
+        const res = bulkDeleteTxWithUndo(ids);
+        reply(msg.id, { ok: res.removed > 0, removed: res.removed, ids: res.ids });
+        break;
+      }
+      if (msg.action === "kategori") {
+        const kat = String(msg.value ?? "").trim();
+        if (!kat) {
+          reply(msg.id, { ok: false, error: "Kategori wajib dipilih." });
+          break;
+        }
+        const res = bulkUpdateTxWithUndo(ids, { kategori: kat }, `ubah massal kategori (${ids.length} tx)`);
+        reply(msg.id, { ok: true, ...res });
+        break;
+      }
+      if (msg.action === "akun") {
+        const accId = Number(msg.accountId);
+        if (!Number.isInteger(accId) || accId <= 0) {
+          reply(msg.id, { ok: false, error: "Akun wajib dipilih." });
+          break;
+        }
+        const res = bulkUpdateTxWithUndo(ids, { account_id: accId }, `ubah massal akun (${ids.length} tx)`);
+        reply(msg.id, { ok: true, ...res });
+        break;
+      }
+      if (msg.action === "addtag" || msg.action === "removetag") {
+        const tag = String(msg.value ?? "").trim().replace(/^#/, "");
+        if (!/^[a-zA-Z0-9_-]{2,30}$/.test(tag)) {
+          reply(msg.id, { ok: false, error: "Format tag tidak valid (2-30 huruf/angka)." });
+          break;
+        }
+        const res = bulkUpdateTxWithUndo(
+          ids,
+          msg.action === "addtag" ? { addTag: tag } : { removeTag: tag },
+          `${msg.action === "addtag" ? "tambah" : "hapus"} tag #${tag} (${ids.length} tx)`
+        );
+        reply(msg.id, { ok: true, ...res });
+        break;
+      }
+      reply(msg.id, { ok: false, error: "Aksi massal tidak dikenal." });
+      break;
+    }
+    case "duplicates": {
+      reply(msg.id, { ok: true, groups: findDuplicateGroups() });
       break;
     }
     case "export":

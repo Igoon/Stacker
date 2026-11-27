@@ -997,7 +997,6 @@ async function refresh(): Promise<Record<string, unknown>> {
   if (Array.isArray(r.tagNames)) {
     cachedTagNames = (r.tagNames as string[]).map(String).filter(Boolean);
   }
-  txSinceBackup = Number(r.txSinceBackup ?? 0);
   chipsEl.hidden = txCount > 0;
   const hasUndo = !!r.canUndo;
   const hasRedo = !!r.canRedo;
@@ -1031,6 +1030,7 @@ async function refresh(): Promise<Record<string, unknown>> {
     // Badging API tak didukung; abaikan.
   }
   lastBackupAt = typeof r.lastBackupAt === "string" ? r.lastBackupAt : null;
+  txSinceBackup = Number(r.txSinceBackup ?? 0);
   // Notice dari worker (mis. transaksi berulang yang baru dicatat).
   // Jangan tambahkan bila layar sudah dibersihkan saat request masih berjalan.
   const notes = Array.isArray(r.notices) ? (r.notices as string[]) : [];
@@ -2151,34 +2151,6 @@ async function doEncryptedExport(pass: string): Promise<void> {
   );
 }
 
-async function doImport(text: string, pass?: string): Promise<void> {
-  if (
-    pass === undefined &&
-    !(await askConfirm(
-      `Restore akan MENGGANTI semua data di perangkat ini.\n\n${describeBackup(text)}\n\nData lama bisa dikembalikan dengan \`undo\`. Lanjut?`,
-      { title: "Restore backup", okText: "Restore" }
-    ))
-  ) {
-    return;
-  }
-  const r = await call({ type: "import", json: text, pass });
-  if (r.needPass) {
-    askPass(text);
-    return;
-  }
-  if (pass !== undefined && !r.ok && /kata sandi salah|file rusak/i.test(r.error ?? "")) {
-    askPass(text, r.error ?? "Kata sandi salah. Coba lagi.");
-    return;
-  }
-  addBubble(
-    r.ok
-      ? "Backup dimuat. Data sebelum restore bisa dikembalikan dengan ketik `undo`."
-      : "Gagal impor: " + (r.error ?? "format salah"),
-    "bot"
-  );
-  void refresh();
-}
-
 async function doVerifyBackup(text: string, pass?: string): Promise<void> {
   const r = await call({ type: "verifybackup", json: text, pass });
   if (r.needPass) {
@@ -2225,6 +2197,34 @@ async function doVerifyBackup(text: string, pass?: string): Promise<void> {
   showToast("File backup valid ✓");
 }
 
+async function doImport(text: string, pass?: string): Promise<void> {
+  if (
+    pass === undefined &&
+    !(await askConfirm(
+      `Restore akan MENGGANTI semua data di perangkat ini.\n\n${describeBackup(text)}\n\nData lama bisa dikembalikan dengan \`undo\`. Lanjut?`,
+      { title: "Restore backup", okText: "Restore" }
+    ))
+  ) {
+    return;
+  }
+  const r = await call({ type: "import", json: text, pass });
+  if (r.needPass) {
+    askPass(text);
+    return;
+  }
+  if (pass !== undefined && !r.ok && /kata sandi salah|file rusak/i.test(r.error ?? "")) {
+    askPass(text, r.error ?? "Kata sandi salah. Coba lagi.");
+    return;
+  }
+  addBubble(
+    r.ok
+      ? "Backup dimuat. Data sebelum restore bisa dikembalikan dengan ketik `undo`."
+      : "Gagal impor: " + (r.error ?? "format salah"),
+    "bot"
+  );
+  void refresh();
+}
+
 document.getElementById("passCancel")!.onclick = () => {
   pendingImport = null;
   pendingAction = "import";
@@ -2249,8 +2249,8 @@ passInput.addEventListener("keydown", (e) => {
 // ---------- Info, storage permanen, auto-backup folder ----------
 let appVersion = "";
 let txCount = 0;
-let txSinceBackup = 0;
 let lastBackupAt: string | null = null;
+let txSinceBackup = 0;
 let persisted = false;
 let folder: FolderHandle | null = null;
 let folderNeedsPermission = false;
@@ -2288,8 +2288,8 @@ const katModal = document.getElementById("katModal")!;
 const catListEl = document.getElementById("catList")!;
 const catNameEl = document.getElementById("catName") as HTMLInputElement;
 const catTipeEl = document.getElementById("catTipe") as HTMLSelectElement;
-const catKelompokEl = document.getElementById("catKelompok") as HTMLSelectElement;
 const catKwEl = document.getElementById("catKw") as HTMLInputElement;
+const catKelompokEl = document.getElementById("catKelompok") as HTMLSelectElement;
 const catIkonEl = document.getElementById("catIkon") as HTMLSelectElement;
 const catMsgEl = document.getElementById("catMsg")!;
 const budgetModal = document.getElementById("budgetModal")!;
@@ -2764,12 +2764,12 @@ document.getElementById("checkData")!.onclick = async () => {
 
 // ---------- Manajemen kategori (UI) ----------
 interface CatRow {
-  kelompok?: string | null;
   id: number;
   nama: string;
   tipe: string;
   keywords: string[];
   ikon?: string | null;
+  kelompok?: string | null;
 }
 let catNames = new Set<string>();
 
@@ -2835,8 +2835,8 @@ async function refreshCatList(): Promise<void> {
       catNameEl.value = c.nama;
       catTipeEl.value = c.tipe === "masuk" || c.tipe === "keduanya" ? c.tipe : "keluar";
       catKwEl.value = c.keywords.join(", ");
-      catIkonEl.value = c.ikon ?? "";
       catKelompokEl.value = c.kelompok ?? "";
+      catIkonEl.value = c.ikon ?? "";
       catMsgEl.hidden = true;
       catNameEl.focus();
     };
@@ -2848,7 +2848,29 @@ async function refreshCatList(): Promise<void> {
       showToast(res.text || `Kategori ${c.nama} dihapus.`);
       await refreshCatList();
     };
-    actions.append(edit, del);
+    const mergeBtn = document.createElement("button");
+    mergeBtn.textContent = "Gabung";
+    mergeBtn.onclick = async () => {
+      const ans = await askModalPrompt({
+        title: `Gabung kategori: ${c.nama}`,
+        hint: `Semua transaksi, berulang, dan kata kunci dari "${c.nama}" akan dipindah ke kategori tujuan lalu "${c.nama}" dihapus (1 langkah undo).`,
+        label: "Nama kategori tujuan",
+        placeholder: "Makanan",
+        validate: (v) => (!v.value ? "Nama kategori tujuan wajib diisi." : null),
+      });
+      if (!ans) return;
+      const ok = await askConfirm(
+        `Gabung kategori "${c.nama}" ke "${ans.value}"?
+
+Seluruh transaksi terkait akan dipindahkan dalam 1 langkah (bisa di-undo).`,
+        { title: "Konfirmasi gabung kategori", okText: "Gabung" }
+      );
+      if (!ok) return;
+      const res = await runCmd(`kategori gabung ${c.nama} ke ${ans.value}`);
+      showToast(res.text || "Kategori digabung.");
+      await refreshCatList();
+    };
+    actions.append(edit, mergeBtn, del);
     item.append(head, kw, actions);
     catListEl.appendChild(item);
   }
@@ -2864,8 +2886,8 @@ document.getElementById("catBack")!.onclick = () => showInfoPane(infoModal);
 document.getElementById("catReset")!.onclick = () => {
   catNameEl.value = "";
   catKwEl.value = "";
-  catIkonEl.value = "";
   catKelompokEl.value = "";
+  catIkonEl.value = "";
   catMsgEl.hidden = true;
 };
 document.getElementById("catSave")!.onclick = async () => {
@@ -2886,12 +2908,12 @@ document.getElementById("catSave")!.onclick = async () => {
     const r = await runCmd(`kategori tambah ${tipe} ${nama} | ${list}`);
     showToast(r.text || `Kategori ${nama} ditambah.`);
   }
-  await runCmd(`kategori ikon ${nama} ${catIkonEl.value || "auto"}`);
   await runCmd(`kategori kelompok ${nama} ${catKelompokEl.value || "auto"}`);
+  await runCmd(`kategori ikon ${nama} ${catIkonEl.value || "auto"}`);
   catNameEl.value = "";
   catKwEl.value = "";
-  catIkonEl.value = "";
   catKelompokEl.value = "";
+  catIkonEl.value = "";
   catMsgEl.hidden = true;
   await refreshCatList();
 };
@@ -3163,10 +3185,10 @@ async function renderDash(): Promise<void> {
     needs?: number;
     wants?: number;
     savings?: number;
+    unallocated?: number;
     targetNeeds?: number;
     targetWants?: number;
     targetSavings?: number;
-    unallocated?: number;
   };
   const allocIncome = Number(alloc.income ?? 0);
   if (allocIncome > 0) {
@@ -3361,7 +3383,29 @@ async function refreshAccList(): Promise<void> {
       showToast(res.text || `Akun ${a.nama} dihapus.`);
       await refreshAccList();
     };
-    actions.append(ren, adj, del);
+    const mergeBtn = document.createElement("button");
+    mergeBtn.textContent = "Gabung";
+    mergeBtn.onclick = async () => {
+      const ans = await askModalPrompt({
+        title: `Gabung akun: ${a.nama}`,
+        hint: `Saldo awal & transaksi dari "${a.nama}" akan dipindah ke akun tujuan, transfer internal dibersihkan, lalu "${a.nama}" dihapus (1 langkah undo).`,
+        label: "Nama akun tujuan",
+        placeholder: "BSI",
+        validate: (v) => (!v.value ? "Nama akun tujuan wajib diisi." : null),
+      });
+      if (!ans) return;
+      const ok = await askConfirm(
+        `Gabung akun "${a.nama}" ke "${ans.value}"?
+
+Saldo awal & transaksi akan digabung dalam 1 langkah (bisa di-undo).`,
+        { title: "Konfirmasi gabung akun", okText: "Gabung" }
+      );
+      if (!ok) return;
+      const res = await runCmd(`akun gabung ${a.nama} ke ${ans.value}`);
+      showToast(res.text || "Akun digabung.");
+      await refreshAccList();
+    };
+    actions.append(ren, adj, mergeBtn, del);
     item.append(head, saldo, actions);
     accListEl.appendChild(item);
   }
@@ -3730,6 +3774,9 @@ async function runSearch(): Promise<void> {
     minRaw: searchMinEl.value.trim() || undefined,
     maxRaw: searchMaxEl.value.trim() || undefined,
   });
+  if (Array.isArray(r.warnings) && r.warnings.length > 0) {
+    showToast(String(r.warnings[0]));
+  }
   const rows = (Array.isArray(r.results) ? r.results : []) as SearchRow[];
   searchSummaryEl.hidden = false;
   searchSummaryEl.textContent = `${rows.length} transaksi ditemukan.`;
@@ -3741,18 +3788,33 @@ async function runSearch(): Promise<void> {
     searchListEl.appendChild(empty);
     return;
   }
+  lastSearchIds = rows.map((r) => r.id);
+  syncBulkBar();
   for (const t of rows) {
     const item = document.createElement("div");
     item.className = "cat-item";
     const head = document.createElement("div");
     head.className = "cat-head";
+    const left = document.createElement("span");
+    left.className = "cat-left";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.className = "bulk-check";
+    cb.checked = selectedTxIds.has(t.id);
+    cb.setAttribute("aria-label", `Pilih transaksi #${t.id}`);
+    cb.onchange = () => {
+      if (cb.checked) selectedTxIds.add(t.id);
+      else selectedTxIds.delete(t.id);
+      syncBulkBar();
+    };
     const nm = document.createElement("span");
     nm.className = "cat-name";
     nm.textContent = `#${t.id} · ${t.kategori}`;
+    left.append(cb, nm);
     const badge = document.createElement("span");
     badge.className = "cat-badge";
     badge.textContent = t.tipe;
-    head.append(nm, badge);
+    head.append(left, badge);
     const info = document.createElement("div");
     info.className = "cat-kw";
     info.textContent =
@@ -3788,6 +3850,201 @@ async function runSearch(): Promise<void> {
     searchListEl.appendChild(item);
   }
 }
+
+const bulkBarEl = document.getElementById("bulkBar")!;
+const bulkCountEl = document.getElementById("bulkCount")!;
+const selectedTxIds = new Set<number>();
+let lastSearchIds: number[] = [];
+
+function syncBulkBar(): void {
+  const n = selectedTxIds.size;
+  bulkBarEl.hidden = n === 0;
+  bulkCountEl.textContent = `${n} dipilih`;
+}
+
+async function runDuplicatesReview(): Promise<void> {
+  selectedTxIds.clear();
+  syncBulkBar();
+  const r = await call({ type: "duplicates" });
+  const groups = (Array.isArray(r.groups) ? r.groups : []) as {
+    tanggal: string;
+    jumlah: number;
+    akun: string | null;
+    catatan: string;
+    txs: SearchRow[];
+  }[];
+  searchSummaryEl.hidden = false;
+  searchListEl.replaceChildren();
+  if (!groups.length) {
+    searchSummaryEl.textContent = "Tidak ditemukan transaksi duplikat ✓";
+    return;
+  }
+  const allRows = groups.flatMap((g) => g.txs);
+  lastSearchIds = allRows.map((x) => x.id);
+  searchSummaryEl.textContent = `${groups.length} grup berpotensi duplikat (${allRows.length} transaksi). Tinjau sebelum menghapus.`;
+  for (const g of groups) {
+    const hdr = document.createElement("p");
+    hdr.className = "info-note";
+    hdr.textContent = `Grup (${g.txs.length}×): ${g.tanggal} · ${fmtRp(g.jumlah)}${g.akun ? ` · ${g.akun}` : ""} · ${g.catatan}`;
+    searchListEl.appendChild(hdr);
+    for (const t of g.txs) {
+      const item = document.createElement("div");
+      item.className = "cat-item";
+      const head = document.createElement("div");
+      head.className = "cat-head";
+      const left = document.createElement("span");
+      left.className = "cat-left";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.className = "bulk-check";
+      cb.checked = selectedTxIds.has(t.id);
+      cb.onchange = () => {
+        if (cb.checked) selectedTxIds.add(t.id);
+        else selectedTxIds.delete(t.id);
+        syncBulkBar();
+      };
+      const nm = document.createElement("span");
+      nm.className = "cat-name";
+      nm.textContent = `#${t.id} · ${t.kategori}`;
+      left.append(cb, nm);
+      const badge = document.createElement("span");
+      badge.className = "cat-badge";
+      badge.textContent = t.tipe;
+      head.append(left, badge);
+      const info = document.createElement("div");
+      info.className = "cat-kw";
+      info.textContent = `${t.tanggal} · ${t.tipe === "masuk" ? "+" : "−"}${fmtRp(t.jumlah)}${t.akun ? ` · ${t.akun}` : ""}${t.catatan ? ` · ${t.catatan}` : ""}`;
+      const actions = document.createElement("div");
+      actions.className = "cat-actions";
+      const del = document.createElement("button");
+      del.type = "button";
+      del.textContent = "Hapus";
+      del.onclick = async () => {
+        if (!(await askConfirm(`Hapus transaksi #${t.id}?`, { title: "Hapus duplikat", okText: "Hapus" }))) return;
+        const res = await call({ type: "delete", txId: t.id });
+        const ids = Array.isArray(res.ids) ? (res.ids as number[]) : [t.id];
+        removeTxRows(ids);
+        showToast(`Transaksi #${t.id} dihapus.`);
+        void refresh();
+        await runDuplicatesReview();
+      };
+      actions.append(del);
+      item.append(head, info, actions);
+      searchListEl.appendChild(item);
+    }
+  }
+}
+
+document.getElementById("searchDupBtn")!.onclick = () => void runDuplicatesReview();
+document.getElementById("bulkAll")!.onclick = () => {
+  for (const id of lastSearchIds) selectedTxIds.add(id);
+  searchListEl.querySelectorAll<HTMLInputElement>(".bulk-check").forEach((c) => {
+    c.checked = true;
+  });
+  syncBulkBar();
+};
+document.getElementById("bulkClear")!.onclick = () => {
+  selectedTxIds.clear();
+  searchListEl.querySelectorAll<HTMLInputElement>(".bulk-check").forEach((c) => {
+    c.checked = false;
+  });
+  syncBulkBar();
+};
+document.getElementById("bulkCat")!.onclick = async () => {
+  const ids = [...selectedTxIds];
+  if (!ids.length) return;
+  const ans = await askModalPrompt({
+    title: `Ubah kategori (${ids.length} transaksi)`,
+    label: "Nama kategori tujuan",
+    placeholder: "Makanan",
+    validate: (v) => (!v.value ? "Kategori wajib diisi." : null),
+  });
+  if (!ans) return;
+  const ok = await askConfirm(
+    `Ubah kategori ${ids.length} transaksi terpilih menjadi "${ans.value}"? (1 langkah undo)`,
+    { title: "Edit massal kategori", okText: "Terapkan", danger: false }
+  );
+  if (!ok) return;
+  const r = await call({ type: "bulktx", action: "kategori", ids, value: ans.value });
+  showToast(r.ok ? `${Number(r.updated ?? 0)} transaksi diperbarui.` : String(r.error ?? "Gagal."));
+  selectedTxIds.clear();
+  syncBulkBar();
+  void refresh();
+  await runSearch();
+};
+document.getElementById("bulkAcc")!.onclick = async () => {
+  const ids = [...selectedTxIds];
+  if (!ids.length) return;
+  const aRes = await call({ type: "listacc" });
+  const accs = (Array.isArray(aRes.accounts) ? aRes.accounts : []) as AccRow[];
+  const ans = await askModalPrompt({
+    title: `Pindah akun (${ids.length} transaksi)`,
+    label: "Nama akun tujuan",
+    placeholder: accs[0]?.nama ?? "BSI",
+    validate: (v) => (!v.value ? "Nama akun wajib diisi." : null),
+  });
+  if (!ans) return;
+  const target = accs.find((a) => a.nama.toLowerCase() === ans.value.toLowerCase());
+  if (!target) {
+    showToast(`Akun "${ans.value}" tidak ditemukan.`);
+    return;
+  }
+  const ok = await askConfirm(
+    `Pindahkan ${ids.length} transaksi terpilih ke akun "${target.nama}"? (1 langkah undo)`,
+    { title: "Edit massal akun", okText: "Terapkan", danger: false }
+  );
+  if (!ok) return;
+  const r = await call({ type: "bulktx", action: "akun", ids, accountId: target.id });
+  showToast(r.ok ? `${Number(r.updated ?? 0)} transaksi dipindahkan.` : String(r.error ?? "Gagal."));
+  selectedTxIds.clear();
+  syncBulkBar();
+  void refresh();
+  await runSearch();
+};
+document.getElementById("bulkTag")!.onclick = async () => {
+  const ids = [...selectedTxIds];
+  if (!ids.length) return;
+  const ans = await askModalPrompt({
+    title: `Tambah/Hapus #tag (${ids.length} transaksi)`,
+    hint: "Awali dengan '-' untuk menghapus tag (mis. -liburan), atau tulis biasa untuk menambah (mis. liburan).",
+    label: "Tag",
+    placeholder: "#liburan",
+    validate: (v) => (!v.value ? "Tag wajib diisi." : null),
+  });
+  if (!ans) return;
+  const isRemove = ans.value.startsWith("-");
+  const cleanTag = ans.value.replace(/^[-#]+/, "");
+  const r = await call({
+    type: "bulktx",
+    action: isRemove ? "removetag" : "addtag",
+    ids,
+    value: cleanTag,
+  });
+  showToast(r.ok ? `${Number(r.updated ?? 0)} transaksi diperbarui.` : String(r.error ?? "Gagal."));
+  selectedTxIds.clear();
+  syncBulkBar();
+  void refresh();
+  await runSearch();
+};
+document.getElementById("bulkDel")!.onclick = async () => {
+  const ids = [...selectedTxIds];
+  if (!ids.length) return;
+  const ok = await askConfirm(
+    `Hapus ${ids.length} transaksi terpilih sekaligus?
+
+Semua perubahan bisa dibatalkan dengan 1 langkah \`undo\`.`,
+    { title: "Hapus massal", okText: `Hapus ${ids.length} tx` }
+  );
+  if (!ok) return;
+  const r = await call({ type: "bulktx", action: "delete", ids });
+  const delIds = Array.isArray(r.ids) ? (r.ids as number[]) : ids;
+  removeTxRows(delIds);
+  showToast(`${Number(r.removed ?? 0)} transaksi dihapus. Ketik undo untuk batalkan.`);
+  selectedTxIds.clear();
+  syncBulkBar();
+  void refresh();
+  await runSearch();
+};
 
 document.getElementById("openSearch")!.onclick = async () => {
   showInfoPane(searchModal);

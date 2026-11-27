@@ -15,7 +15,12 @@ import {
   deleteCategory,
   deleteDebt,
   deleteRecurring,
+  bulkDeleteTx,
+  bulkUpdateTx,
   deleteTxWithIds,
+  findDuplicateGroups,
+  mergeAccount,
+  mergeCategory,
   dailySeries,
   getAccountByName,
   getBudget,
@@ -428,6 +433,30 @@ export function deleteTxWithUndo(id: number): { removed: number; ids: number[] }
   return res;
 }
 
+export function bulkUpdateTxWithUndo(
+  ids: number[],
+  patch: { kategori?: string; account_id?: number; addTag?: string; removeTag?: string },
+  label: string
+): { updated: number; skippedTransfers: number } {
+  const before = currentState();
+  const res = bulkUpdateTx(ids, patch);
+  if (res.updated > 0) {
+    pushUndo(before, label);
+    rememberSnapshot(exportJson());
+  }
+  return res;
+}
+
+export function bulkDeleteTxWithUndo(ids: number[]): { removed: number; ids: number[] } {
+  const before = currentState();
+  const res = bulkDeleteTx(ids);
+  if (res.removed > 0) {
+    pushUndo(before, `hapus massal (${res.removed} tx)`);
+    rememberSnapshot(exportJson());
+  }
+  return res;
+}
+
 // Import transaksi dari CSV secara atomik dengan pencegahan duplikat (bisa di-undo).
 export function importCsvWithUndo(csvText: string): {
   imported: number;
@@ -792,6 +821,23 @@ async function handleMessageInner(input: string): Promise<Reply> {
     return { text: `Akun ${lama} → ${baru}.` };
   }
 
+  if ((m = text.match(/^akun\s+gabung\s+(.+?)\s+(?:ke|->|→)\s+(.+)$/i))) {
+    try {
+      const res = mergeAccount(m[1].trim(), m[2].trim());
+      const parts = [
+        `Akun ${res.from} digabung ke ${res.to} (${res.movedTx} transaksi dipindah).`,
+      ];
+      if (res.movedRec > 0) parts.push(`${res.movedRec} berulang ikut dipindah.`);
+      if (res.removedInternalTransfers > 0) {
+        parts.push(`${res.removedInternalTransfers} transfer internal antar keduanya dibersihkan.`);
+      }
+      parts.push("Ketik `undo` untuk batalkan.");
+      return { text: parts.join(" ") };
+    } catch (e) {
+      return { text: (e as Error).message };
+    }
+  }
+
   if ((m = text.match(/^akun hapus\s+(.+)$/i))) {
     const acc = getAccountByName(m[1]);
     if (!acc) return { text: `Akun "${m[1]}" tidak ada.` };
@@ -1004,6 +1050,20 @@ async function handleMessageInner(input: string): Promise<Reply> {
     if (nameConflict) return { text: `Nama kategori ditolak: "${baru}" ${nameConflict}.` };
     renameCategory(cat.id, baru);
     return { text: `Kategori ${lama} → ${baru}. Riwayat transaksi & anggaran ikut diganti.` };
+  }
+
+  if ((m = text.match(/^kategori\s+gabung\s+(.+?)\s+(?:ke|->|→)\s+(.+)$/i))) {
+    try {
+      const res = mergeCategory(m[1].trim(), m[2].trim());
+      return {
+        text:
+          `Kategori ${res.from} digabung ke ${res.to} (${res.movedTx} transaksi` +
+          (res.movedRec > 0 ? `, ${res.movedRec} berulang` : "") +
+          ` dipindah). Ketik \`undo\` untuk batalkan.`,
+      };
+    } catch (e) {
+      return { text: (e as Error).message };
+    }
   }
 
   if ((m = text.match(/^kategori ubah\s+(.+)$/i))) {
@@ -1359,7 +1419,24 @@ ${latest.join("\n")}`,
     };
   }
 
-  if (/^cari\b/.test(low)) {
+  if (low === "duplikat" || low === "cari duplikat" || low === "cek duplikat") {
+    const groups = findDuplicateGroups();
+    if (!groups.length) {
+      return { text: "Tidak ditemukan transaksi duplikat ✓" };
+    }
+    const lines = groups.slice(0, 15).map((g, i) => {
+      const ids = g.txs.map((t) => `#${t.id}`).join(", ");
+      return `  ${i + 1}. ${g.tanggal} · ${rupiah(g.jumlah)}${g.akun ? ` · ${g.akun}` : ""} · ${g.catatan} (${g.txs.length}×: ${ids})`;
+    });
+    return {
+      text:
+        `Ditemukan ${groups.length} grup berpotensi duplikat (tinjau dulu sebelum hapus):\n` +
+        lines.join("\n") +
+        `\n\nHapus salah satu dengan \`hapus #id\` atau buka 🔍 Cari → Tinjau duplikat.`,
+    };
+  }
+
+    if (/^cari\b/.test(low)) {
     const arg = text.replace(/^\s*cari\s*/i, "").trim();
     const { account, per, query } = parseFilter(arg);
     let q = query;
@@ -1420,7 +1497,49 @@ ${latest.join("\n")}`,
     return { text: parts.join("\n"), removedIds: [...deletedIds] };
   }
 
-  if ((m = low.match(/^ubah\s+#?(\d+)\s+akun\s+(.+)$/))) {
+  if ((m = text.match(/^ubah\s+((?:#?\d+(?:[\s,]+#?\d+)+))\s+(kategori|akun|tag|hapustag)\s+(.+)$/i))) {
+    const ids = m[1]
+      .split(/[\s,]+/)
+      .map((s) => Number(s.replace(/^#/, "")))
+      .filter((n) => Number.isInteger(n) && n > 0);
+    const field = m[2].toLowerCase();
+    const val = m[3].trim();
+    if (field === "kategori") {
+      const cat = getCategoryByName(val);
+      if (!cat) return { text: `Kategori "${val}" tidak ada. Lihat: \`kategori\`` };
+      const res = bulkUpdateTx(ids, { kategori: cat.nama });
+      return {
+        text:
+          `${res.updated} transaksi dipindah ke kategori ${cat.nama}.` +
+          (res.skippedTransfers ? ` (${res.skippedTransfers} transfer dilewati)` : "") +
+          " Ketik `undo` untuk batalkan.",
+      };
+    }
+    if (field === "akun") {
+      const acc = getAccountByName(val);
+      if (!acc) return { text: `Akun "${val}" tidak ada. Lihat: \`akun\`` };
+      const res = bulkUpdateTx(ids, { account_id: acc.id });
+      return {
+        text:
+          `${res.updated} transaksi dipindah ke akun ${acc.nama}.` +
+          (res.skippedTransfers ? ` (${res.skippedTransfers} transfer dilewati)` : "") +
+          " Ketik `undo` untuk batalkan.",
+      };
+    }
+    if (field === "tag" || field === "hapustag") {
+      const clean = val.replace(/^#/, "");
+      if (!/^[a-zA-Z0-9_-]{2,30}$/.test(clean)) {
+        return { text: "Format tag tidak valid. Contoh: `#liburan` (2-30 huruf/angka)." };
+      }
+      const res = bulkUpdateTx(ids, field === "tag" ? { addTag: clean } : { removeTag: clean });
+      return {
+        text:
+          `${res.updated} transaksi diperbarui (${field === "tag" ? "+" : "-"}#${clean.toLowerCase()}). Ketik \`undo\` untuk batalkan.`,
+      };
+    }
+  }
+
+    if ((m = low.match(/^ubah\s+#?(\d+)\s+akun\s+(.+)$/))) {
     const id = Number(m[1]);
     const cur = getTx(id);
     if (!cur) return { text: `Id ${id} tidak ada.` };

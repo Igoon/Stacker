@@ -513,9 +513,19 @@
       </div>
       <div class="info-actions row-actions">
         <button id="searchRun" type="button">Cari</button>
+        <button id="searchDupBtn" type="button">Tinjau duplikat</button>
         <button id="searchExportCsv" type="button">Export CSV</button>
         <button id="searchResetForm" type="button">Reset</button>
       </div>
+    </div>
+    <div id="bulkBar" class="bulk-bar" hidden>
+      <span id="bulkCount" class="bulk-count">0 dipilih</span>
+      <button id="bulkAll" type="button">Pilih semua</button>
+      <button id="bulkCat" type="button">Kategori</button>
+      <button id="bulkAcc" type="button">Akun</button>
+      <button id="bulkTag" type="button">#Tag</button>
+      <button id="bulkDel" type="button" class="danger">Hapus</button>
+      <button id="bulkClear" type="button">Batal</button>
     </div>
     <p id="searchSummary" class="info-note" hidden></p>
     <div id="searchList" class="cat-list"></div>

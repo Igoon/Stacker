@@ -1324,5 +1324,56 @@ await check("kategori kelompok: alias masa-depan/future & auto", async () => {
   await handleMessage("kategori hapus DanaKustom");
 });
 
+await check("edit massal (multi-ID ubah), gabung kategori/akun, & duplikat (1 langkah undo)", async () => {
+  const t1 = (await handleMessage("kopi massal 20rb bsi")).txs![0];
+  const t2 = (await handleMessage("kopi massal 20rb bsi")).txs![0];
+
+  // Deteksi duplikat (tanpa hapus otomatis)
+  const dups = dbmod.findDuplicateGroups();
+  assert(dups.some((g) => g.txs.length >= 2 && g.jumlah === 20_000), "grup duplikat terdeteksi");
+  const dupCmd = await handleMessage("duplikat");
+  assert(dupCmd.text.includes("berpotensi duplikat"), "perintah duplikat tampil");
+
+  // Multi-ID ubah kategori & tag (1 langkah undo)
+  const uCat = await handleMessage(`ubah #${t1.id} #${t2.id} kategori Belanja`);
+  assert(uCat.text.includes("2 transaksi"), "multi-ID ubah kategori");
+  assert.equal(dbmod.getTx(t1.id)!.kategori, "Belanja");
+  assert.equal(dbmod.getTx(t2.id)!.kategori, "Belanja");
+  await handleMessage("undo");
+  assert.equal(dbmod.getTx(t1.id)!.kategori, "Makanan", "undo 1 langkah kembalikan 2 tx");
+
+  await handleMessage(`ubah ${t1.id} ${t2.id} tag #batch`);
+  assert(dbmod.getTx(t1.id)!.catatan?.includes("#batch"), "tag massal ditambahkan");
+  await handleMessage(`ubah ${t1.id} ${t2.id} hapustag #batch`);
+  assert(!dbmod.getTx(t1.id)!.catatan?.includes("#batch"), "tag massal dihapus");
+
+  // Gabung kategori
+  await handleMessage("kategori tambah keluar SrcKat | srckat");
+  const tKat = (await handleMessage("srckat 15rb")).txs![0];
+  const mKat = await handleMessage("kategori gabung SrcKat ke Makanan");
+  assert(mKat.text.includes("digabung"), "gabung kategori sukses");
+  assert.equal(dbmod.getCategoryByName("SrcKat"), undefined, "kategori sumber terhapus");
+  assert.equal(dbmod.getTx(tKat.id)!.kategori, "Makanan", "tx kategori sumber pindah");
+  await handleMessage("undo");
+  assert(dbmod.getCategoryByName("SrcKat"), "undo kembalikan kategori sumber");
+
+  // Gabung akun (saldo awal + transfer internal)
+  await handleMessage("akun tambah SrcAcc bank saldo 100rb");
+  await handleMessage("akun tambah DstAcc bank saldo 200rb");
+  await handleMessage("transfer 50rb SrcAcc ke DstAcc");
+  const mAcc = await handleMessage("akun gabung SrcAcc ke DstAcc");
+  assert(mAcc.text.includes("digabung"), "gabung akun sukses");
+  assert.equal(dbmod.getAccountByName("SrcAcc"), undefined, "akun sumber terhapus");
+  assert.equal(dbmod.accountBalance(dbmod.getAccountByName("DstAcc")!.id), 300_000, "saldo gabungan utuh 300rb");
+  await handleMessage("undo");
+  assert(dbmod.getAccountByName("SrcAcc"), "undo kembalikan akun sumber");
+
+  // Bersihkan data uji
+  await handleMessage(`hapus #${t1.id} #${t2.id} #${tKat.id}`);
+  await handleMessage("kategori hapus SrcKat");
+  await handleMessage("akun hapus SrcAcc");
+  await handleMessage("akun hapus DstAcc");
+});
+
 console.log(`\n${pass} ok, ${fail} fail`);
 if (fail > 0) process.exit(1);
