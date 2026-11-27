@@ -229,6 +229,7 @@ test("menu Reset data menjalankan reset transaksi", async ({ page }) => {
   await expect(page.locator("#chat .tx")).toHaveCount(1);
 
   await page.locator("#info").click();
+  await page.locator("#openStorage").click();
   await page.locator("#openReset").click();
   await page.locator("#resetTxBtn").click();
   await confirmOk(page);
@@ -858,19 +859,23 @@ test("Hapus semua data ada di Reset data, bukan Keamanan", async ({ page }) => {
   await page.locator("#openSecurity").click();
   await expect(page.locator("#wipeData")).toBeHidden();
   await page.locator("#secBack").click();
+  await page.locator("#openStorage").click();
   await page.locator("#openReset").click();
   await expect(page.locator("#wipeData")).toBeVisible();
   await page.locator("#resetBack").click();
+  await page.locator("#storeBack").click();
 });
 
 test("Periksa data & toggle bunyi pengingat", async ({ page }) => {
   await boot(page);
   await page.locator("#info").click();
+  await page.locator("#openStorage").click();
   await page.locator("#openReset").click();
   await page.locator("#checkData").click();
   await expect(page.locator("#checkResult")).toContainText("tidak ada masalah");
   await expect(page.locator("#resetModal")).toBeVisible();
   await page.locator("#resetBack").click();
+  await page.locator("#storeBack").click();
 
   await page.locator("#openWall").click();
   await expect(page.locator("#soundNotice")).toBeChecked();
@@ -974,6 +979,7 @@ test("hapus semua data membersihkan storage dan mereset app", async ({ page }) =
   );
 
   await page.locator("#info").click();
+  await page.locator("#openStorage").click();
   await page.locator("#openReset").click();
   await page.locator("#wipeData").click();
   await confirmOk(page);
@@ -993,6 +999,7 @@ test("hapus semua data wajib PIN bila PIN aktif", async ({ page }) => {
   await expect(page.locator("#lock")).toBeHidden();
 
   await page.locator("#info").click();
+  await page.locator("#openStorage").click();
   await page.locator("#openReset").click();
   await page.locator("#wipeData").click();
   await confirmOk(page);

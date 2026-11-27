@@ -3,6 +3,11 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.46.1]
+- **Penyederhanaan struktur menu ☰ (`index.html`, `src/main.ts`, `e2e/app.spec.ts`)**: menu dikelompokkan lebih ringkas menjadi **Keuangan** (Akun, Kategori), **Perencanaan** (Anggaran, Target, Berulang), **Kewajiban** (Utang/Piutang, Langganan), **Pengaturan** (Keamanan & PIN, Backup & Penyimpanan, Tema & Tampilan, AI), dan **Informasi** (Tentang).
+- **Reset data dipindah ke dalam Backup & Penyimpanan**: mendorong pengguna melihat opsi backup sebelum mereset data; tombol **Kembali** di Reset data kini kembali ke Backup & Penyimpanan.
+- **Halaman Tentang disatukan**: tombol **Periksa pembaruan** dan **Pasang aplikasi** kini berada di dalam modal **Tentang** bersama info versi, build, dan lisensi.
+
 ## [2.46.0]
 - **Edit massal transaksi & 1 langkah undo (`src/db.ts`, `src/bot.ts`, `src/worker.ts`, `index.html`, `src/main.ts`, `src/style.css`)**: mode pilih banyak (checkbox + **Pilih semua**) di modal **Cari transaksi** dengan bar aksi massal (**Kategori**, **Akun**, **#Tag**, **Hapus**) lengkap dengan pratinjau konfirmasi, plus perintah chat multi-ID (`ubah 24 25 kategori Makanan`, `ubah 24 25 akun bsi`, `ubah 24 25 tag #liburan`, `ubah 24 25 hapustag #liburan`). Seluruh operasi berjalan atomik dalam 1 transaksi DB dan dapat dibatalkan dengan 1 langkah `undo`.
 - **Gabung kategori & akun**: perintah `kategori gabung <sumber> ke <tujuan>` dan `akun gabung <sumber> ke <tujuan>` serta tombol **Gabung** di menu **Kategori** dan **Akun**. Penggabungan akun otomatis menjumlahkan `saldo_awal`, membersihkan transfer internal antar keduanya, memindahkan transaksi/berulang, dan menghapus akun sumber secara atomik.

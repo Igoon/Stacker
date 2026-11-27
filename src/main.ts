@@ -2694,7 +2694,7 @@ document.getElementById("openReset")!.onclick = () => {
 document.getElementById("secBack")!.onclick = () => showInfoPane(infoModal);
 document.getElementById("storeBack")!.onclick = () => showInfoPane(infoModal);
 document.getElementById("aboutBack")!.onclick = () => showInfoPane(infoModal);
-document.getElementById("resetBack")!.onclick = () => showInfoPane(infoModal);
+document.getElementById("resetBack")!.onclick = () => showInfoPane(storeModal);
 
 const { askConfirm, closeConfirmModal, askModalPrompt, closePromptModal } =
   createDialogController(async () => {

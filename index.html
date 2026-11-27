@@ -181,22 +181,21 @@
       <button id="openDash" class="menu-row"><span>Ringkasan</span><span class="chev">›</span></button>
       <button id="openSearch" class="menu-row"><span>Cari</span><span class="chev">›</span></button>
       <div class="menu-head">Keuangan</div>
-      <button id="openCat" class="menu-row"><span>Kategori</span><span class="chev">›</span></button>
       <button id="openAcc" class="menu-row"><span>Akun</span><span class="chev">›</span></button>
+      <button id="openCat" class="menu-row"><span>Kategori</span><span class="chev">›</span></button>
+      <div class="menu-head">Perencanaan</div>
       <button id="openBudget" class="menu-row"><span>Anggaran</span><span class="chev">›</span></button>
       <button id="openGoal" class="menu-row"><span>Target</span><span class="chev">›</span></button>
       <button id="openRec" class="menu-row"><span>Berulang</span><span class="chev">›</span></button>
+      <div class="menu-head">Kewajiban</div>
       <button id="openDebt" class="menu-row"><span>Utang/Piutang</span><span class="chev">›</span></button>
       <button id="openSubs" class="menu-row"><span>Langganan</span><span class="chev">›</span></button>
       <div class="menu-head">Pengaturan</div>
       <button id="openSecurity" class="menu-row"><span>Keamanan &amp; PIN</span><span class="chev">›</span></button>
       <button id="openStorage" class="menu-row"><span>Backup &amp; penyimpanan</span><span id="storageWarn" class="menu-warn" hidden>Perlu izin</span><span class="chev">›</span></button>
       <button id="openWall" class="menu-row"><span>Tema &amp; tampilan</span><span class="chev">›</span></button>
-      <button id="openAI" class="menu-row"><span>AI (opsional)</span><span class="chev">›</span></button>
-      <button id="openReset" class="menu-row"><span>Reset data</span><span class="chev">›</span></button>
-      <button id="installApp" class="menu-row" hidden><span>Pasang aplikasi</span><span class="chev">›</span></button>
-      <div class="menu-head">Lainnya</div>
-      <button id="checkUpdate" class="menu-row"><span>Periksa pembaruan</span><span class="chev">›</span></button>
+      <button id="openAI" class="menu-row"><span>AI</span><span class="chev">›</span></button>
+      <div class="menu-head">Informasi</div>
       <button id="openAbout" class="menu-row"><span>Tentang</span><span class="chev">›</span></button>
     </div>
     <div class="modal-actions">
@@ -257,6 +256,7 @@
       <button id="pickDir">Pilih folder auto-backup</button>
       <button id="backupNow">Backup ke folder sekarang</button>
       <button id="clearDir">Matikan auto-backup</button>
+      <button id="openReset" class="danger">Reset data &amp; periksa integritas…</button>
     </div>
     <p class="info-note">Restore akan mengganti seluruh data di perangkat ini (bisa dibatalkan dengan <code>undo</code>).</p>
     <p id="verifyBackupResult" class="info-note" hidden></p>
@@ -274,6 +274,10 @@
   <div class="modal-box">
     <h3>Tentang Stacker</h3>
     <div id="aboutLines" class="info-lines"></div>
+    <div class="info-actions">
+      <button id="checkUpdate">Periksa pembaruan</button>
+      <button id="installApp" hidden>Pasang aplikasi</button>
+    </div>
     <div class="about">
       <p>
         Pencatat keuangan lewat chat. Data tersimpan lokal di perangkat — tanpa
