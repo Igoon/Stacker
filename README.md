@@ -1,5 +1,7 @@
 # Stacker — Mobile (PWA)
 
+[![Gemini Audit Score](https://img.shields.io/badge/Gemini%20Audit-9.6%2F10%20(v2.46.1)-00a884?style=flat-square&logo=googlegemini&logoColor=white)](CHANGELOG.md)
+
 Versi gadget bernama **Stacker** (dari project desktop Duit Bot). Berjalan penuh di browser, data tersimpan **lokal
 per perangkat** lewat SQLite WASM + OPFS. Tanpa server, tanpa Telegram, tanpa
 API key bawaan.
