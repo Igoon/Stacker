@@ -1128,7 +1128,11 @@ await check("alokasi 50/30/20: hitung kelompok & konsistensi", async () => {
   assert(a.income >= 10_000_000, "income terhitung");
   assert(a.needs >= 3_000_000, "needs (Makanan) terhitung");
   assert(a.wants >= 1_000_000, "wants (Hiburan) terhitung");
-  assert.equal(a.savings, a.income - a.needs - a.wants, "savings = income - needs - wants");
+  assert.equal(
+    a.unallocated,
+    a.income - a.needs - a.wants - a.savings,
+    "unallocated = income - needs - wants - savings"
+  );
   assert.equal(a.targetNeeds, Math.round(a.income * 0.5), "target needs 50%");
 });
 

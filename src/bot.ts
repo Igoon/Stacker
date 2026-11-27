@@ -53,6 +53,7 @@ import {
   setAccountSaldoAwal,
   setBudget,
   setCategoryTipe,
+  setCategoryGroup,
   setCategoryIcon,
   setSetting,
   totalChanges,
@@ -841,6 +842,30 @@ async function handleMessageInner(input: string): Promise<Reply> {
     const ikon = id === "auto" || id === "otomatis" || id === "-" ? null : id;
     setCategoryIcon(cat.nama, ikon);
     return { text: `Ikon kategori ${cat.nama} → ${ikon ?? "(otomatis)"}.` };
+  }
+
+  if ((m = text.match(/^kategori\s+kelompok\s+(.+?)\s+(\S+)\s*$/i))) {
+    const name = m[1].trim();
+    const cat = getCategoryByName(name);
+    if (!cat) return { text: `Kategori "${name}" tidak ada.` };
+    const rawG = m[2].toLowerCase();
+    const mapG: Record<string, "kebutuhan" | "keinginan" | "tabungan" | null> = {
+      kebutuhan: "kebutuhan",
+      needs: "kebutuhan",
+      keinginan: "keinginan",
+      wants: "keinginan",
+      tabungan: "tabungan",
+      savings: "tabungan",
+      auto: null,
+      otomatis: null,
+      "-": null,
+    };
+    if (!(rawG in mapG)) {
+      return { text: "Pilihan kelompok: `kebutuhan`, `keinginan`, `tabungan`, atau `auto`." };
+    }
+    const kelompok = mapG[rawG];
+    setCategoryGroup(cat.nama, kelompok);
+    return { text: `Kelompok kategori ${cat.nama} → ${kelompok ?? "(otomatis)"}.` };
   }
 
   if ((m = text.match(/^kategori tambahkata\s+(.+)$/i))) {
@@ -1878,7 +1903,8 @@ ${latest.join("\n")}`,
         `Alokasi 50/30/20 (bulan ini)\nPemasukan: ${rupiah(a.income)}\n\n` +
         row("Kebutuhan", a.needs, a.targetNeeds) + "\n" +
         row("Keinginan", a.wants, a.targetWants) + "\n" +
-        row("Tabungan ", a.savings, a.targetSavings) + "\n\n" +
+        row("Tabungan ", a.savings, a.targetSavings) + "\n" +
+        `  Sisa     ${rupiahSigned(a.unallocated)} (${pctOf(a.unallocated)}%) · belum dialokasikan\n\n` +
         "Panduan: kebutuhan ≤50%, keinginan ≤30%, tabungan ≥20%.",
       pre: true,
     };

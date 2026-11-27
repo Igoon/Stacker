@@ -3,6 +3,11 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.44.0]
+- **Pemetaan kelompok 50/30/20 per kategori (`src/db.ts`, `src/bot/analytics.ts`, `src/bot.ts`, `index.html`, `src/main.ts`)**: kolom baru `kelompok` (`kebutuhan` / `keinginan` / `tabungan` / otomatis) di tabel `categories` dengan migrasi skema aman, pilihan **Kelompok (50/30/20)** di form **☰ → Kategori**, dan perintah chat `kategori kelompok <nama> <kebutuhan|keinginan|tabungan|auto>`.
+- **Tabungan tercatat vs sisa belum dialokasikan**: Alokasi 50/30/20 kini menghitung `Tabungan` dari kategori berkelompok `tabungan` yang benar-benar dicatat, dan menampilkan `Belum dialokasikan` secara terpisah.
+- **Kompatibel penuh dengan backup/restore & skor kesehatan**: `kelompok` ikut disimpan di backup JSON (backup lama otomatis jatuh ke mode otomatis), serta kategori `tabungan` kustom otomatis dikecualikan dari pengeluaran hidup di **Skor Kesehatan Finansial**.
+
 ## [2.43.4]
 - **Peringatan tanggal tidak valid & masa depan (`src/dates.ts`, `src/parser.ts`, `src/bot.ts`, `src/smoke.ts`)**: `extractDate()` kini mendeteksi tanggal kalender yang tidak valid (mis. `2026-02-30`, `30 februari`, `tgl 32`) maupun tanggal di masa depan dan menampilkan peringatan eksplisit di balasan bot, sekaligus membersihkan token tanggal tak valid agar angkanya tidak salah terbaca sebagai nominal.
 

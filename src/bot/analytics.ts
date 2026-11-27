@@ -6,6 +6,7 @@ import {
   getBudget,
   getSetting,
   listBudgets,
+  listCategories,
   ringkasRange,
   rupiah,
   saldo,
@@ -88,38 +89,60 @@ export interface Alloc {
   needs: number;
   wants: number;
   savings: number;
+  unallocated: number;
   targetNeeds: number;
   targetWants: number;
   targetSavings: number;
 }
 
-// Klasifikasi kategori ke kelompok 50/30/20 (berdasar nama kategori umum).
-function catGroup(nama: string): "needs" | "wants" | "savings" {
+function buildGroupMap(): Map<string, "needs" | "wants" | "savings"> {
+  const map = new Map<string, "needs" | "wants" | "savings">();
+  for (const c of listCategories()) {
+    if (c.kelompok === "kebutuhan") map.set(c.nama.toLowerCase().trim(), "needs");
+    else if (c.kelompok === "keinginan") map.set(c.nama.toLowerCase().trim(), "wants");
+    else if (c.kelompok === "tabungan") map.set(c.nama.toLowerCase().trim(), "savings");
+  }
+  return map;
+}
+
+// Klasifikasi kategori ke kelompok 50/30/20: prioritaskan kolom `kelompok` di DB,
+// lalu fallback ke heuristik nama kategori umum bila belum diatur.
+function catGroup(
+  nama: string,
+  groupMap?: Map<string, "needs" | "wants" | "savings">
+): "needs" | "wants" | "savings" {
   const n = nama.toLowerCase().trim();
+  const explicit = groupMap?.get(n);
+  if (explicit) return explicit;
   if (ALLOC_SAVINGS.has(n)) return "savings";
   if (ALLOC_NEEDS.has(n)) return "needs";
   return "wants";
 }
 
 // Panduan 50/30/20 dari pemasukan bulan berjalan (transfer dikecualikan).
+// `savings` = tabungan/investasi yang benar-benar tercatat; `unallocated` = sisa pemasukan.
 export function computeAlloc(periodArg = ""): Alloc {
   const per = parsePeriod(periodArg) ?? parsePeriod("");
   const rows = per ? ringkasRange(per.from, per.to) : [];
+  const groupMap = buildGroupMap();
   const income = rows.filter((r) => r.tipe === "masuk").reduce((a, b) => a + b.total, 0);
   let needs = 0;
   let wants = 0;
+  let savings = 0;
   for (const r of rows) {
     if (r.tipe !== "keluar") continue;
-    const g = catGroup(r.kategori);
+    const g = catGroup(r.kategori, groupMap);
     if (g === "needs") needs += r.total;
-    else if (g === "wants") wants += r.total;
+    else if (g === "savings") savings += r.total;
+    else wants += r.total;
   }
-  const savings = income - needs - wants;
+  const unallocated = income - needs - wants - savings;
   return {
     income,
     needs,
     wants,
     savings,
+    unallocated,
     targetNeeds: Math.round(income * 0.5),
     targetWants: Math.round(income * 0.3),
     targetSavings: Math.round(income * 0.2),
@@ -144,10 +167,11 @@ export interface Health {
 export function computeHealth(): Health {
   const per = parsePeriod("");
   const rows = per ? ringkasRange(per.from, per.to) : [];
+  const groupMap = buildGroupMap();
   const income = rows.filter((r) => r.tipe === "masuk").reduce((a, b) => a + b.total, 0);
   // Pengeluaran hidup: kecualikan kategori tabungan/investasi agar menabung tidak menurunkan skor.
   const livingExpenses = rows
-    .filter((r) => r.tipe === "keluar" && catGroup(r.kategori) !== "savings")
+    .filter((r) => r.tipe === "keluar" && catGroup(r.kategori, groupMap) !== "savings")
     .reduce((a, b) => a + b.total, 0);
   const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 
@@ -173,7 +197,7 @@ export function computeHealth(): Health {
   const pastExp = past3
     .map((p) =>
       ringkasRange(p.from, p.to)
-        .filter((r) => r.tipe === "keluar" && catGroup(r.kategori) !== "savings")
+        .filter((r) => r.tipe === "keluar" && catGroup(r.kategori, groupMap) !== "savings")
         .reduce((a, b) => a + b.total, 0)
     )
     .filter((x) => x > 0);

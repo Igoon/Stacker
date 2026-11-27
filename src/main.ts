@@ -2207,6 +2207,7 @@ const katModal = document.getElementById("katModal")!;
 const catListEl = document.getElementById("catList")!;
 const catNameEl = document.getElementById("catName") as HTMLInputElement;
 const catTipeEl = document.getElementById("catTipe") as HTMLSelectElement;
+const catKelompokEl = document.getElementById("catKelompok") as HTMLSelectElement;
 const catKwEl = document.getElementById("catKw") as HTMLInputElement;
 const catIkonEl = document.getElementById("catIkon") as HTMLSelectElement;
 const catMsgEl = document.getElementById("catMsg")!;
@@ -2682,6 +2683,7 @@ document.getElementById("checkData")!.onclick = async () => {
 
 // ---------- Manajemen kategori (UI) ----------
 interface CatRow {
+  kelompok?: string | null;
   id: number;
   nama: string;
   tipe: string;
@@ -2738,7 +2740,7 @@ async function refreshCatList(): Promise<void> {
     left.append(ico, nm);
     const badge = document.createElement("span");
     badge.className = "cat-badge";
-    badge.textContent = c.tipe;
+    badge.textContent = c.kelompok ? `${c.tipe} · ${c.kelompok}` : c.tipe;
     head.append(left, badge);
     const kw = document.createElement("div");
     kw.className = "cat-kw";
@@ -2752,6 +2754,7 @@ async function refreshCatList(): Promise<void> {
       catTipeEl.value = c.tipe === "masuk" || c.tipe === "keduanya" ? c.tipe : "keluar";
       catKwEl.value = c.keywords.join(", ");
       catIkonEl.value = c.ikon ?? "";
+      catKelompokEl.value = c.kelompok ?? "";
       catMsgEl.hidden = true;
       catNameEl.focus();
     };
@@ -2780,6 +2783,7 @@ document.getElementById("catReset")!.onclick = () => {
   catNameEl.value = "";
   catKwEl.value = "";
   catIkonEl.value = "";
+  catKelompokEl.value = "";
   catMsgEl.hidden = true;
 };
 document.getElementById("catSave")!.onclick = async () => {
@@ -2801,9 +2805,11 @@ document.getElementById("catSave")!.onclick = async () => {
     showToast(r.text || `Kategori ${nama} ditambah.`);
   }
   await runCmd(`kategori ikon ${nama} ${catIkonEl.value || "auto"}`);
+  await runCmd(`kategori kelompok ${nama} ${catKelompokEl.value || "auto"}`);
   catNameEl.value = "";
   catKwEl.value = "";
   catIkonEl.value = "";
+  catKelompokEl.value = "";
   catMsgEl.hidden = true;
   await refreshCatList();
 };
@@ -3078,6 +3084,7 @@ async function renderDash(): Promise<void> {
     targetNeeds?: number;
     targetWants?: number;
     targetSavings?: number;
+    unallocated?: number;
   };
   const allocIncome = Number(alloc.income ?? 0);
   if (allocIncome > 0) {
@@ -3108,6 +3115,16 @@ async function renderDash(): Promise<void> {
       bar.appendChild(fill);
       list.append(row, bar);
     }
+    const unalloc = Number(alloc.unallocated ?? 0);
+    const uRow = document.createElement("div");
+    uRow.className = "dr";
+    const uA = document.createElement("span");
+    uA.textContent = "Belum dialokasikan";
+    const uB = document.createElement("span");
+    const uPct = allocIncome > 0 ? Math.round((unalloc / allocIncome) * 100) : 0;
+    uB.textContent = `${signed(unalloc)} (${uPct}%)`;
+    uRow.append(uA, uB);
+    list.appendChild(uRow);
     dashBodyEl.append(title, list);
   }
 

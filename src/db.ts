@@ -132,6 +132,9 @@ CREATE INDEX IF NOT EXISTS idx_rec_account ON recurring(account_id);
   if (!hasColumn("categories", "ikon")) {
     db.exec(`ALTER TABLE categories ADD COLUMN ikon TEXT`);
   }
+  if (!hasColumn("categories", "kelompok")) {
+    db.exec(`ALTER TABLE categories ADD COLUMN kelompok TEXT`);
+  }
   if (!hasColumn("budgets", "periode")) {
     db.exec(`ALTER TABLE budgets ADD COLUMN periode TEXT NOT NULL DEFAULT 'bulanan'`);
   }
@@ -191,12 +194,15 @@ export interface Account {
   rupiah?: string;
 }
 
+export type CategoryGroup = "kebutuhan" | "keinginan" | "tabungan";
+
 export interface Category {
   id: number;
   nama: string;
   keywords: string[];
   tipe: string;
   ikon: string | null;
+  kelompok: CategoryGroup | null;
   created_at: string;
 }
 
@@ -546,13 +552,14 @@ export function listAccounts(): Account[] {
 
 export function listCategories(tipe?: "masuk" | "keluar"): Category[] {
   const rows = db
-    .prepare(`SELECT id, nama, keywords, tipe, ikon, created_at FROM categories ORDER BY id ASC`)
+    .prepare(`SELECT id, nama, keywords, tipe, ikon, kelompok, created_at FROM categories ORDER BY id ASC`)
     .all() as {
     id: number;
     nama: string;
     keywords: string;
     tipe: string;
     ikon: string | null;
+    kelompok: CategoryGroup | null;
     created_at: string;
   }[];
   const cats = rows.map((r) => {
@@ -587,6 +594,7 @@ export function addCategory(nama: string, keywords: string[], tipe = "keluar"): 
     keywords,
     tipe,
     ikon: null,
+    kelompok: null,
     created_at: new Date().toISOString(),
   };
 }
@@ -629,6 +637,13 @@ export function renameCategory(id: number, nama: string): void {
 
 export function setCategoryIcon(nama: string, ikon: string | null): void {
   db.prepare(`UPDATE categories SET ikon = ? WHERE lower(nama) = lower(?)`).run(ikon, nama.trim());
+}
+
+export function setCategoryGroup(nama: string, kelompok: CategoryGroup | null): void {
+  db.prepare(`UPDATE categories SET kelompok = ? WHERE lower(nama) = lower(?)`).run(
+    kelompok,
+    nama.trim()
+  );
 }
 
 export function getAccountByName(nama: string): Account | undefined {
@@ -1195,7 +1210,7 @@ export function exportAll(): string {
     accounts: listAccounts(),
     transactions: db.prepare(`SELECT * FROM transactions ORDER BY id ASC`).all() as unknown[],
     categories: db
-      .prepare(`SELECT id, nama, keywords, tipe, ikon, created_at FROM categories ORDER BY id ASC`)
+      .prepare(`SELECT id, nama, keywords, tipe, ikon, kelompok, created_at FROM categories ORDER BY id ASC`)
       .all() as unknown[],
     budgets: listBudgets(),
     recurring: listRecurring(),
@@ -1257,7 +1272,7 @@ export function importAll(json: string): void {
     }
 
     const insCat = db.prepare(
-      `INSERT INTO categories (id, nama, keywords, tipe, ikon, created_at) VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO categories (id, nama, keywords, tipe, ikon, kelompok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
     );
     for (const r of t.categories ?? []) {
       const c = r as {
@@ -1266,9 +1281,14 @@ export function importAll(json: string): void {
         keywords: string;
         tipe: string;
         ikon?: string | null;
+        kelompok?: string | null;
         created_at: string;
       };
-      insCat.run(c.id, c.nama, c.keywords, c.tipe, c.ikon ?? null, c.created_at);
+      const kl =
+        c.kelompok === "kebutuhan" || c.kelompok === "keinginan" || c.kelompok === "tabungan"
+          ? c.kelompok
+          : null;
+      insCat.run(c.id, c.nama, c.keywords, c.tipe, c.ikon ?? null, kl, c.created_at);
     }
 
     const insTx = db.prepare(
