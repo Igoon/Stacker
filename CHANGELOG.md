@@ -3,6 +3,11 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.43.3]
+- **Penguatan Import CSV (`src/csv.ts`, `src/bot.ts`, `src/db.ts`, `src/main.ts`)**: validasi tanggal kalender ketat (tidak lagi mengganti tanggal tak valid menjadi hari ini), lewati baris `Transfer` agar tak terpecah jadi transaksi biasa, eksekusi atomik dalam satu transaksi DB (`withTransaction`), dan deteksi duplikat otomatis.
+- **Keamanan PIN, Kripto & Backup (`src/pin.ts`, `src/crypto.ts`, `src/db.ts`)**: *rate-limit* percobaan PIN salah langsung di sisi worker (5× salah → jeda 30 detik), peningkatan iterasi PBKDF2 (`BACKUP_ITER = 600.000`, `PIN_ITER = 310.000`, tetap kompatibel dengan data lama), kecualikan `ai_base_url`/`ai_model` dari file backup, serta validasi struktur tabel & transaksi sebelum `importAll()`.
+- **Efisiensi AI & Konsistensi Regex Bot (`src/ai.ts`, `src/bot.ts`)**: kuota harian AI hanya bertambah setelah panggilan API berhasil, batas ukuran cache AI (`CACHE_MAX = 200`), dan batas kata `(?![a-zA-Z])` pada 7 pola satuan `k` di perintah `transfer biaya`, `anggaran`, `utang`/`piutang`, `bayar`, dan `target`.
+
 ## [2.43.2]
 - **Akurasi analitik & skor kesehatan (`src/bot/analytics.ts`)**: proyeksi bulan kini hanya aktif untuk bulan berjalan mulai hari ke-3 (mencegah lonjakan 30× di tanggal 1), kategori `Tabungan`/`Investasi` dikecualikan dari pengeluaran saat menghitung rasio tabungan, dana darurat & `avg3Net` memakai rata-rata bulan selesai, skor konsistensi adil bagi pengguna baru (`first_use_at`), ringkasan hari ini memakai `searchTx` tanpa menghitung ganda transfer, dan `budgetOverview()`/`budgetWarn()` tidak lagi menghitung `carry` dua kali.
 - **Validasi & efisiensi worker (`src/worker.ts`, `src/main.ts`)**: `state()` lebih ringan (single `budgetOverview()`, `runRecurringWithUndo()` hanya bila jatuh tempo, `budgetNoticeShown` diset sekali), validasi URL/model/key pada `setai`, batas `limit` pencarian (1–500), validasi format tanggal ISO di `markbackup` & `setfirstuse`, serta peringatan UI bila filter nominal tak terbaca atau ekspor CSV terpotong di 10.000 baris.

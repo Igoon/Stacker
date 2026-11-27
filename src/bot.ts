@@ -62,6 +62,7 @@ import {
   updateTransferAmount,
   updateTransferDate,
   updateTx,
+  withTransaction,
   type Account,
   type Budget,
   type Debt,
@@ -426,30 +427,60 @@ export function deleteTxWithUndo(id: number): { removed: number; ids: number[] }
   return res;
 }
 
-// Import transaksi dari CSV (bisa dibatalkan lewat undo).
-export function importCsvWithUndo(csvText: string): { imported: number; skipped: number } {
-  const { rows, skipped } = parseCSV(csvText);
-  if (!rows.length) return { imported: 0, skipped };
+// Import transaksi dari CSV secara atomik dengan pencegahan duplikat (bisa di-undo).
+export function importCsvWithUndo(csvText: string): {
+  imported: number;
+  skipped: number;
+  duplicates: number;
+  skippedTransfers: number;
+} {
+  const { rows, skipped, skippedTransfers } = parseCSV(csvText);
+  if (!rows.length) return { imported: 0, skipped, duplicates: 0, skippedTransfers };
   const before = currentState();
   const fallbackAcc = getAccountByName("Cash") ?? listAccounts()[0];
-  let imported = 0;
-  for (const r of rows) {
-    const acc = (r.akun ? getAccountByName(r.akun) : undefined) ?? fallbackAcc;
-    addTx({
-      tanggal: r.tanggal,
-      tipe: r.tipe,
-      kategori: r.kategori,
-      jumlah: r.jumlah,
-      catatan: r.catatan || undefined,
-      account_id: acc?.id ?? null,
-    });
-    imported++;
+
+  const txKey = (
+    tanggal: string,
+    tipe: string,
+    accId: number | null,
+    kategori: string,
+    jumlah: number,
+    catatan: string
+  ) => `${tanggal}|${tipe}|${accId ?? ""}|${kategori.toLowerCase()}|${jumlah}|${catatan.trim().toLowerCase()}`;
+
+  const existing = new Set<string>();
+  for (const t of listAll()) {
+    existing.add(txKey(t.tanggal, t.tipe, t.account_id ?? null, t.kategori, t.jumlah, t.catatan ?? ""));
   }
+
+  let imported = 0;
+  let duplicates = 0;
+  withTransaction(() => {
+    for (const r of rows) {
+      const acc = (r.akun ? getAccountByName(r.akun) : undefined) ?? fallbackAcc;
+      const accId = acc?.id ?? null;
+      const key = txKey(r.tanggal, r.tipe, accId, r.kategori, r.jumlah, r.catatan);
+      if (existing.has(key)) {
+        duplicates++;
+        continue;
+      }
+      addTx({
+        tanggal: r.tanggal,
+        tipe: r.tipe,
+        kategori: r.kategori,
+        jumlah: r.jumlah,
+        catatan: r.catatan || undefined,
+        account_id: accId,
+      });
+      existing.add(key);
+      imported++;
+    }
+  });
   if (imported > 0) {
     pushUndo(before, `import CSV (${imported} tx)`);
     rememberSnapshot(exportJson());
   }
-  return { imported, skipped };
+  return { imported, skipped, duplicates, skippedTransfers };
 }
 
 // Restore dari UI juga harus bisa di-undo (import mengganti seluruh DB).
@@ -1036,7 +1067,7 @@ async function handleMessageInner(input: string): Promise<Reply> {
     });
     const out = [keluar, masuk];
     const feeM = text.match(
-      /\b(?:biaya|fee|admin)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k))?)/i
+      /\b(?:biaya|fee|admin)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k)(?![a-zA-Z]))?)/i
     );
     const fee = feeM ? parseAmount(feeM[1]) : undefined;
     if (fee && fee > 0) {
@@ -1621,7 +1652,7 @@ ${latest.join("\n")}`,
       setBudget(b.kategori, b.jumlah, { rollover: false });
       return { text: `Rollover ${b.kategori} dimatikan.` };
     }
-    if ((bm = arg.match(/^(.+?)\s+([\d][\d.,]*(?:\s*(?:jt|juta|rb|ribu|k))?)(?:\s+(mingguan|bulanan))?$/i))) {
+    if ((bm = arg.match(/^(.+?)\s+([\d][\d.,]*(?:\s*(?:jt|juta|rb|ribu|k)(?![a-zA-Z]))?)(?:\s+(mingguan|bulanan))?$/i))) {
       const nama = bm[1].trim();
       const jumlah = parseAmount(bm[2]);
       const periode = (bm[3]?.toLowerCase() as "mingguan" | "bulanan" | undefined) ?? undefined;
@@ -1761,7 +1792,7 @@ ${latest.join("\n")}`,
     };
   }
 
-  if ((m = text.match(/^bayar\s+(utang|piutang)\s+(.+?)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k))?)(?:\s+@(.+))?$/i))) {
+  if ((m = text.match(/^bayar\s+(utang|piutang)\s+(.+?)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k)(?![a-zA-Z]))?)(?:\s+@(.+))?$/i))) {
     const arah = m[1].toLowerCase() === "utang" ? "utang" : "piutang";
     const nama = m[2].trim();
     const nominal = parseAmount(m[3]);
@@ -1802,7 +1833,7 @@ ${latest.join("\n")}`,
       amountRaw = km[1].trim();
       nama = km[2].trim();
     } else {
-      km = rest.match(new RegExp(`^${prep}\\s+(.+?)\\s+([\\d][\\d.,]*(?:\\s*(?:jt|juta|rb|ribu|k))?)$`, "i"));
+      km = rest.match(new RegExp(`^${prep}\\s+(.+?)\\s+([\\d][\\d.,]*(?:\\s*(?:jt|juta|rb|ribu|k)(?![a-zA-Z]))?)$`, "i"));
       if (km) {
         nama = km[1].trim();
         amountRaw = km[2].trim();
@@ -1881,7 +1912,7 @@ ${latest.join("\n")}`,
     return { text: `Target ${g.nama} dihapus.` };
   }
 
-  if ((m = text.match(/^target\s+isi\s+(.+?)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k))?)(?:\s+@(.+))?$/i))) {
+  if ((m = text.match(/^target\s+isi\s+(.+?)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k)(?![a-zA-Z]))?)(?:\s+@(.+))?$/i))) {
     const nama = m[1].trim();
     const g = getGoalByName(nama);
     if (!g) return { text: `Target "${nama}" tidak ada.` };
@@ -1915,7 +1946,7 @@ ${latest.join("\n")}`,
     return { text: msgText };
   }
 
-  if ((m = text.match(/^target\s+ambil\s+(.+?)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k))?)$/i))) {
+  if ((m = text.match(/^target\s+ambil\s+(.+?)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k)(?![a-zA-Z]))?)$/i))) {
     const nama = m[1].trim();
     const g = getGoalByName(nama);
     if (!g) return { text: `Target "${nama}" tidak ada.` };
@@ -1928,7 +1959,7 @@ ${latest.join("\n")}`,
     return { text: `Target ${after.nama}: ${rupiah(after.terkumpul)} / ${rupiah(after.target)}.` };
   }
 
-  if ((m = text.match(/^target\s+(.+?)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k))?)(?:\s+tempo\s+(\S+))?$/i))) {
+  if ((m = text.match(/^target\s+(.+?)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k)(?![a-zA-Z]))?)(?:\s+tempo\s+(\S+))?$/i))) {
     const nama = m[1].trim();
     const nominal = parseAmount(m[2]);
     if (nominal == null || nominal <= 0) {

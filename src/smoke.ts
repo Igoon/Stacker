@@ -1228,5 +1228,30 @@ await check("parser: tolak nomor telepon, angka > 1T, dan batas kata k", async (
   assert.equal(rKg?.result.jumlah, 10, "10 kg bukan 10000");
 });
 
+await check("import CSV: duplikat, tanggal invalid, transfer dilewati", async () => {
+  const sample = [
+    "tanggal,tipe,akun,kategori,jumlah,catatan",
+    "2026-10-01,keluar,BSI,Makanan,25000,kopi #csvdup",
+    "2026-10-02,masuk,BSI,Gaji,1000000,bonus #csvdup",
+  ].join("\r\n");
+  const first = importCsvWithUndo(sample);
+  assert.equal(first.imported, 2, "2 baris pertama diimport");
+
+  // Impor ulang CSV yang sama -> dicegah duplikat.
+  const dupRes = importCsvWithUndo(sample);
+  assert.equal(dupRes.imported, 0, "impor ulang tidak menggandakan");
+  assert.equal(dupRes.duplicates, 2, "2 duplikat terdeteksi");
+
+  // Tanggal tak valid & transfer dilewati.
+  const badCsv = [
+    "tanggal,tipe,akun,kategori,jumlah,catatan",
+    "2026-02-30,keluar,BSI,Makanan,10000,tanggal salah",
+    "2026-10-03,keluar,BSI,Transfer,50000,tf ke gopay",
+  ].join("\r\n");
+  const badRes = importCsvWithUndo(badCsv);
+  assert.equal(badRes.imported, 0, "tanggal salah & transfer dilewati");
+  assert.equal(badRes.skipped, 2, "2 baris dilewati");
+});
+
 console.log(`\n${pass} ok, ${fail} fail`);
 if (fail > 0) process.exit(1);

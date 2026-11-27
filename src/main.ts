@@ -1214,7 +1214,11 @@ document.getElementById("importCsvFile")!.addEventListener("change", async (e) =
   if (r.ok) {
     const imp = Number(r.imported ?? 0);
     const skp = Number(r.skipped ?? 0);
-    const msg = `Berhasil import ${imp} transaksi dari CSV${skp > 0 ? ` (${skp} baris dilewati)` : ""}. Ketik \`undo\` untuk batalkan.`;
+    const dup = Number(r.duplicates ?? 0);
+    const notes: string[] = [];
+    if (dup > 0) notes.push(`${dup} duplikat dilewati`);
+    if (skp > 0) notes.push(`${skp} baris lain dilewati`);
+    const msg = `Berhasil import ${imp} transaksi dari CSV${notes.length ? ` (${notes.join(", ")})` : ""}. Ketik \`undo\` untuk batalkan.`;
     showToast(msg);
     addBubble(msg, "bot");
     void refresh();

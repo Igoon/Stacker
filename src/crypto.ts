@@ -4,8 +4,8 @@
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
-export const PIN_ITER = 120_000;
-export const BACKUP_ITER = 150_000;
+export const PIN_ITER = 310_000;
+export const BACKUP_ITER = 600_000;
 
 // Nilai iter dari settings/file bisa rusak/ekstrem. Jangan sampai PIN tak bisa
 // dibuka atau file backup jadi DoS.

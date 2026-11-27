@@ -1168,11 +1168,19 @@ export function setGoalDeadline(id: number, tenggat: string | null): void {
 // ikut backup supaya tak terbawa/tertimpa ke perangkat lain saat restore.
 const SETTING_EXPORT_SKIP = new Set([
   "ai_key",
+  "ai_base_url",
+  "ai_model",
   "pin_hash",
   "pin_salt",
   "pin_iter",
+  "pin_fails",
+  "pin_lock_until",
   "first_use_at",
 ]);
+
+export function withTransaction<T>(fn: () => T): T {
+  return db.transaction(fn);
+}
 const settingExportable = (key: string): boolean =>
   !SETTING_EXPORT_SKIP.has(key) && !key.startsWith("backup_") && key !== "_backup_keys";
 
@@ -1199,14 +1207,37 @@ export function exportAll(): string {
 }
 
 export function importAll(json: string): void {
-  const parsed = JSON.parse(json) as { tables: Record<string, unknown[]> };
-  const t = parsed.tables;
-  if (!t) throw new Error("Format backup tidak dikenali.");
+  const parsed = JSON.parse(json) as { version?: unknown; tables?: unknown };
+  if (!parsed || typeof parsed !== "object" || !parsed.tables || typeof parsed.tables !== "object" || Array.isArray(parsed.tables)) {
+    throw new Error("Format backup tidak dikenali.");
+  }
+  const t = parsed.tables as Record<string, unknown[]>;
+  const tableKeys = ["accounts", "transactions", "categories", "budgets", "recurring", "debts", "goals", "settings"];
+  for (const k of tableKeys) {
+    if (t[k] !== undefined && !Array.isArray(t[k])) {
+      throw new Error(`Struktur backup rusak: tabel "${k}" tidak valid.`);
+    }
+  }
+  for (const row of t.transactions ?? []) {
+    const tx = row as Record<string, unknown>;
+    if (
+      !tx ||
+      typeof tx !== "object" ||
+      typeof tx.tanggal !== "string" ||
+      typeof tx.jumlah !== "number" ||
+      !Number.isFinite(tx.jumlah) ||
+      (tx.tipe !== "masuk" && tx.tipe !== "keluar") ||
+      typeof tx.kategori !== "string"
+    ) {
+      throw new Error("Struktur backup rusak: ada baris transaksi tidak valid.");
+    }
+  }
 
-  // API key AI tidak ikut di backup (lihat exportAll). Pertahankan key lokal
-  // yang sudah ada supaya restore tidak mematikan AI pengguna. PIN juga lokal:
-  // restore dari perangkat lain tak boleh membuka/menghapus kunci perangkat ini.
+  // Konfigurasi AI & PIN lokal tidak ikut di backup (lihat exportAll). Pertahankan
+  // pengaturan lokal agar restore tidak membocorkan/menimpa setting perangkat ini.
   const localAiKey = getSetting("ai_key");
+  const localAiBase = getSetting("ai_base_url");
+  const localAiModel = getSetting("ai_model");
   const localFirstUse = getSetting("first_use_at");
   const localPin = {
     hash: getSetting("pin_hash"),
@@ -1323,6 +1354,8 @@ export function importAll(json: string): void {
       insSetting.run(s.key, s.value ?? null);
     }
     if (localAiKey) insSetting.run("ai_key", localAiKey);
+    if (localAiBase) insSetting.run("ai_base_url", localAiBase);
+    if (localAiModel) insSetting.run("ai_model", localAiModel);
     // Tanggal pasang tetap milik perangkat ini (tidak ditimpa isi backup).
     if (localFirstUse) insSetting.run("first_use_at", localFirstUse);
     if (localPin.hash && localPin.salt) {

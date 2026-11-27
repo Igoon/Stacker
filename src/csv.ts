@@ -1,4 +1,5 @@
 import { rupiah, type Tx } from "./db";
+import { isoLocal } from "./dates";
 
 function cell(v: string | number | null): string {
   let s = String(v ?? "");
@@ -68,13 +69,13 @@ function unescapeCell(s: string): string {
   return t.startsWith("'") && /^[=+\-@\t\r]/.test(t.slice(1)) ? t.slice(1) : t;
 }
 
-export function parseCSV(raw: string): { rows: CsvTxRow[]; skipped: number } {
+export function parseCSV(raw: string): { rows: CsvTxRow[]; skipped: number; skippedTransfers: number } {
   const clean = raw.replace(/^\ufeff/, "").trim();
-  if (!clean) return { rows: [], skipped: 0 };
+  if (!clean) return { rows: [], skipped: 0, skippedTransfers: 0 };
   const firstLine = clean.split(/\r?\n/, 1)[0] ?? "";
   const sep = (firstLine.match(/;/g)?.length ?? 0) > (firstLine.match(/,/g)?.length ?? 0) ? ";" : ",";
   const matrix = splitCsvLines(clean, sep);
-  if (matrix.length < 2) return { rows: [], skipped: 0 };
+  if (matrix.length < 2) return { rows: [], skipped: 0, skippedTransfers: 0 };
 
   const header = matrix[0].map((h) => h.trim().toLowerCase());
   const col = (...names: string[]): number => header.findIndex((h) => names.includes(h));
@@ -85,15 +86,33 @@ export function parseCSV(raw: string): { rows: CsvTxRow[]; skipped: number } {
   const iJml = col("jumlah", "nominal", "amount");
   const iCat = col("catatan", "note", "notes", "deskripsi", "keterangan");
 
-  if (iJml < 0) return { rows: [], skipped: matrix.length - 1 };
+  if (iJml < 0) return { rows: [], skipped: matrix.length - 1, skippedTransfers: 0 };
+
+  const isValidIsoDate = (s: string): boolean => {
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return false;
+    const y = Number(m[1]);
+    const mo = Number(m[2]);
+    const d = Number(m[3]);
+    if (mo < 1 || mo > 12 || d < 1 || d > 31) return false;
+    const dt = new Date(y, mo - 1, d);
+    return dt.getFullYear() === y && dt.getMonth() === mo - 1 && dt.getDate() === d;
+  };
 
   const rows: CsvTxRow[] = [];
   let skipped = 0;
+  let skippedTransfers = 0;
   for (let r = 1; r < matrix.length; r++) {
     const line = matrix[r];
     const katRaw = iKat >= 0 ? unescapeCell(line[iKat] ?? "") : "";
     if (katRaw.toLowerCase() === "selisih" && (iTgl < 0 || !unescapeCell(line[iTgl] ?? ""))) {
       continue; // baris ringkasan bawaan toCSV
+    }
+    // Lewati baris transfer agar tidak terimpor menjadi 2 transaksi biasa.
+    if (katRaw.toLowerCase() === "transfer") {
+      skippedTransfers++;
+      skipped++;
+      continue;
     }
     const jmlRaw = unescapeCell(line[iJml] ?? "").replace(/[^\d\-.,]/g, "");
     const num = Number(jmlRaw.replace(/[.,](?=\d{3}(?:\D|$))/g, "").replace(",", "."));
@@ -102,18 +121,22 @@ export function parseCSV(raw: string): { rows: CsvTxRow[]; skipped: number } {
       continue;
     }
     const tglRaw = iTgl >= 0 ? unescapeCell(line[iTgl] ?? "") : "";
-    const tanggal = /^\d{4}-\d{2}-\d{2}$/.test(tglRaw)
-      ? tglRaw
-      : new Date().toISOString().slice(0, 10);
+    let tanggal: string;
+    if (!tglRaw) {
+      tanggal = isoLocal();
+    } else if (isValidIsoDate(tglRaw)) {
+      tanggal = tglRaw;
+    } else {
+      skipped++;
+      continue; // jangan diam-diam ganti tanggal tak valid dengan hari ini
+    }
     const tipeRaw = iTipe >= 0 ? unescapeCell(line[iTipe] ?? "").toLowerCase() : "";
     const tipe: "masuk" | "keluar" =
       tipeRaw === "masuk" || tipeRaw === "income" || tipeRaw === "in"
         ? "masuk"
         : tipeRaw === "keluar" || tipeRaw === "expense" || tipeRaw === "out"
           ? "keluar"
-          : num < 0
-            ? "keluar"
-            : "keluar";
+          : "keluar";
     rows.push({
       tanggal,
       tipe,
@@ -123,5 +146,5 @@ export function parseCSV(raw: string): { rows: CsvTxRow[]; skipped: number } {
       catatan: iCat >= 0 ? unescapeCell(line[iCat] ?? "") : "",
     });
   }
-  return { rows, skipped };
+  return { rows, skipped, skippedTransfers };
 }

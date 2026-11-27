@@ -15,6 +15,7 @@ const DEFAULT_BASE_OPENAI = "http://localhost:11434/v1";
 
 const TIMEOUT_MS = 6000;
 const CACHE_TTL = 1000 * 60 * 60 * 6;
+const CACHE_MAX = 200;
 const DAILY_LIMIT = 100;
 
 export type AiProvider = "gemini" | "openai";
@@ -279,14 +280,15 @@ export async function parseGemini(text: string): Promise<ParseResult[] | null> {
   const cfg = getConfig();
   const cacheKey = `${cfg.provider}|${cfg.model}|${text.trim().toLowerCase()}`;
   const hit = cache.get(cacheKey);
-  if (hit && Date.now() - hit.at < CACHE_TTL) return hit.value;
+  if (hit) {
+    if (Date.now() - hit.at < CACHE_TTL) return hit.value;
+    cache.delete(cacheKey);
+  }
 
   if (callsToday() >= DAILY_LIMIT) {
     console.warn(`[ai] batas harian ${DAILY_LIMIT} tercapai, lewati AI.`);
     return null;
   }
-
-  bumpUsage();
 
   try {
     const masukNames = categoryNames("masuk");
@@ -298,8 +300,15 @@ export async function parseGemini(text: string): Promise<ParseResult[] | null> {
         ? await callGemini(cfg, masukNames, keluarNames, union, text)
         : await callOpenAi(cfg, masukNames, keluarNames, text);
 
+    // Hitung kuota setelah panggilan ke API benar-benar berhasil.
+    bumpUsage();
+
     const list = validate(raw, { masuk: new Set(masukNames), keluar: new Set(keluarNames) });
     if (list.length) {
+      if (cache.size >= CACHE_MAX) {
+        const oldest = cache.keys().next().value;
+        if (oldest !== undefined) cache.delete(oldest);
+      }
       cache.set(cacheKey, { at: Date.now(), value: list });
     }
     return list.length ? list : null;
