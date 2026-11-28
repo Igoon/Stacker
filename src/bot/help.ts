@@ -78,6 +78,8 @@ export const HELP =
   "  utang 100rb ke budi         (ledger utang/piutang)\n" +
   "  piutang 50rb dari andi\n" +
   "  bayar utang budi 50rb [@bsi] | utang hapus 3 | piutang hapus 4\n" +
+  "  patungan makan 100rb @bsi dengan budi, andi  (bagi sama rata)\n" +
+  "  patungan makan 100rb @bsi budi 35rb, andi 25rb (split bebas)\n" +
   "  target Liburan 5jt [tempo 2027-06-01]   (target / sinking fund)\n" +
   "  target | target isi Liburan 500rb [@bsi] | target ambil Liburan 100rb | target hapus Liburan\n" +
   "  alokasi                     (panduan 50/30/20 bulan ini)\n" +

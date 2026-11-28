@@ -467,11 +467,47 @@
       <p id="debtMsg" class="hint" hidden></p>
       <div class="info-actions">
         <button id="debtSave">Tambah</button>
+        <button id="openSplitBtn" type="button">Patungan (Split Bill)…</button>
         <button id="debtResetForm">Kosongkan form</button>
       </div>
     </div>
     <div class="modal-actions">
       <button id="debtBack">Kembali</button>
+    </div>
+  </div>
+</div>
+
+
+<div id="splitModal" class="modal" role="dialog" aria-modal="true" hidden>
+  <div class="modal-box">
+    <h3>Patungan (Split Bill)</h3>
+    <div class="cat-form">
+      <label>Catatan / keperluan
+        <input id="splitNote" placeholder="makan siang" autocomplete="off" />
+      </label>
+      <div class="form-row">
+        <label>Total tagihan
+          <input id="splitTotal" placeholder="100rb" autocomplete="off" />
+        </label>
+        <label>Akun pembayar
+          <select id="splitAcc"></select>
+        </label>
+      </div>
+      <label>Model pembagian
+        <select id="splitMode">
+          <option value="rata">Bagi sama rata (termasuk saya)</option>
+          <option value="bebas">Split bebas (nominal per teman)</option>
+        </select>
+      </label>
+      <label id="splitFriendsLabel">Teman (pisah koma)
+        <input id="splitFriends" placeholder="budi, andi" autocomplete="off" />
+      </label>
+      <p id="splitPreview" class="info-note"></p>
+      <p id="splitMsg" class="hint" hidden></p>
+    </div>
+    <div class="modal-actions">
+      <button id="splitCancel" type="button">Batal</button>
+      <button id="splitSave" type="button">Catat patungan</button>
     </div>
   </div>
 </div>

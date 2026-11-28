@@ -1903,7 +1903,142 @@ ${latest.join("\n")}`,
     };
   }
 
-  if (low === "utang" || low === "piutang" || low === "utang piutang" || low === "hutang") {
+  if ((m = text.match(/^(?:patungan|split)(?:\s+([\s\S]+))?$/i))) {
+    const body = (m[1] ?? "").trim();
+    if (!body) {
+      return {
+        text:
+          "Format patungan (split bill):\n" +
+          "• Sama rata: `patungan makan 100rb @bsi dengan budi, andi`\n" +
+          "• Split bebas: `patungan makan 100rb @bsi budi 35rb, andi 25rb`",
+      };
+    }
+
+    let headPart = "";
+    let partRaw = "";
+    const denganM = body.match(/\s+dengan\s+/i);
+    if (denganM && denganM.index != null) {
+      headPart = body.slice(0, denganM.index).trim();
+      partRaw = body.slice(denganM.index + denganM[0].length).trim();
+    } else {
+      const amtRe = /\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k)(?![a-zA-Z]))?/i;
+      const am = body.match(amtRe);
+      if (!am || am.index == null) {
+        return { text: "Total tagihan tidak kebaca. Contoh: `patungan makan 100rb dengan budi, andi`" };
+      }
+      let cut = am.index + am[0].length;
+      const afterAmt = body.slice(cut);
+      const atAcc = afterAmt.match(/^\s+@\S+/);
+      if (atAcc) cut += atAcc[0].length;
+      headPart = body.slice(0, cut).trim();
+      partRaw = body.slice(cut).trim();
+    }
+
+    if (!headPart || !partRaw) {
+      return {
+        text:
+          "Sebut total tagihan dan nama teman.\n" +
+          "Contoh: `patungan makan 100rb dengan budi, andi` atau `patungan makan 100rb budi 35rb, andi 25rb`.",
+      };
+    }
+
+    const parsedHead = parseLocal(headPart);
+    const total = parsedHead?.result.jumlah;
+    if (!total || total <= 0) {
+      return { text: "Total tagihan tidak valid. Contoh: `patungan makan 100rb dengan budi, andi`" };
+    }
+
+    const acc = resolveAccount(headPart);
+    const kategori = parsedHead.result.kategori || "Makanan";
+    const tanggal = dateInfo.tanggal ?? parsedHead.result.tanggal;
+    const rawItems = partRaw
+      .split(/\s*,\s*|\s*;\s*|\s+dan\s+/i)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (rawItems.length === 0) {
+      return { text: "Sebut minimal satu nama teman untuk patungan." };
+    }
+
+    const itemRe = /^(.+?)\s+(\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k)(?![a-zA-Z]))?)$/i;
+    const hasCustomAmt = rawItems.some((it) => itemRe.test(it));
+    const shares: { nama: string; jumlah: number }[] = [];
+
+    if (hasCustomAmt) {
+      let sumFriends = 0;
+      for (const it of rawItems) {
+        const im = it.match(itemRe);
+        if (!im) {
+          return {
+            text: `Format split bebas kurang nominal untuk "${it}". Contoh: \`patungan makan 100rb budi 35rb, andi 25rb\`.`,
+          };
+        }
+        const nama = im[1].trim();
+        const nom = parseAmount(im[2]);
+        if (!nama || nom == null || nom <= 0) {
+          return { text: `Nominal tidak valid untuk "${it}".` };
+        }
+        sumFriends += nom;
+        shares.push({ nama, jumlah: nom });
+      }
+      if (sumFriends > total) {
+        return {
+          text: `Total porsi teman (${rupiah(sumFriends)}) melebihi total tagihan (${rupiah(total)}).`,
+        };
+      }
+    } else {
+      const people = rawItems.length + 1; // termasuk pembayar
+      const perPerson = Math.round(total / people);
+      if (perPerson <= 0) {
+        return { text: "Total tagihan terlalu kecil untuk dibagi." };
+      }
+      for (const nama of rawItems) {
+        shares.push({ nama, jumlah: perPerson });
+      }
+    }
+
+    const sumFriends = shares.reduce((a, s) => a + s.jumlah, 0);
+    const selfShare = Math.max(0, total - sumFriends);
+    const noteClean = headPart
+      .replace(/@\S+/g, "")
+      .replace(/\d[\d.,]*(?:\s*(?:jt|juta|rb|ribu|k)(?![a-zA-Z]))?/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    const catatan = noteClean ? `Patungan ${noteClean}` : "Patungan";
+
+    const tx = withTransaction(() => {
+      const createdTx = addTx({
+        jumlah: total,
+        tipe: "keluar",
+        kategori,
+        catatan,
+        tanggal,
+        account_id: acc?.id ?? null,
+      });
+      for (const s of shares) {
+        addDebt({
+          arah: "piutang",
+          nama: s.nama,
+          jumlah: s.jumlah,
+          catatan,
+          tanggal,
+        });
+      }
+      return createdTx;
+    });
+
+    const modeLabel = hasCustomAmt ? "split bebas" : `sama rata (${shares.length + 1} orang)`;
+    const lines = shares.map((s) => `  • Piutang ${s.nama}: ${rupiah(s.jumlah)}`);
+    return {
+      text:
+        `${catatan} ${rupiah(total)} (${modeLabel})${acc ? ` · ${acc.nama}` : ""}\n` +
+        `${lines.join("\n")}\n` +
+        `  • Porsi saya: ${rupiah(selfShare)}\n` +
+        `Ketik \`undo\` untuk batalkan sekaligus.`,
+      txs: [withRupiah(tx)],
+    };
+  }
+
+    if (low === "utang" || low === "piutang" || low === "utang piutang" || low === "hutang") {
     const rows = listDebts();
     const t = debtTotals();
     if (rows.length === 0) {

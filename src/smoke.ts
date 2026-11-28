@@ -1375,5 +1375,32 @@ await check("edit massal (multi-ID ubah), gabung kategori/akun, & duplikat (1 la
   await handleMessage("akun hapus DstAcc");
 });
 
+await check("patungan (split bill): sama rata, split bebas, validasi, & 1 langkah undo", async () => {
+  const bsi = dbmod.getAccountByName("BSI")!;
+  const balBefore = dbmod.accountBalance(bsi.id);
+
+  // 1. Sama rata: 100rb / 3 orang (saya + budi + andi)
+  const eq = await handleMessage("patungan makan 100rb @bsi dengan budi, andi");
+  assert.equal(eq.txs?.length, 1, "1 transaksi pengeluaran tercatat");
+  assert.equal(balBefore - dbmod.accountBalance(bsi.id), 100_000, "saldo BSI terpotong 100rb");
+  assert.equal(dbmod.debtTotals().piutang, 66_666, "piutang 2 teman = 33.333 x 2");
+  await handleMessage("undo");
+  assert.equal(dbmod.accountBalance(bsi.id), balBefore, "undo 1 langkah kembalikan saldo");
+  assert.equal(dbmod.debtTotals().piutang, 0, "undo 1 langkah hapus piutang");
+
+  // 2. Split bebas: 100rb (budi 35rb, andi 25rb -> porsi saya 40rb)
+  const fr = await handleMessage("patungan makan 100rb @bsi budi 35rb, andi 25rb");
+  assert.equal(fr.txs?.length, 1, "1 transaksi pengeluaran split bebas");
+  assert(fr.text.includes("Rp40.000"), "porsi saya Rp40.000");
+  assert.equal(dbmod.debtTotals().piutang, 60_000, "piutang teman 60rb");
+
+  // 3. Validasi melebihi total ditolak
+  const bad = await handleMessage("patungan makan 100rb budi 70rb, andi 50rb");
+  assert(bad.text.includes("melebihi total"), "porsi melebihi total ditolak");
+
+  await handleMessage("undo");
+  assert.equal(dbmod.debtTotals().piutang, 0, "bersih setelah undo");
+});
+
 console.log(`\n${pass} ok, ${fail} fail`);
 if (fail > 0) process.exit(1);

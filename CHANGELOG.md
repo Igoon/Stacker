@@ -3,6 +3,10 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.47.0]
+- **Patungan / Split Bill (`src/bot.ts`, `src/commands.ts`, `src/bot/help.ts`, `index.html`, `src/main.ts`)**: mendukung dua model pembagian sekaligus—**sama rata** (`patungan makan 100rb @bsi dengan budi, andi`) dan **split bebas** (`patungan makan 100rb @bsi budi 35rb, andi 25rb`, sisa otomatis jadi porsi sendiri)—serta modal **Patungan (Split Bill)** di menu **Utang/Piutang**. Seluruh transaksi pengeluaran + piutang teman dicatat atomik dalam 1 langkah `undo`.
+- **Pengingat jatuh tempo saat aplikasi dibuka (`src/worker.ts`)**: menampilkan notifikasi ringkas sekali per sesi untuk tagihan berulang yang jatuh tempo dalam **1–3 hari ke depan** dan target tabungan dengan tempo **≤ 30 hari** (100% andal di PWA & iOS tanpa push server).
+
 ## [2.46.1]
 - **Penyederhanaan struktur menu ☰ (`index.html`, `src/main.ts`, `e2e/app.spec.ts`)**: menu dikelompokkan lebih ringkas menjadi **Keuangan** (Akun, Kategori), **Perencanaan** (Anggaran, Target, Berulang), **Kewajiban** (Utang/Piutang, Langganan), **Pengaturan** (Keamanan & PIN, Backup & Penyimpanan, Tema & Tampilan, AI), dan **Informasi** (Tentang).
 - **Reset data dipindah ke dalam Backup & Penyimpanan**: mendorong pengguna melihat opsi backup sebelum mereset data; tombol **Kembali** di Reset data kini kembali ke Backup & Penyimpanan.

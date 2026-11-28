@@ -284,6 +284,7 @@ function reply(id: number, payload: unknown): void {
 
 let backupNoticeShown = false;
 let budgetNoticeShown = false;
+let upcomingNoticeShown = false;
 
 function state() {
   // Catat transaksi berulang hanya bila ada yang jatuh tempo.
@@ -306,6 +307,52 @@ function state() {
       notices.push("⚠️ Anggaran hampir: " + near.map((b) => `${b.kategori} ${b.pct}%`).join(", "));
     }
     budgetNoticeShown = true;
+  }
+
+  // Pengingat jatuh tempo (sekali per buka app): tagihan berulang 1-3 hari ke depan
+  // & target tabungan dengan tempo <= 30 hari.
+  if (!upcomingNoticeShown) {
+    const now = new Date();
+    const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dueSoon: { nama: string; jumlah: number; days: number }[] = [];
+    for (const r of listRecurring().filter((x) => x.aktif && x.tipe === "keluar")) {
+      const cand1 = new Date(now.getFullYear(), now.getMonth(), Math.min(r.hari, 28));
+      const nextDue =
+        cand1.getTime() > today0.getTime()
+          ? cand1
+          : new Date(now.getFullYear(), now.getMonth() + 1, Math.min(r.hari, 28));
+      const diffDays = Math.round((nextDue.getTime() - today0.getTime()) / 86_400_000);
+      const ymDue = `${nextDue.getFullYear()}-${String(nextDue.getMonth() + 1).padStart(2, "0")}`;
+      if (diffDays >= 1 && diffDays <= 3 && (!r.terakhir || !r.terakhir.startsWith(ymDue))) {
+        dueSoon.push({ nama: r.catatan, jumlah: r.jumlah, days: diffDays });
+      }
+    }
+    if (dueSoon.length > 0) {
+      const summary = dueSoon
+        .slice(0, 3)
+        .map((d) => `${d.nama} ${rupiah(d.jumlah)} (${d.days} hari lagi)`)
+        .join(", ");
+      notices.push(`📅 Tagihan segera jatuh tempo: ${summary}.`);
+    }
+
+    const goalSoon: { nama: string; sisa: number; days: number }[] = [];
+    for (const g of listGoals()) {
+      if (!g.tenggat || g.terkumpul >= g.target) continue;
+      const dt = new Date(g.tenggat + "T00:00:00").getTime();
+      if (!Number.isFinite(dt)) continue;
+      const diffDays = Math.ceil((dt - today0.getTime()) / 86_400_000);
+      if (diffDays >= 0 && diffDays <= 30) {
+        goalSoon.push({ nama: g.nama, sisa: g.target - g.terkumpul, days: diffDays });
+      }
+    }
+    if (goalSoon.length > 0) {
+      const gSum = goalSoon
+        .slice(0, 2)
+        .map((g) => `${g.nama} (sisa ${rupiah(g.sisa)}, ${g.days} hari lagi)`)
+        .join(", ");
+      notices.push(`🎯 Target mendekati tempo: ${gSum}.`);
+    }
+    upcomingNoticeShown = true;
   }
 
   // Pengingat backup bertingkat: 7 hari (lembut), 30 hari (tegas) + jumlah

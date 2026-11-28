@@ -3415,7 +3415,50 @@ document.getElementById("openAcc")!.onclick = async () => {
   showInfoPane(accModal);
   accMsgEl.hidden = true;
   await refreshAccList();
+}
+
+const splitModal = document.getElementById("splitModal")!;
+const splitNoteEl = document.getElementById("splitNote") as HTMLInputElement;
+const splitTotalEl = document.getElementById("splitTotal") as HTMLInputElement;
+const splitAccEl = document.getElementById("splitAcc") as HTMLSelectElement;
+const splitModeEl = document.getElementById("splitMode") as HTMLSelectElement;
+const splitFriendsEl = document.getElementById("splitFriends") as HTMLInputElement;
+const splitPreviewEl = document.getElementById("splitPreview")!;
+const splitMsgEl = document.getElementById("splitMsg")!;
+
+function updateSplitUi(): void {
+  const isBebas = splitModeEl.value === "bebas";
+  splitFriendsEl.placeholder = isBebas ? "budi 35rb, andi 25rb" : "budi, andi";
+  splitPreviewEl.textContent = isBebas
+    ? "Sisa dari total tagihan otomatis menjadi porsi saya."
+    : "Total tagihan dibagi rata ke semua teman + saya.";
+}
+
+splitModeEl.addEventListener("change", updateSplitUi);
+
+document.getElementById("openSplitBtn")!.onclick = async () => {
+  const a = await call({ type: "listacc" });
+  const accs = (Array.isArray(a.accounts) ? a.accounts : []) as AccRow[];
+  splitAccEl.replaceChildren();
+  for (const x of accs) {
+    const o = document.createElement("option");
+    o.value = x.nama;
+    o.textContent = x.nama;
+    splitAccEl.appendChild(o);
+  }
+  splitNoteEl.value = "";
+  splitTotalEl.value = "";
+  splitFriendsEl.value = "";
+  splitModeEl.value = "rata";
+  splitMsgEl.hidden = true;
+  updateSplitUi();
+  splitModal.hidden = false;
+  splitNoteEl.focus();
 };
+
+document.getElementById("splitCancel")!.onclick = () => {
+  splitModal.hidden = true;
+};;
 document.getElementById("accBack")!.onclick = () => showInfoPane(infoModal);
 document.getElementById("accResetForm")!.onclick = () => {
   accNameEl.value = "";
