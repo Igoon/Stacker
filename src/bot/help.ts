@@ -44,6 +44,7 @@ export const HELP =
   "  kategori hapus Sedekah      (atau: hapus kategori Sedekah)\n\n" +
   "Laporan & export:\n" +
   "  laporan | laporan september | laporan gopay september\n" +
+  "  laporan tahunan [tahun]      (ringkasan setahun & banding antartahun)\n" +
   "  laporan banding [bulan]      (vs periode sebelumnya)\n" +
   "  laporan arus kas 6           (6 bulan terakhir)\n" +
   "  laporan top 10 [bulan]       (pengeluaran terbesar)\n" +

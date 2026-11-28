@@ -276,6 +276,7 @@ Peringatan otomatis muncul saat pemakaian 80% dan saat tembus.
 ### Laporan, grafik, export
 ```
 laporan | laporan september | laporan gopay september
+laporan tahunan [tahun]       → ringkasan setahun, banding antartahun, & cetak/PDF SPT
 laporan banding [bulan]       → banding vs periode sebelumnya + top perubahan
 laporan arus kas 6            → masuk/keluar/net 6 bulan terakhir
 laporan arus kas gopay 6      → arus kas satu akun
@@ -309,6 +310,8 @@ bayar utang budi 50rb          → cicil / lunas otomatis
 bayar piutang andi 50rb
 utang hapus 3                  → hapus catatan utang #3
 piutang hapus 4                → hapus catatan piutang #4
+patungan makan 100rb @bsi dengan budi, andi  → bagi sama rata (otomatis buat piutang)
+patungan makan 100rb @bsi budi 35rb, andi 25rb → split bebas (sisa = porsi saya)
 ```
 Ledger utang/piutang **terpisah** dari saldo akun: mencatat utang tidak
 mengubah saldo. Pembayaran mengalokasikan ke catatan tertua lebih dulu.
@@ -322,6 +325,10 @@ ubah 3 catatan makan siang     → ubah catatan
 ubah 3 kategori Makanan        → ubah kategori
 hapus 3                        → hapus #3
 hapus 24 25                    → hapus beberapa (boleh #24)
+ubah 24 25 kategori Makanan    → edit massal (kategori / akun / tag / hapustag, 1× undo)
+kategori gabung A ke B         → gabung kategori & pindahkan transaksi
+akun gabung A ke B             → gabung akun, saldo awal, & bersihkan transfer internal
+duplikat                       → tinjau grup transaksi berpotensi duplikat
 undo                           → batalkan aksi terakhir (maks 20 langkah)
 alias                          → daftar alias
 alias tf transfer              → buat/ubah alias (tf = transfer)

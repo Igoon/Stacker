@@ -31,6 +31,7 @@ import {
   budgetOverview,
   canRedo,
   canUndo,
+  annualReport,
   dashboardData,
   detectSubscriptions,
   bulkDeleteTxWithUndo,
@@ -186,6 +187,11 @@ interface DashMsg {
   id: number;
   period?: string;
 }
+interface AnnualMsg {
+  type: "annualreport";
+  id: number;
+  year?: number;
+}
 interface ImportCsvMsg {
   type: "importcsv";
   id: number;
@@ -249,6 +255,7 @@ type InMsg =
   | CheckDataMsg
   | SetFirstUseMsg
   | DashMsg
+  | AnnualMsg
   | ExportCsvMsg
   | ImportCsvMsg
   | MarkBackupMsg;
@@ -619,6 +626,9 @@ async function onMessage(msg: InMsg): Promise<void> {
     }
     case "dashboard":
       reply(msg.id, { ok: true, ...dashboardData(msg.period ?? "") });
+      break;
+    case "annualreport":
+      reply(msg.id, { ok: true, report: annualReport(msg.year) });
       break;
     case "exportcsv": {
       const warnings: string[] = [];

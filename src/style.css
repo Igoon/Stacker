@@ -1701,3 +1701,79 @@ header .top-right {
   cursor: pointer;
   flex: 0 0 auto;
 }
+
+/* ---------- v2.48.0 Laporan Tahunan & Cetak PDF (Siap SPT) ---------- */
+.annual-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  margin-top: 6px;
+}
+
+.annual-table th,
+.annual-table td {
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+}
+
+.annual-table th:first-child,
+.annual-table td:first-child {
+  text-align: left;
+}
+
+.annual-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #111111 !important;
+    height: auto !important;
+    display: block !important;
+  }
+  .app,
+  .modal:not(#annualModal),
+  .no-print,
+  #toast,
+  #panic,
+  #lock {
+    display: none !important;
+  }
+  #annualModal {
+    position: static !important;
+    background: #ffffff !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+  #annualModal .modal-box {
+    max-width: 100% !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #111111 !important;
+    padding: 0 !important;
+  }
+  #annualPrintArea {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .dash-card {
+    background: #f8fafc !important;
+    border: 1px solid #cbd5e1 !important;
+    color: #111111 !important;
+  }
+  .dash-card .k,
+  .dash-title,
+  .annual-table th {
+    color: #475569 !important;
+  }
+  .annual-table th,
+  .annual-table td {
+    border-bottom: 1px solid #cbd5e1 !important;
+  }
+}

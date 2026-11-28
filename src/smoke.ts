@@ -1402,5 +1402,12 @@ await check("patungan (split bill): sama rata, split bebas, validasi, & 1 langka
   assert.equal(dbmod.debtTotals().piutang, 0, "bersih setelah undo");
 });
 
+await check("laporan tahunan: ringkasan setahun & perbandingan antartahun", async () => {
+  const r = await handleMessage("laporan tahunan 2026");
+  assert(r.text.includes("Laporan Tahunan 2026"), "judul laporan tahunan");
+  assert(r.text.includes("Masa Depan"), "baris Masa Depan tampil");
+  assert(r.text.includes("vs 2025"), "pembanding tahun sebelumnya tampil");
+});
+
 console.log(`\n${pass} ok, ${fail} fail`);
 if (fail > 0) process.exit(1);

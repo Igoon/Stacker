@@ -2300,6 +2300,11 @@ const budgetPeriodeEl = document.getElementById("budgetPeriode") as HTMLSelectEl
 const budgetRolloverEl = document.getElementById("budgetRollover") as HTMLInputElement;
 const budgetMsgEl = document.getElementById("budgetMsg")!;
 const dashModal = document.getElementById("dashModal")!;
+const annualModal = document.getElementById("annualModal")!;
+const annualYearLabel = document.getElementById("annualYearLabel")!;
+const annualPrintArea = document.getElementById("annualPrintArea")!;
+const annualPrevBtn = document.getElementById("annualPrev") as HTMLButtonElement;
+const annualNextBtn = document.getElementById("annualNext") as HTMLButtonElement;
 const dashBodyEl = document.getElementById("dashBody")!;
 const accModal = document.getElementById("accModal")!;
 const accListEl = document.getElementById("accList")!;
@@ -2355,6 +2360,7 @@ const INFO_PANES = [
   searchModal,
   subsModal,
   goalModal,
+  annualModal,
 ];
 // Semantik dialog + tutup dengan Esc.
 for (const m of document.querySelectorAll<HTMLElement>(".modal")) {
@@ -3410,6 +3416,137 @@ Saldo awal & transaksi akan digabung dalam 1 langkah (bisa di-undo).`,
     accListEl.appendChild(item);
   }
 }
+
+let annualYear = new Date().getFullYear();
+
+async function renderAnnualReport(): Promise<void> {
+  const curYear = new Date().getFullYear();
+  annualYearLabel.textContent = String(annualYear);
+  annualNextBtn.disabled = annualYear >= curYear;
+  const r = await call({ type: "annualreport", year: annualYear });
+  const rep = r.report as {
+    year: number;
+    masuk: number;
+    keluar: number;
+    net: number;
+    masaDepan: number;
+    prevYear: number;
+    prevMasuk: number;
+    prevKeluar: number;
+    prevNet: number;
+    masukPct: number | null;
+    keluarPct: number | null;
+    netWorth: number;
+    totalSaldo: number;
+    utang: number;
+    piutang: number;
+    months: { label: string; masuk: number; keluar: number; net: number }[];
+    masukCats: { kategori: string; total: number }[];
+    keluarCats: { kategori: string; total: number }[];
+  } | undefined;
+  annualPrintArea.replaceChildren();
+  if (!rep) return;
+
+  const signed = (n: number) => (n < 0 ? "-" : "+") + fmtRp(Math.abs(n));
+  const pctBadge = (v: number | null) =>
+    v === null ? "" : ` (${v >= 0 ? "+" : ""}${v}% vs ${rep.prevYear})`;
+
+  const card = (k: string, v: string, wide = false): HTMLElement => {
+    const d = document.createElement("div");
+    d.className = "dash-card" + (wide ? " wide" : "");
+    const kk = document.createElement("div");
+    kk.className = "k";
+    kk.textContent = k;
+    const vv = document.createElement("div");
+    vv.className = "v";
+    vv.textContent = v;
+    d.append(kk, vv);
+    return d;
+  };
+
+  const note = document.createElement("p");
+  note.className = "info-note";
+  note.textContent = `Stacker · Ringkasan Keuangan Tahun ${rep.year} (dicetak ${todayStr()}, transfer dikecualikan)`;
+  annualPrintArea.appendChild(note);
+
+  const cards = document.createElement("div");
+  cards.className = "dash-cards";
+  cards.append(
+    card(`Total Pemasukan${pctBadge(rep.masukPct)}`, fmtRp(rep.masuk), true),
+    card(`Total Pengeluaran${pctBadge(rep.keluarPct)}`, fmtRp(rep.keluar), true),
+    card("Arus Bersih (Net)", signed(rep.net)),
+    card("Masa Depan (Tabungan)", fmtRp(rep.masaDepan)),
+    card(`Net ${rep.prevYear} (Pembanding)`, signed(rep.prevNet)),
+    card("Net Worth Saat Ini", signed(rep.netWorth))
+  );
+  annualPrintArea.appendChild(cards);
+
+  const mTitle = document.createElement("div");
+  mTitle.className = "dash-title";
+  mTitle.textContent = `Rekap Bulanan ${rep.year}`;
+  const tbl = document.createElement("table");
+  tbl.className = "annual-table";
+  tbl.innerHTML =
+    "<thead><tr><th>Bulan</th><th>Masuk</th><th>Keluar</th><th>Net</th></tr></thead>";
+  const tbody = document.createElement("tbody");
+  for (const mo of rep.months) {
+    const tr = document.createElement("tr");
+    const c1 = document.createElement("td");
+    c1.textContent = mo.label;
+    const c2 = document.createElement("td");
+    c2.textContent = fmtRp(mo.masuk);
+    const c3 = document.createElement("td");
+    c3.textContent = fmtRp(mo.keluar);
+    const c4 = document.createElement("td");
+    c4.textContent = signed(mo.net);
+    tr.append(c1, c2, c3, c4);
+    tbody.appendChild(tr);
+  }
+  tbl.appendChild(tbody);
+  annualPrintArea.append(mTitle, tbl);
+
+  const addCatList = (title: string, items: { kategori: string; total: number }[]) => {
+    if (!items.length) return;
+    const t = document.createElement("div");
+    t.className = "dash-title";
+    t.textContent = title;
+    const list = document.createElement("div");
+    list.className = "dash-list";
+    for (const c of items) {
+      const row = document.createElement("div");
+      row.className = "dr";
+      const a = document.createElement("span");
+      a.textContent = c.kategori;
+      const b = document.createElement("span");
+      b.textContent = fmtRp(c.total);
+      row.append(a, b);
+      list.appendChild(row);
+    }
+    annualPrintArea.append(t, list);
+  };
+
+  addCatList(`Pemasukan per Kategori (${rep.year})`, rep.masukCats);
+  addCatList(`Pengeluaran per Kategori (${rep.year})`, rep.keluarCats);
+}
+
+document.getElementById("openAnnualBtn")!.onclick = async () => {
+  annualYear = new Date().getFullYear();
+  showInfoPane(annualModal);
+  await renderAnnualReport();
+};
+annualPrevBtn.onclick = () => {
+  annualYear -= 1;
+  void renderAnnualReport();
+};
+annualNextBtn.onclick = () => {
+  if (annualYear >= new Date().getFullYear()) return;
+  annualYear += 1;
+  void renderAnnualReport();
+};
+document.getElementById("annualPrintBtn")!.onclick = () => {
+  window.print();
+};
+document.getElementById("annualBack")!.onclick = () => showInfoPane(dashModal);
 
 document.getElementById("openAcc")!.onclick = async () => {
   showInfoPane(accModal);

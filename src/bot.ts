@@ -99,6 +99,7 @@ import { aiEnabled, aiResetUsage, aiStats, parseGemini } from "./ai";
 import { APP_VERSION } from "./version";
 import { HELP } from "./bot/help";
 import {
+  annualReport,
   budgetCarry,
   budgetEffective,
   budgetOverview,
@@ -114,6 +115,7 @@ import {
   type HealthFactor,
 } from "./bot/analytics";
 export {
+  annualReport,
   budgetOverview,
   computeAlloc,
   computeHealth,
@@ -1182,7 +1184,35 @@ async function handleMessageInner(input: string): Promise<Reply> {
   if (/^(laporan|ringkasan|report)\b/.test(low)) {
     const arg = text.replace(/^\s*(laporan|ringkasan|report)\s*/i, "").trim();
 
-    if (/^banding\b/i.test(arg)) {
+    if (/^tahun(?:an)?\b/i.test(arg)) {
+      const ym = arg.match(/(\d{4})/);
+      const yr = ym ? Number(ym[1]) : new Date().getFullYear();
+      const rep = annualReport(yr);
+      const pctStr = (v: number | null) => (v === null ? "" : ` (${v >= 0 ? "+" : ""}${v}% vs ${rep.prevYear})`);
+      const topOut = rep.keluarCats
+        .slice(0, 6)
+        .map((c) => `  ${c.kategori}: ${rupiah(c.total)}`)
+        .join("\n");
+      const topIn = rep.masukCats
+        .slice(0, 5)
+        .map((c) => `  ${c.kategori}: ${rupiah(c.total)}`)
+        .join("\n");
+      return {
+        text:
+          `Laporan Tahunan ${rep.year} (tanpa transfer)\n\n` +
+          `Masuk      : ${rupiah(rep.masuk)}${pctStr(rep.masukPct)}\n` +
+          `Keluar     : ${rupiah(rep.keluar)}${pctStr(rep.keluarPct)}\n` +
+          `Selisih    : ${rupiahSigned(rep.net)} (vs ${rep.prevYear}: ${rupiahSigned(rep.prevNet)})\n` +
+          `Masa Depan : ${rupiah(rep.masaDepan)}\n` +
+          `Net Worth  : ${rupiahSigned(rep.netWorth)}\n\n` +
+          `Pemasukan per kategori:\n${topIn || "  -"}\n\n` +
+          `Pengeluaran terbesar:\n${topOut || "  -"}\n\n` +
+          `Tip: buka 📊 Ringkasan → Laporan Tahunan / PDF (SPT) untuk cetak/simpan PDF.`,
+        pre: true,
+      };
+    }
+
+        if (/^banding\b/i.test(arg)) {
       const rest = arg.replace(/^banding\s*/i, "").trim();
       const { account, per: perParsed, query } = parseFilter(rest);
       if (query) return { text: "Periode tidak dikenali. Contoh: `laporan banding september`." };

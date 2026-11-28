@@ -376,3 +376,107 @@ export function budgetWarn(t: Tx): string | null {
   return null;
 }
 
+
+export interface AnnualMonthRow {
+  month: number;
+  label: string;
+  masuk: number;
+  keluar: number;
+  net: number;
+}
+
+export interface AnnualReport {
+  year: number;
+  masuk: number;
+  keluar: number;
+  net: number;
+  masaDepan: number;
+  prevYear: number;
+  prevMasuk: number;
+  prevKeluar: number;
+  prevNet: number;
+  masukPct: number | null;
+  keluarPct: number | null;
+  netWorth: number;
+  totalSaldo: number;
+  utang: number;
+  piutang: number;
+  months: AnnualMonthRow[];
+  masukCats: { kategori: string; total: number }[];
+  keluarCats: { kategori: string; total: number }[];
+}
+
+const SHORT_BULAN = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+
+export function annualReport(yearArg?: number): AnnualReport {
+  const year =
+    yearArg && Number.isInteger(yearArg) && yearArg >= 2000 && yearArg <= 2100
+      ? yearArg
+      : new Date().getFullYear();
+  const prevYear = year - 1;
+  const groupMap = buildGroupMap();
+
+  const rows = ringkasRange(`${year}-01-01`, `${year}-12-31`);
+  const masukCats = rows
+    .filter((r) => r.tipe === "masuk")
+    .map((r) => ({ kategori: r.kategori, total: r.total }))
+    .sort((a, b) => b.total - a.total);
+  const keluarCats = rows
+    .filter((r) => r.tipe === "keluar")
+    .map((r) => ({ kategori: r.kategori, total: r.total }))
+    .sort((a, b) => b.total - a.total);
+
+  const masuk = masukCats.reduce((a, b) => a + b.total, 0);
+  const keluar = keluarCats.reduce((a, b) => a + b.total, 0);
+  const masaDepan = keluarCats
+    .filter((c) => catGroup(c.kategori, groupMap) === "savings")
+    .reduce((a, b) => a + b.total, 0);
+
+  const prevRows = ringkasRange(`${prevYear}-01-01`, `${prevYear}-12-31`);
+  const prevMasuk = prevRows.filter((r) => r.tipe === "masuk").reduce((a, b) => a + b.total, 0);
+  const prevKeluar = prevRows.filter((r) => r.tipe === "keluar").reduce((a, b) => a + b.total, 0);
+  const prevNet = prevMasuk - prevKeluar;
+
+  const pctDelta = (cur: number, prev: number): number | null =>
+    prev > 0 ? Math.round(((cur - prev) / prev) * 100) : null;
+
+  const months: AnnualMonthRow[] = [];
+  for (let mo = 1; mo <= 12; mo++) {
+    const p = parsePeriod(`${year}-${String(mo).padStart(2, "0")}`);
+    const mr = p ? ringkasRange(p.from, p.to) : [];
+    const mIn = mr.filter((r) => r.tipe === "masuk").reduce((a, b) => a + b.total, 0);
+    const mOut = mr.filter((r) => r.tipe === "keluar").reduce((a, b) => a + b.total, 0);
+    months.push({
+      month: mo,
+      label: SHORT_BULAN[mo - 1],
+      masuk: mIn,
+      keluar: mOut,
+      net: mIn - mOut,
+    });
+  }
+
+  const { utang, piutang } = debtTotals();
+  const totalSaldo = saldo();
+  const netWorth = totalSaldo + piutang - utang;
+
+  return {
+    year,
+    masuk,
+    keluar,
+    net: masuk - keluar,
+    masaDepan,
+    prevYear,
+    prevMasuk,
+    prevKeluar,
+    prevNet,
+    masukPct: pctDelta(masuk, prevMasuk),
+    keluarPct: pctDelta(keluar, prevKeluar),
+    netWorth,
+    totalSaldo,
+    utang,
+    piutang,
+    months,
+    masukCats,
+    keluarCats,
+  };
+}

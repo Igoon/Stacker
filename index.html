@@ -381,7 +381,25 @@
     </div>
     <div id="dashBody" class="dash-body-scroll"></div>
     <div class="modal-actions">
+      <button id="openAnnualBtn" type="button">Laporan Tahunan / PDF</button>
       <button id="dashBack">Kembali</button>
+    </div>
+  </div>
+</div>
+
+
+<div id="annualModal" class="modal" role="dialog" aria-modal="true" hidden>
+  <div class="modal-box">
+    <h3>Laporan Tahunan (Siap SPT)</h3>
+    <div class="dash-nav no-print">
+      <button id="annualPrev" type="button" aria-label="Tahun sebelumnya">‹</button>
+      <span id="annualYearLabel">2026</span>
+      <button id="annualNext" type="button" aria-label="Tahun berikutnya">›</button>
+    </div>
+    <div id="annualPrintArea" class="dash-body-scroll"></div>
+    <div class="modal-actions no-print">
+      <button id="annualPrintBtn" type="button">Cetak / Simpan PDF</button>
+      <button id="annualBack" type="button">Kembali</button>
     </div>
   </div>
 </div>

@@ -3,6 +3,11 @@
 Semua perubahan penting Stacker (mobile). Format berbasis [SemVer](https://semver.org/);
 versi MAJOR relatif terhadap jalur desktop.
 
+## [2.48.0]
+- **Laporan Tahunan & Perbandingan Antartahun (`src/bot/analytics.ts`, `src/bot.ts`, `src/worker.ts`)**: perintah `laporan tahunan [tahun]` dan modal **Laporan Tahunan (Siap SPT)** di **Ringkasan** menampilkan total pemasukan, pengeluaran, selisih, kelompok Masa Depan, Net Worth, perbandingan persentase vs tahun sebelumnya, rekap 12 bulan, dan rincian per kategori.
+- **Cetak / Simpan PDF Siap SPT (`index.html`, `src/style.css`, `src/main.ts`)**: tombol **Cetak / Simpan PDF** berbasis `@media print` & `window.print()` menghasilkan dokumen bersih siap arsip/SPT di Android, iOS, maupun desktop tanpa menambah library eksternal.
+- **Sinkronisasi `GUIDE.md` & `help`**: melengkapi panduan dengan perintah edit massal (`ubah 24 25 ...`), gabung kategori/akun, `duplikat`, `patungan` (sama rata & split bebas), dan `laporan tahunan`.
+
 ## [2.47.0]
 - **Patungan / Split Bill (`src/bot.ts`, `src/commands.ts`, `src/bot/help.ts`, `index.html`, `src/main.ts`)**: mendukung dua model pembagian sekaligus—**sama rata** (`patungan makan 100rb @bsi dengan budi, andi`) dan **split bebas** (`patungan makan 100rb @bsi budi 35rb, andi 25rb`, sisa otomatis jadi porsi sendiri)—serta modal **Patungan (Split Bill)** di menu **Utang/Piutang**. Seluruh transaksi pengeluaran + piutang teman dicatat atomik dalam 1 langkah `undo`.
 - **Pengingat jatuh tempo saat aplikasi dibuka (`src/worker.ts`)**: menampilkan notifikasi ringkas sekali per sesi untuk tagihan berulang yang jatuh tempo dalam **1–3 hari ke depan** dan target tabungan dengan tempo **≤ 30 hari** (100% andal di PWA & iOS tanpa push server).
